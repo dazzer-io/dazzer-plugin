@@ -1,0 +1,35 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"[Dazzer] Before answering anything your Brain may already know, recall it - answer from what is recorded, not from assumption. As real decisions accumulate in this session, checkpoint your progress so a context reset cannot lose your place.\""
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"[Dazzer] This session restarted from a context reset, so nothing reconnected and you were never re-oriented. Call resume to restore your saved working session before continuing, and before asking the user to repeat anything.\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/capture-sweep.sh\""
+          }
+        ]
+      }
+    ]
+  }
+}

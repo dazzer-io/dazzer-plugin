@@ -1,0 +1,14 @@
+{
+  "name": "dazzer",
+  "owner": {
+    "name": "Dazzer",
+    "url": "https://dazzer.io"
+  },
+  "plugins": [
+    {
+      "name": "dazzer",
+      "source": "./plugins/dazzer",
+      "description": "Connects your AI to your Dazzer Brain, so it checks what you already know before answering and saves what settles."
+    }
+  ]
+}

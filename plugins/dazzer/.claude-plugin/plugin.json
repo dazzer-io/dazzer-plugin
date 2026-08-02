@@ -1,0 +1,14 @@
+{
+  "name": "dazzer",
+  "displayName": "Dazzer",
+  "version": "0.1.0",
+  "description": "Connects your AI to your Dazzer Brain, so it checks what you already know before answering and saves what settles.",
+  "author": {
+    "name": "Dazzer",
+    "url": "https://dazzer.io"
+  },
+  "homepage": "https://dazzer.io",
+  "repository": "https://github.com/dazzer-io/dazzer-plugin",
+  "license": "MIT",
+  "keywords": ["memory", "knowledge", "brain", "mcp"]
+}
