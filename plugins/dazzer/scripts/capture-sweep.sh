@@ -64,8 +64,14 @@ RECEIPTS="$STATE_DIR/receipts.jsonl"
 # Anthropic's tool and OpenAI's both hand us a folder variable; Google's hands us nothing,
 # so being run without one and finding ourselves under its plugins folder is the tell.
 # DAZZER_TOOL overrides, for anywhere those guesses are wrong.
+# ORDER MATTERS HERE. Several tools set the same folder variables as each other for
+# compatibility - Microsoft's sets all three of them - so the only reliable tell is each
+# tool's OWN variable, checked before the shared ones. Reordering these silently
+# mislabels whole tools.
 if [ -n "${DAZZER_TOOL:-}" ]; then
   TOOL="$DAZZER_TOOL"
+elif [ -n "${COPILOT_PLUGIN_ROOT:-}" ]; then
+  TOOL="copilot"
 elif [ -n "${CURSOR_PLUGIN_ROOT:-}" ]; then
   TOOL="cursor"
 elif [ -n "${PLUGIN_ROOT:-}" ]; then
