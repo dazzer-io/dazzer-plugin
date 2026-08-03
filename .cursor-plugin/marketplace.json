@@ -1,0 +1,19 @@
+{
+  "name": "dazzer",
+  "owner": {
+    "name": "Dazzer",
+    "url": "https://dazzer.io"
+  },
+  "plugins": [
+    {
+      "name": "dazzer",
+      "source": "./plugins/dazzer",
+      "description": "Makes your AI check your Dazzer Brain before answering and save what settles. Safe to install alongside an existing connection - it adds no connection of its own."
+    },
+    {
+      "name": "dazzer-connect",
+      "source": "./plugins/dazzer-connect",
+      "description": "The Dazzer Brain connection itself, for people who have not already connected one. Skip this if Dazzer already shows as connected."
+    }
+  ]
+}

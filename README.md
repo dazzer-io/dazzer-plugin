@@ -116,6 +116,19 @@ Two of the three reminders work there. The third — being put back on track aft
 forgets itself — does not, because Antigravity has no such moment at all. Nothing we can add fixes
 that; it is simply absent from the tool, and is called out here rather than left to be discovered.
 
+**Cursor** takes it from this repository too:
+
+```
+cursor-agent plugin marketplace add https://github.com/dazzer-io/dazzer-plugin.git
+```
+
+then install Dazzer from the Customize panel in the sidebar.
+
+One difference you will see rather than read about: Cursor has no way for a plugin to speak
+privately to the AI at the end of a reply. It only accepts a message and submits it as though you
+had typed it. So on Cursor the save prompt is visible in the conversation. Everything still works;
+it just is not silent.
+
 Where nothing can run at the end of a reply — Claude's chat apps and the web app — the bundled
 skill carries the same intent as plain text, and reaching your Brain works exactly the same.
 
