@@ -228,7 +228,7 @@ receipt fired "threshold-reached"
 
 # The tap. The message is one file shared by every tool; only the envelope around it
 # differs, because each tool has its own word for "keep going".
-MESSAGE="$(cat "$HERE/prompts/capture-tap.txt" 2>/dev/null | tr -d '\n')"
+MESSAGE="$(tr -d '\n' < "$HERE/prompts/capture-tap.txt" 2>/dev/null)"
 [ -z "$MESSAGE" ] && exit 0
 printf '{"decision":"%s","reason":"%s"}' "$KEEP_GOING" "$MESSAGE"
 exit 0
