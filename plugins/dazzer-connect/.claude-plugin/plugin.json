@@ -1,7 +1,7 @@
 {
   "name": "dazzer-connect",
   "displayName": "Dazzer Connect",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "The Dazzer Brain connection, for people who have not already connected one. Skip this if Dazzer already shows as connected.",
   "author": {
     "name": "Dazzer",

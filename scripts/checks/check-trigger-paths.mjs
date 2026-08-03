@@ -10,8 +10,15 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { REPO_ROOT, readJson, rel, runGate, walk } from "./lib/gate.mjs";
 
-/** The variable the host sets to this plugin's own folder. */
+/** The variable most tools set to this plugin's own folder. */
 const PLUGIN_ROOT = "${CLAUDE_PLUGIN_ROOT}";
+
+/**
+ * Folders a tool always installs plugins into. Naming one of these is the fallback for a
+ * tool that hands a plugin no variable at all - it is a known location, not somebody's
+ * own machine. Verified by installing there and reading back where the files landed.
+ */
+const INSTALL_DIRS = ["$HOME/.gemini/config/plugins/"];
 
 /** Every command string declared anywhere in a trigger file. */
 function commands(node, out = []) {
@@ -45,15 +52,24 @@ runGate({
         const scriptRef = command.match(/(\$\{?[A-Za-z_][A-Za-z0-9_]*\}?)?[^\s"']*\.sh/);
         if (!scriptRef) continue; // a trigger that just prints text runs no script
 
-        if (!command.includes(PLUGIN_ROOT)) {
+        // Two acceptable forms, and only two. Most tools hand a plugin a variable holding
+        // its own folder. Google's hands it nothing, so the only way its trigger can find
+        // the script is to name the folder that tool always installs into - which is a
+        // known location, not a developer's own machine.
+        const usesPluginRoot = command.includes(PLUGIN_ROOT);
+        const usesKnownInstallDir = INSTALL_DIRS.some((d) => command.includes(d));
+
+        if (!usesPluginRoot && !usesKnownInstallDir) {
           findings.push({
             file: rel(file),
             message:
-              `runs a script without addressing it from ${PLUGIN_ROOT}: ${command.trim()}. ` +
-              "An absolute or relative path only works on the machine it was written on.",
+              `runs a script from a path that only works on the machine it was written on: ${command.trim()}. ` +
+              `Address it from ${PLUGIN_ROOT}, or from a folder the tool always installs into ` +
+              `(${INSTALL_DIRS.join(", ")}).`,
           });
           continue;
         }
+        if (usesKnownInstallDir) continue; // resolved at run time, nothing to check here
 
         const scriptPath = command.match(/\$\{CLAUDE_PLUGIN_ROOT\}(\/[^\s"']+\.sh)/)?.[1];
         if (!scriptPath) continue;

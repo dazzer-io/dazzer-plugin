@@ -104,6 +104,18 @@ codex plugin add dazzer@dazzer
 Codex asks you to approve a plugin's hooks before it will run them. If nothing appears in the run
 history described above, that approval is the first thing to check.
 
+**Google's Antigravity** works too, with one real limitation. It has no store to install from, so
+point it at a copy of this repository instead:
+
+```
+git clone https://github.com/dazzer-io/dazzer-plugin.git
+agy plugin install ./dazzer-plugin/plugins/dazzer
+```
+
+Two of the three reminders work there. The third — being put back on track after a long session
+forgets itself — does not, because Antigravity has no such moment at all. Nothing we can add fixes
+that; it is simply absent from the tool, and is called out here rather than left to be discovered.
+
 Where nothing can run at the end of a reply — Claude's chat apps and the web app — the bundled
 skill carries the same intent as plain text, and reaching your Brain works exactly the same.
 
