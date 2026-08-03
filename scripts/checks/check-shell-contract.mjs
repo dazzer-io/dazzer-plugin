@@ -79,26 +79,39 @@ const RULES = [
   },
   {
     id: "unvalidated-setting",
-    why: "a setting taken from the environment and used without checking its shape",
+    why: "a setting taken from the environment reaching a numeric comparison unchecked",
     check(all, findings, file) {
       const body = all.map((l) => l.text).join("\n");
+      // Functions whose whole job is to return a value of the right shape or a fallback.
+      const VALIDATORS = /\b(whole_number|setting|require_int|validated)\b/;
+      // Only comparisons matter here: that is where a malformed value stops being inert
+      // and starts producing the opposite of the intended behaviour.
+      const NUMERIC_TEST = /-(lt|gt|le|ge|eq|ne)\b/;
+
       const seen = new Set();
       for (const { n, text } of all) {
-        const m = text.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)=.*\$\{(DAZZER_[A-Z0-9_]+)/);
+        const m = text.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)=.*\$\{?(DAZZER_[A-Z0-9_]+)/);
         if (!m) continue;
         const [, holder, envName] = m;
         if (seen.has(envName)) continue;
         seen.add(envName);
-        const validated = new RegExp(`case\\s+"?\\$\\{?${holder}\\b`).test(body);
-        if (!validated) {
+
+        const comparedNumerically = all.some(
+          (l) => NUMERIC_TEST.test(l.text) && new RegExp(`\\$\\{?${holder}\\b`).test(l.text),
+        );
+        if (!comparedNumerically) continue;
+
+        const checkedInPlace = new RegExp(`case\\s+"?\\$\\{?${holder}\\b`).test(body);
+        const checkedByFunction = VALIDATORS.test(text);
+        if (!checkedInPlace && !checkedByFunction) {
           findings.push({
             file,
             line: n,
             id: "unvalidated-setting",
             message:
-              `${envName} is used without checking its shape. A typo in it reaches a numeric ` +
-              "comparison, which fails loudly and falls through to the opposite of the intended " +
-              `behaviour. Check $${holder} and fall back to the packaged default.`,
+              `${envName} reaches a numeric comparison without its shape being checked. A typo ` +
+              "in it makes the comparison fail loudly and fall through to the opposite of the " +
+              `intended behaviour. Check $${holder}, or take it through a validator.`,
           });
         }
       }
@@ -110,12 +123,22 @@ const RULES = [
     check(all, findings, file) {
       const body = all.map((l) => l.text).join("\n");
       const movesIntoPlace = /\bmv\s+(-f\s+)?"/.test(body);
+
+      // Names holding a scratch path - written to freely, because the name they will take
+      // is only claimed by the move at the end.
+      const scratch = new Set(
+        all
+          .map(({ text }) => text.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)=.*(\$\$|\.tmp)/))
+          .filter(Boolean)
+          .map((m) => m[1]),
+      );
+
       for (const { n, text } of all) {
         const redirect = text.match(/>\s*"\$\{?([A-Za-z_][A-Za-z0-9_]*)/);
         if (!redirect) continue;
         if (/^\s*(printf|echo|cat)\b/.test(text) === false) continue;
         const target = redirect[1];
-        const toTemp = /\$\$|\.tmp/.test(text);
+        const toTemp = /\$\$|\.tmp/.test(text) || scratch.has(target);
         if (!toTemp || !movesIntoPlace) {
           findings.push({
             file,

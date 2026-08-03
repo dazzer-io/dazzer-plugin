@@ -62,9 +62,30 @@ In your Brain, served live — `brain.door.entrance`, `brain.capture.protocol`, 
 
 ## Tuning
 
+Set any of these in your environment to override the shipped value. The shipped values live
+in `plugins/dazzer/config/capture.defaults`, which is read as plain data and never run.
+
 | Variable | Default | Effect |
 | --- | --- | --- |
-| `DAZZER_CAPTURE_THRESHOLD` | `80` | Lines of conversation growth required between capture sweeps. Raise it for fewer interruptions, lower it to capture more eagerly. |
+| `DAZZER_CAPTURE_THRESHOLD` | `80` | How much new conversation accumulates before a save is prompted. Raise it for fewer interruptions, lower it to capture more eagerly. |
+| `DAZZER_CAPTURE_STATE_TTL_DAYS` | `30` | How long a finished session's marker is kept before being tidied away. |
+| `DAZZER_CAPTURE_RECEIPTS_MAX_BYTES` | `262144` | How large the record of what this did may grow before the old one is rolled aside. |
+| `DAZZER_CAPTURE_MAX_INPUT_BYTES` | `100000` | A guard against an unreasonably large message, not a tuning dial. There is no reason to change it. |
+
+A bad value never takes effect and never causes an error: anything that is not a whole
+number falls back to the shipped default, silently and on purpose.
+
+## Checking it is actually working
+
+The plugin writes one line every time it runs, recording when, what it decided and why —
+never any of your conversation. To see it:
+
+```
+cat "${CLAUDE_PLUGIN_DATA:-$HOME/.dazzer}/capture/receipts.jsonl" | tail
+```
+
+An empty file, or no file at all, means the plugin has never run — which is worth knowing,
+because that failure is otherwise completely silent.
 
 ## Supported clients
 

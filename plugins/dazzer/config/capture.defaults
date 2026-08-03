@@ -1,0 +1,22 @@
+# Tuning for the end-of-reply backstop. Plain name=value, one per line.
+#
+# This file is READ, never run. It is data, so nothing here can execute on your machine.
+# Setting any of these in your environment overrides the value here.
+#
+# Every name below is also in the README's tuning table, and a check keeps the two lists
+# identical - a setting that gets added without being documented fails the build.
+
+# How much new conversation has to accumulate before a save is prompted, counted in
+# entries. Raise it for fewer interruptions, lower it to capture more eagerly.
+DAZZER_CAPTURE_THRESHOLD=80
+
+# The most of the incoming message we will read at once. A guard against a pathological
+# payload, not a tuning dial - there is no reason to change it.
+DAZZER_CAPTURE_MAX_INPUT_BYTES=100000
+
+# How long a finished session's marker is kept before it is tidied away. These are a few
+# bytes each, but one is created per session forever, so something has to remove them.
+DAZZER_CAPTURE_STATE_TTL_DAYS=30
+
+# How large the record of what this did may grow before the old one is rolled aside.
+DAZZER_CAPTURE_RECEIPTS_MAX_BYTES=262144
