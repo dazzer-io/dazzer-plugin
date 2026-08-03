@@ -129,6 +129,15 @@ privately to the AI at the end of a reply. It only accepts a message and submits
 had typed it. So on Cursor the save prompt is visible in the conversation. Everything still works;
 it just is not silent.
 
+**GitHub Copilot** takes it from this repository as well:
+
+```
+copilot plugin marketplace add dazzer-io/dazzer-plugin
+copilot plugin install dazzer@dazzer
+```
+
+All three reminders work there, quietly, the same way they do in Claude's.
+
 Where nothing can run at the end of a reply — Claude's chat apps and the web app — the bundled
 skill carries the same intent as plain text, and reaching your Brain works exactly the same.
 
