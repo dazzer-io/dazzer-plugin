@@ -66,6 +66,8 @@ RECEIPTS="$STATE_DIR/receipts.jsonl"
 # DAZZER_TOOL overrides, for anywhere those guesses are wrong.
 if [ -n "${DAZZER_TOOL:-}" ]; then
   TOOL="$DAZZER_TOOL"
+elif [ -n "${CURSOR_PLUGIN_ROOT:-}" ]; then
+  TOOL="cursor"
 elif [ -n "${PLUGIN_ROOT:-}" ]; then
   TOOL="codex"
 elif [ -n "${CLAUDE_PLUGIN_ROOT:-}" ]; then
@@ -76,14 +78,6 @@ else
     *) TOOL="claude-code" ;;
   esac
 fi
-
-# The word each tool uses to mean "do not stop yet, act on this first". Anthropic's and
-# OpenAI's say "block"; Google's says "continue" and treats anything else as permission to
-# stop - so sending the wrong one is not an error, it is silence.
-case "$TOOL" in
-  antigravity) KEEP_GOING="continue" ;;
-  *) KEEP_GOING="block" ;;
-esac
 VERSION="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$HERE/.claude-plugin/plugin.json" 2>/dev/null | head -1)"
 
 # --- reading the message -------------------------------------------------------
@@ -227,8 +221,20 @@ find "$STATE_DIR" -maxdepth 1 -name '*.last' -mtime "+$STATE_TTL_DAYS" -exec rm 
 receipt fired "threshold-reached"
 
 # The tap. The message is one file shared by every tool; only the envelope around it
-# differs, because each tool has its own word for "keep going".
+# differs, and each tool's envelope is genuinely its own:
+#
+#   Anthropic's and OpenAI's  say "block"    to mean "act on this before you stop"
+#   Google's                  says "continue" for the same thing, and reads any other
+#                             word as permission to stop - so the wrong one is silence
+#   Cursor                    has no such word at all. It takes a message and submits it
+#                             as the next thing the person said, which is why theirs is a
+#                             different field rather than a different value.
 MESSAGE="$(tr -d '\n' < "$HERE/prompts/capture-tap.txt" 2>/dev/null)"
 [ -z "$MESSAGE" ] && exit 0
-printf '{"decision":"%s","reason":"%s"}' "$KEEP_GOING" "$MESSAGE"
+
+case "$TOOL" in
+  cursor) printf '{"followup_message":"%s"}' "$MESSAGE" ;;
+  antigravity) printf '{"decision":"continue","reason":"%s"}' "$MESSAGE" ;;
+  *) printf '{"decision":"block","reason":"%s"}' "$MESSAGE" ;;
+esac
 exit 0

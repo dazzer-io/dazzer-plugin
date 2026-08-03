@@ -10,8 +10,13 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { REPO_ROOT, readJson, rel, runGate, walk } from "./lib/gate.mjs";
 
-/** The variable most tools set to this plugin's own folder. */
-const PLUGIN_ROOT = "${CLAUDE_PLUGIN_ROOT}";
+/**
+ * The variables tools set to this plugin's own folder. Named one by one on purpose: any
+ * variable would pass a wildcard, including a made-up one that is never set, and a trigger
+ * pointing at an unset variable fails silently on somebody else's machine.
+ */
+const PLUGIN_ROOT_VARS = ["${CLAUDE_PLUGIN_ROOT}", "${CURSOR_PLUGIN_ROOT}"];
+const PLUGIN_ROOT = PLUGIN_ROOT_VARS[0];
 
 /**
  * Folders a tool always installs plugins into. Naming one of these is the fallback for a
@@ -35,7 +40,7 @@ function commands(node, out = []) {
 runGate({
   id: "trigger-paths",
   purpose: "Every trigger runs a script that is really there.",
-  rule: `a trigger that runs a script must address it from ${PLUGIN_ROOT} and the script must exist`,
+  rule: "a trigger that runs a script must address it from a folder variable its tool sets, and the script must exist",
   assert(findings) {
     const triggerFiles = walk(join(REPO_ROOT, "plugins")).filter((f) => /(^|\/)hooks\.json$/.test(f));
 
@@ -56,7 +61,7 @@ runGate({
         // its own folder. Google's hands it nothing, so the only way its trigger can find
         // the script is to name the folder that tool always installs into - which is a
         // known location, not a developer's own machine.
-        const usesPluginRoot = command.includes(PLUGIN_ROOT);
+        const usesPluginRoot = PLUGIN_ROOT_VARS.some((v) => command.includes(v));
         const usesKnownInstallDir = INSTALL_DIRS.some((d) => command.includes(d));
 
         if (!usesPluginRoot && !usesKnownInstallDir) {
@@ -64,7 +69,8 @@ runGate({
             file: rel(file),
             message:
               `runs a script from a path that only works on the machine it was written on: ${command.trim()}. ` +
-              `Address it from ${PLUGIN_ROOT}, or from a folder the tool always installs into ` +
+              `Address it from one of ${PLUGIN_ROOT_VARS.join(" / ")}, or from a folder the tool ` +
+            `always installs into ` +
               `(${INSTALL_DIRS.join(", ")}).`,
           });
           continue;
