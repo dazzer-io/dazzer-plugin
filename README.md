@@ -71,6 +71,7 @@ in `plugins/dazzer/config/capture.defaults`, which is read as plain data and nev
 | `DAZZER_CAPTURE_STATE_TTL_DAYS` | `30` | How long a finished session's marker is kept before being tidied away. |
 | `DAZZER_CAPTURE_RECEIPTS_MAX_BYTES` | `262144` | How large the record of what this did may grow before the old one is rolled aside. |
 | `DAZZER_CAPTURE_MAX_INPUT_BYTES` | `100000` | A guard against an unreasonably large message, not a tuning dial. There is no reason to change it. |
+| `DAZZER_TOOL` | works itself out | Which tool this is running inside, recorded in the run history. Only set it somewhere the automatic answer is wrong. |
 
 A bad value never takes effect and never causes an error: anything that is not a whole
 number falls back to the shipped default, silently and on purpose.
@@ -87,11 +88,24 @@ cat "${CLAUDE_PLUGIN_DATA:-$HOME/.dazzer}/capture/receipts.jsonl" | tail
 An empty file, or no file at all, means the plugin has never run — which is worth knowing,
 because that failure is otherwise completely silent.
 
-## Supported clients
+## Supported tools
 
-The reminders work anywhere that runs Claude Code plugins. In clients where hooks do not run —
-Claude Desktop and the web app — the bundled skill carries the same intent as plain text, and the
-connection itself works exactly the same.
+The same plugin installs in **Claude Code** and in **OpenAI's Codex** — the same files, no separate
+version. Codex reads this repository's layout as-is, and hands the plugin the same information at
+the same moments, which is why one copy serves both.
+
+Installing on Codex:
+
+```
+codex plugin marketplace add dazzer-io/dazzer-plugin
+codex plugin add dazzer@dazzer
+```
+
+Codex asks you to approve a plugin's hooks before it will run them. If nothing appears in the run
+history described above, that approval is the first thing to check.
+
+Where nothing can run at the end of a reply — Claude's chat apps and the web app — the bundled
+skill carries the same intent as plain text, and reaching your Brain works exactly the same.
 
 ## Uninstall
 

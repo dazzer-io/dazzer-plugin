@@ -20,3 +20,8 @@ DAZZER_CAPTURE_STATE_TTL_DAYS=30
 
 # How large the record of what this did may grow before the old one is rolled aside.
 DAZZER_CAPTURE_RECEIPTS_MAX_BYTES=262144
+
+# Which tool this is running inside, recorded in the run history so the two can be told
+# apart. Left empty on purpose: it works itself out, and is only set by hand somewhere the
+# guess is wrong.
+DAZZER_TOOL=
