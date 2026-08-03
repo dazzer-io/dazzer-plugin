@@ -57,17 +57,33 @@ RECEIPTS_MAX_BYTES="$(setting "${DAZZER_CAPTURE_RECEIPTS_MAX_BYTES:-}" "$(defaul
 STATE_DIR="${CLAUDE_PLUGIN_DATA:-$HOME/.dazzer}/capture"
 RECEIPTS="$STATE_DIR/receipts.jsonl"
 
-# Which tool are we running inside? The same plugin installs in more than one, and the
-# record of what happened is worthless if it names the wrong one. OpenAI's tool sets its
-# own name for the plugin folder as well as Anthropic's; Anthropic's sets only its own.
-# DAZZER_TOOL overrides, for anywhere that guess is wrong.
+# Which tool are we running inside? The same plugin installs in more than one, and two
+# things depend on the answer: the record of what happened is worthless if it names the
+# wrong tool, and - more importantly - the word for "keep going" is not the same everywhere.
+#
+# Anthropic's tool and OpenAI's both hand us a folder variable; Google's hands us nothing,
+# so being run without one and finding ourselves under its plugins folder is the tell.
+# DAZZER_TOOL overrides, for anywhere those guesses are wrong.
 if [ -n "${DAZZER_TOOL:-}" ]; then
   TOOL="$DAZZER_TOOL"
 elif [ -n "${PLUGIN_ROOT:-}" ]; then
   TOOL="codex"
-else
+elif [ -n "${CLAUDE_PLUGIN_ROOT:-}" ]; then
   TOOL="claude-code"
+else
+  case "$HERE" in
+    *"/.gemini/"*) TOOL="antigravity" ;;
+    *) TOOL="claude-code" ;;
+  esac
 fi
+
+# The word each tool uses to mean "do not stop yet, act on this first". Anthropic's and
+# OpenAI's say "block"; Google's says "continue" and treats anything else as permission to
+# stop - so sending the wrong one is not an error, it is silence.
+case "$TOOL" in
+  antigravity) KEEP_GOING="continue" ;;
+  *) KEEP_GOING="block" ;;
+esac
 VERSION="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$HERE/.claude-plugin/plugin.json" 2>/dev/null | head -1)"
 
 # --- reading the message -------------------------------------------------------
@@ -210,6 +226,9 @@ find "$STATE_DIR" -maxdepth 1 -name '*.last' -mtime "+$STATE_TTL_DAYS" -exec rm 
 
 receipt fired "threshold-reached"
 
-# The tap. Deliberately points at the rules rather than restating them.
-printf '%s' "$(cat "$HERE/prompts/capture-tap.txt" 2>/dev/null)"
+# The tap. The message is one file shared by every tool; only the envelope around it
+# differs, because each tool has its own word for "keep going".
+MESSAGE="$(tr -d '\n' < "$HERE/prompts/capture-tap.txt" 2>/dev/null)"
+[ -z "$MESSAGE" ] && exit 0
+printf '{"decision":"%s","reason":"%s"}' "$KEEP_GOING" "$MESSAGE"
 exit 0
