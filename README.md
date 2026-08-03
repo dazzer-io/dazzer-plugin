@@ -74,6 +74,17 @@ connection itself works exactly the same.
 
 ## Uninstall
 
+Remove the part that changes behaviour:
+
 ```
 /plugin uninstall dazzer@dazzer
 ```
+
+If you also installed the connection, and you want that gone too:
+
+```
+/plugin uninstall dazzer-connect@dazzer
+```
+
+Leave that second one in place if Dazzer is still how you reach your Brain — removing it
+takes the connection with it.

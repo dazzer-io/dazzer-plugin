@@ -1,0 +1,66 @@
+# @purpose: Runs every check on every proposed change, so a defect in the one script that
+# executes on other people's machines cannot reach the branch people install from.
+#
+# No dependencies are installed: the checks are plain Node scripts and a shell suite, so
+# there is nothing to resolve, nothing to cache and no supply chain to trust.
+
+name: Gates
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: gates-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  gates:
+    name: Gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+
+      # The whole suite, including the defect ledger. Green means "no regressions",
+      # not "nothing is wrong" - anything outstanding is printed by name.
+      - name: All gates, under the system shell
+        run: node scripts/baseline.mjs
+
+      # The script ships as plain POSIX shell and runs under whatever the person's system
+      # shell happens to be. On a Mac that is bash in posix mode; here it is dash. They
+      # disagree on the numeric comparison one of the defects lives on, so proving it under
+      # one says nothing about the other. Same ledger, so this is a real gate, not a smoke test.
+      - name: All gates, under bash
+        if: ${{ !cancelled() }}
+        env:
+          SHELL_UNDER_TEST: bash
+        run: node scripts/baseline.mjs
+
+      # Asserted, not assumed: the previous suite named its shell internally, so two runs
+      # would have reported two passes from one interpreter.
+      - name: The two runs really did use different shells
+        if: ${{ !cancelled() }}
+        run: |
+          set -eu
+          system=$(sh -c 'echo "${BASH_VERSION:-not-bash}"')
+          explicit=$(bash -c 'echo "${BASH_VERSION:-not-bash}"')
+          echo "system shell reports: $system"
+          echo "bash reports:         $explicit"
+          if [ "$system" = "$explicit" ]; then
+            echo "Both runs used the same interpreter, so the two-shell check proved nothing." >&2
+            exit 1
+          fi
+
+      - name: Shell lint
+        if: ${{ !cancelled() }}
+        run: shellcheck -s sh plugins/dazzer/scripts/*.sh

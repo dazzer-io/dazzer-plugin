@@ -1,0 +1,54 @@
+# Known defects - the ledger.
+#
+# Every line names something that is broken RIGHT NOW and has a test proving it. The run
+# stays green while these fail, so the checks could land without waiting for the fixes.
+#
+# It is SHRINK-ONLY, in both directions:
+#   - a failure that is not listed here fails the run   (a regression)
+#   - a line here that starts PASSING also fails the run (delete it to bank the fix)
+#
+# That second rule is the point. It means a fix has to be demonstrated to the runner
+# rather than announced in a commit message.
+#
+# Format: <id> <one line saying what is wrong and who it hurts>
+
+# --- the anti-loop guard scans the message as text instead of reading the flag ---
+# Anyone whose folder or prompt contains the word "true" AFTER the flag in the message
+# loses saving completely, for the whole session, with no error. Which side of the flag
+# the word lands on is not something anyone promised, so this is luck, not design.
+capture-sweep::reentry-word-after-flag                saving dies when a folder name contains "true"
+capture-sweep::reentry-word-in-prompt-after-flag      saving dies when the person types the word "true"
+shell-contract::payload-glob                          the guard matches the whole message as text
+
+# --- the mark only ever moves up, so a context reset strands it ---
+# The one moment this backstop exists for is the moment it stops working. After a reset
+# the conversation is shorter than the mark, so it stays silent for the rest of the
+# session no matter how much real work follows.
+capture-sweep::shrink:fires-again-once-work-resumes   saving never resumes after a context reset
+
+# --- a mistyped setting does the opposite of failing safe ---
+# The file promises it can only ever fail to prompt. In fact a typo makes it prompt on
+# EVERY reply and print a shell error each time, on the person's own quota.
+capture-sweep::setting:nonsense-falls-back-quietly    a typo makes it interrupt every single reply
+capture-sweep::setting:nonsense-still-fires-on-real-work  a typo also prints an error every reply
+shell-contract::unvalidated-setting                   the setting is used without checking its shape
+
+# --- a name out of the message becomes a filename, unchecked ---
+# A malformed message can create or replace a file outside the folder this plugin owns,
+# under the person's own permissions.
+capture-sweep::escape:parent-directory                a bad session name writes outside our folder
+shell-contract::unfenced-path                         a value from the message is used as a path unchecked
+
+# --- the message is read by pattern, so the LAST match wins, not the real one ---
+# A nested field quietly becomes the session, and the next reply measures the wrong history.
+capture-sweep::reads-the-outer-session-not-a-nested-one  a nested field is mistaken for the session
+
+# --- the mark is written in place, and a failed write is neither safe nor quiet ---
+# Interrupted, it leaves an empty file that reads back as nothing and causes a second
+# prompt. Failed outright, the shell prints an error the script cannot suppress, and it
+# prompts anyway despite having no way to record that it did.
+capture-sweep::cannot-record                          a failed write both shouts and prompts anyway
+shell-contract::non-atomic-write                      the mark is written in place, not moved into place
+
+# --- tuning values are baked into the code ---
+shell-contract::bare-number                           the cadence is a number in the code, not a named setting
