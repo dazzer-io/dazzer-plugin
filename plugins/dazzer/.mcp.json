@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "dazzer": {
+      "type": "http",
+      "url": "https://graph.dazzer.io/mcp",
+      "headers": {
+        "X-Dazzer-Distribution": "plugin",
+        "X-Dazzer-Plugin-Version": "0.2.1"
+      }
+    }
+  }
+}
