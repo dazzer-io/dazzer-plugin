@@ -1,7 +1,7 @@
 {
   "name": "dazzer",
   "displayName": "Dazzer",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Makes your AI check your Dazzer Brain before answering and save what settles. Adds no connection of its own, so it is safe to install alongside one you already have.",
   "author": {
     "name": "Dazzer",

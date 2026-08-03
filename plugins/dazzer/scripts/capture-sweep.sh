@@ -56,6 +56,18 @@ RECEIPTS_MAX_BYTES="$(setting "${DAZZER_CAPTURE_RECEIPTS_MAX_BYTES:-}" "$(defaul
 
 STATE_DIR="${CLAUDE_PLUGIN_DATA:-$HOME/.dazzer}/capture"
 RECEIPTS="$STATE_DIR/receipts.jsonl"
+
+# Which tool are we running inside? The same plugin installs in more than one, and the
+# record of what happened is worthless if it names the wrong one. OpenAI's tool sets its
+# own name for the plugin folder as well as Anthropic's; Anthropic's sets only its own.
+# DAZZER_TOOL overrides, for anywhere that guess is wrong.
+if [ -n "${DAZZER_TOOL:-}" ]; then
+  TOOL="$DAZZER_TOOL"
+elif [ -n "${PLUGIN_ROOT:-}" ]; then
+  TOOL="codex"
+else
+  TOOL="claude-code"
+fi
 VERSION="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$HERE/.claude-plugin/plugin.json" 2>/dev/null | head -1)"
 
 # --- reading the message -------------------------------------------------------
@@ -129,8 +141,8 @@ receipt() { # status, reason
     size="$(whole_number "$size" 0)"
     [ "$size" -gt "$RECEIPTS_MAX_BYTES" ] && mv -f "$RECEIPTS" "$RECEIPTS.1" 2>/dev/null
   fi
-  printf '{"at":"%s","mechanism":"capture","tool":"claude-code","version":"%s","status":"%s","reason":"%s"}\n' \
-    "$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)" "$VERSION" "$1" "$2" >> "$RECEIPTS" 2>/dev/null
+  printf '{"at":"%s","mechanism":"capture","tool":"%s","version":"%s","status":"%s","reason":"%s"}\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)" "$TOOL" "$VERSION" "$1" "$2" >> "$RECEIPTS" 2>/dev/null
   return 0
 }
 
