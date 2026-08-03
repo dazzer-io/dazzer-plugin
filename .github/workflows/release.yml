@@ -1,0 +1,60 @@
+# @purpose: Marks every released version with a retrievable tag, so there is always a
+# known-good point to go back to. Before this, "roll back" meant hunting for a commit id,
+# and there was nothing named to return to at all.
+#
+# It marks what shipped; it does not publish anything. People install from the default
+# branch, so a bad release is undone by putting the branch back to the previous tag.
+
+name: Release tag
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: release-tag
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  tag:
+    name: Tag the released version
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write # only to create the tag
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+
+      # The gates already prove every declared version agrees, so reading one is enough.
+      - name: Read the shipped version
+        id: version
+        run: |
+          set -eu
+          v=$(node -e 'process.stdout.write(require("./plugins/dazzer/.claude-plugin/plugin.json").version)')
+          echo "value=$v" >> "$GITHUB_OUTPUT"
+          echo "shipped version is $v"
+
+      - name: Tag it, if it is not already tagged
+        env:
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          set -eu
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "v$VERSION already exists - nothing to do."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "v$VERSION" -m "v$VERSION"
+          git push origin "v$VERSION"
+          echo "tagged v$VERSION"
