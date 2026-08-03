@@ -8,53 +8,196 @@
 # That is why this file is near-static: change the rules in the Brain, not here.
 #
 # TWO GUARDS, both mechanical, neither a judgment about knowledge:
-#   1. Never fire inside its own continuation (stop_hook_active), or it loops forever.
-#   2. Never fire twice for the same work (a per-session watermark on transcript growth).
+#   1. Never fire inside its own continuation, or it loops forever.
+#   2. Never fire twice for the same work (a per-session mark on transcript growth).
 # Without both, every user gets duplicate writes and doubled cost on their own machine.
 #
-# FAIL-OPEN BY CONSTRUCTION: any missing field, parse failure or unreadable transcript exits 0
-# with no output. A bug here can only fail to prompt a sweep. It can never trap a session.
+# FAIL-OPEN BY CONSTRUCTION, AND THIS TIME IT IS TRUE. The decision starts at "stay quiet"
+# and only a comparison that actually succeeded can turn it on. The previous version made
+# the tap the fall-through branch, so a mistyped setting produced the exact opposite of the
+# promise: it fired on every single reply and printed a shell error each time.
 #
-# Tune cadence with DAZZER_CAPTURE_THRESHOLD (transcript lines of growth between sweeps).
+# EVERYTHING FROM THE HOST IS UNTRUSTED INPUT. Fields are read by name and by value, never
+# by scanning the message for a word - a folder or a prompt containing "true" used to
+# silence saving for a whole session. Anything that becomes a filename is flattened first,
+# because a session name containing "../" used to write outside the folder we own.
+#
+# Tuning lives in config/capture.defaults, documented in the README. Environment wins.
 set +eu
 
-THRESHOLD="${DAZZER_CAPTURE_THRESHOLD:-80}"
-STATE_DIR="${CLAUDE_PLUGIN_DATA:-$HOME/.dazzer}/capture"
+# --- settings ----------------------------------------------------------------
 
-INPUT="$(cat 2>/dev/null | head -c 100000)"
-[ -z "$INPUT" ] && exit 0
+HERE="${CLAUDE_PLUGIN_ROOT:-$(dirname "$0")/..}"
+DEFAULTS="$HERE/config/capture.defaults"
 
-# Guard 1: already inside a sweep continuation - let the session stop.
-case "$INPUT" in
-  *'"stop_hook_active"'*true*) exit 0 ;;
-esac
+# Read a packaged default. The file is parsed, never executed - it is data, not code.
+default_for() { sed -n "s/^$1=//p" "$DEFAULTS" 2>/dev/null | head -1; }
 
-read_field() {
-  printf '%s' "$INPUT" | sed -n "s/.*\"$1\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" | head -1
+# A whole number, or the fallback. This is what makes the fail-open promise true: a
+# malformed value can never reach a numeric comparison.
+whole_number() {
+  case "$1" in
+    '' | *[!0-9]*) printf '%s' "$2" ;;
+    *) printf '%s' "$1" ;;
+  esac
 }
 
-SID="$(read_field session_id)"
-TRANSCRIPT="$(read_field transcript_path)"
-[ -z "$SID" ] && exit 0
-[ -f "$TRANSCRIPT" ] || exit 0
+# Environment first, then the packaged default, then a last resort in case the packaged
+# file is missing or unreadable on this machine. Read explicitly rather than by name, so
+# every setting is greppable and nothing is resolved at run time.
+setting() { # supplied, packaged, last-resort
+  whole_number "$1" "$(whole_number "$2" "$3")"
+}
 
-CURRENT="$(wc -l < "$TRANSCRIPT" 2>/dev/null | tr -d ' ')"
-case "$CURRENT" in ''|*[!0-9]*) exit 0 ;; esac
+THRESHOLD="$(setting "${DAZZER_CAPTURE_THRESHOLD:-}" "$(default_for DAZZER_CAPTURE_THRESHOLD)" 80)"
+MAX_INPUT_BYTES="$(setting "${DAZZER_CAPTURE_MAX_INPUT_BYTES:-}" "$(default_for DAZZER_CAPTURE_MAX_INPUT_BYTES)" 100000)"
+STATE_TTL_DAYS="$(setting "${DAZZER_CAPTURE_STATE_TTL_DAYS:-}" "$(default_for DAZZER_CAPTURE_STATE_TTL_DAYS)" 30)"
+RECEIPTS_MAX_BYTES="$(setting "${DAZZER_CAPTURE_RECEIPTS_MAX_BYTES:-}" "$(default_for DAZZER_CAPTURE_RECEIPTS_MAX_BYTES)" 262144)"
+
+STATE_DIR="${CLAUDE_PLUGIN_DATA:-$HOME/.dazzer}/capture"
+RECEIPTS="$STATE_DIR/receipts.jsonl"
+VERSION="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$HERE/.claude-plugin/plugin.json" 2>/dev/null | head -1)"
+
+# --- reading the message -------------------------------------------------------
+#
+# By name and by value. awk is used rather than a pattern over the whole message because a
+# pattern takes the LAST match, so a nested field quietly became the session id.
+
+INPUT="$(cat 2>/dev/null | head -c "$MAX_INPUT_BYTES")"
+[ -z "$INPUT" ] && exit 0
+
+# The first value for this key, honouring backslash escapes.
+read_string() {
+  printf '%s' "$INPUT" | awk -v key="\"$1\"" '
+    {
+      i = index($0, key)
+      if (i == 0) next
+      rest = substr($0, i + length(key))
+      sub(/^[ \t]*:[ \t]*/, "", rest)
+      if (substr(rest, 1, 1) != "\"") next
+      rest = substr(rest, 2)
+      out = ""
+      n = length(rest)
+      for (p = 1; p <= n; p++) {
+        c = substr(rest, p, 1)
+        if (c == "\\") { p++; out = out substr(rest, p, 1); continue }
+        if (c == "\"") { print out; exit }
+        out = out c
+      }
+    }' 2>/dev/null
+}
+
+# The flag's own value - never a search for the word anywhere in the message.
+read_flag() {
+  printf '%s' "$INPUT" | awk -v key="\"$1\"" '
+    {
+      i = index($0, key)
+      if (i == 0) next
+      rest = substr($0, i + length(key))
+      sub(/^[ \t]*:[ \t]*/, "", rest)
+      if (rest ~ /^true/) { print "true"; exit }
+      if (rest ~ /^false/) { print "false"; exit }
+    }' 2>/dev/null
+}
+
+# --- keeping writes where they belong -----------------------------------------
+
+# Flattens anything that came from the message into a plain filename. A separator or a
+# parent-directory step cannot survive this, so the write cannot leave our folder.
+fence_name() {
+  printf '%s' "$1" | tr -c 'A-Za-z0-9._-' '_' | cut -c1-64
+}
+
+# A transcript we are willing to read: an existing regular file, named absolutely.
+fence_path() {
+  case "$1" in
+    /*) [ -f "$1" ] && printf '%s' "$1" ;;
+    *) : ;;
+  esac
+}
+
+# --- proof that this ran -------------------------------------------------------
+#
+# Content-free by construction: timing, outcome and version only, never conversation.
+# A version of this that was wired up but never actually invoked sat silently dead for two
+# weeks on a real machine, and nothing reported it. A line here is the only way an install
+# that never fires can say so.
+receipt() { # status, reason
+  [ -d "$STATE_DIR" ] || return 0
+  if [ -f "$RECEIPTS" ]; then
+    size="$(wc -c < "$RECEIPTS" 2>/dev/null | tr -d ' ')"
+    size="$(whole_number "$size" 0)"
+    [ "$size" -gt "$RECEIPTS_MAX_BYTES" ] && mv -f "$RECEIPTS" "$RECEIPTS.1" 2>/dev/null
+  fi
+  printf '{"at":"%s","mechanism":"capture","tool":"claude-code","version":"%s","status":"%s","reason":"%s"}\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)" "$VERSION" "$1" "$2" >> "$RECEIPTS" 2>/dev/null
+  return 0
+}
+
+# --- guard 1: never fire inside our own continuation --------------------------
+
+[ "$(read_flag stop_hook_active)" = "true" ] && exit 0
+
+SESSION="$(read_string session_id)"
+[ -z "$SESSION" ] && exit 0
+
+TRANSCRIPT="$(fence_path "$(read_string transcript_path)")"
+[ -z "$TRANSCRIPT" ] && exit 0
+
+CURRENT="$(whole_number "$(wc -l < "$TRANSCRIPT" 2>/dev/null | tr -d ' ')" '')"
+[ -z "$CURRENT" ] && exit 0
 
 mkdir -p "$STATE_DIR" 2>/dev/null || exit 0
-MARK="$STATE_DIR/$SID.last"
+MARK="$STATE_DIR/$(fence_name "$SESSION").last"
+
 LAST=0
 if [ -f "$MARK" ]; then
-  LAST="$(tr -cd '0-9' < "$MARK" 2>/dev/null)"
-  [ -z "$LAST" ] && LAST=0
+  LAST="$(whole_number "$(tr -cd '0-9' < "$MARK" 2>/dev/null)" 0)"
 fi
 
-# Guard 2: not enough new material since the last sweep - stay silent.
-[ "$((CURRENT - LAST))" -lt "$THRESHOLD" ] && exit 0
+# A conversation that got SHORTER is a context reset: the same session, a fresh history.
+# Carrying the old mark forward stranded it above the new length and went quiet for the
+# rest of the session - at the exact moment this backstop exists to serve.
+[ "$CURRENT" -lt "$LAST" ] && LAST=0
 
-# Advance the watermark BEFORE prompting, so the post-sweep Stop sees no growth and cannot re-fire.
-printf '%s' "$CURRENT" > "$MARK" 2>/dev/null
+# --- guard 2: only fire when enough new work has accumulated -------------------
+#
+# The decision starts closed. Nothing below can fall through into a tap.
+
+FIRE=0
+[ "$((CURRENT - LAST))" -ge "$THRESHOLD" ] && FIRE=1
+
+if [ "$FIRE" -eq 0 ]; then
+  receipt quiet "below-threshold"
+  exit 0
+fi
+
+# Record BEFORE prompting, so the reply this prompt produces cannot re-fire. If we cannot
+# record, stay quiet: prompting without a record means prompting again on every reply.
+# The check comes first because a failing redirect is the shell's own, and no redirection
+# on our part can silence it.
+TMP="$MARK.$$"
+if ! ( : > "$TMP" ) 2>/dev/null; then
+  receipt quiet "cannot-record"
+  exit 0
+fi
+printf '%s' "$CURRENT" > "$TMP" 2>/dev/null
+mv -f "$TMP" "$MARK" 2>/dev/null
+
+# Prove the record actually landed before prompting. A move can "succeed" without doing
+# what we meant - moving a file at a name already taken by a folder puts it INSIDE the
+# folder - so a zero status is not evidence. Read it back or stay quiet.
+if [ ! -f "$MARK" ] || [ "$(cat "$MARK" 2>/dev/null)" != "$CURRENT" ]; then
+  rm -f "$TMP" 2>/dev/null
+  receipt quiet "cannot-record"
+  exit 0
+fi
+
+# Old marks from sessions long finished. Ours only, never a recursive delete.
+find "$STATE_DIR" -maxdepth 1 -name '*.last' -mtime "+$STATE_TTL_DAYS" -exec rm -f {} + 2>/dev/null
+
+receipt fired "threshold-reached"
 
 # The tap. Deliberately points at the rules rather than restating them.
-printf '%s' '{"decision":"block","reason":"Dazzer capture checkpoint. Silently review this conversation since your last capture and apply the Brain rule for what is worth saving: record ONLY what actually SETTLED - a decision, a fact, a correction, a preference. If something was merely floated or explored, or you are not certain it settled, SKIP it. For each item that qualifies, remember it in plain words with a source quote from the conversation, and pass replaces when it updates an earlier answer instead of duplicating it. If a save comes back asking you a question, answer it by calling remember again with the blanks filled. If the Brain served you well and you relied on a specific record, confirm it. If nothing settled, do nothing and say nothing. Never save speculation or thinking out loud, and do not narrate this checkpoint to the user. Then stop."}'
+printf '%s' "$(cat "$HERE/prompts/capture-tap.txt" 2>/dev/null)"
 exit 0
