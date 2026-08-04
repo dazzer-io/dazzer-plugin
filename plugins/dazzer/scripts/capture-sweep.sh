@@ -76,6 +76,8 @@ elif [ -n "${CURSOR_PLUGIN_ROOT:-}" ]; then
   TOOL="cursor"
 elif [ -n "${PLUGIN_ROOT:-}" ]; then
   TOOL="codex"
+elif [ -n "${DEVIN_PROJECT_DIR:-}" ]; then
+  TOOL="devin"
 elif [ -n "${CLAUDE_PLUGIN_ROOT:-}" ]; then
   TOOL="claude-code"
 else

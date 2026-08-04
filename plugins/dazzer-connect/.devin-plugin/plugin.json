@@ -1,8 +1,8 @@
 {
-  "name": "dazzer",
-  "displayName": "Dazzer",
+  "name": "dazzer-connect",
+  "displayName": "Dazzer Connect",
   "version": "0.7.0",
-  "description": "Makes your AI check your Dazzer Brain before answering and save what settles. Adds no connection of its own, so it is safe to install alongside one you already have.",
+  "description": "The Dazzer Brain connection, for people who have not already connected one. Skip this if Dazzer already shows as connected.",
   "author": {
     "name": "Dazzer",
     "url": "https://dazzer.io"
@@ -15,6 +15,5 @@
     "knowledge",
     "brain",
     "mcp"
-  ],
-  "category": "developer-tools"
+  ]
 }
