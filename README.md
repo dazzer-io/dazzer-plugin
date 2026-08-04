@@ -75,6 +75,16 @@ privately to the AI at the end of a reply. It only accepts a message and submits
 had typed it, so on Cursor the save prompt is visible in your conversation. Everything works; it
 just is not silent.
 
+### Devin
+
+```
+devin plugins install dazzer-io/dazzer-plugin#plugins/dazzer
+```
+
+Two of the three reminders work. The save prompt does not, and cannot: Devin tells a reminder
+only which session and which prompt it is, with no way to tell how much conversation has built up
+since last time. The prompt has nothing to measure, so it stays quiet rather than firing blindly.
+
 ### Reaching your Brain
 
 Everything above adds the **reminders**. They need your Brain to already be reachable from that
@@ -96,8 +106,10 @@ same.
 
 ### What has actually been tried
 
-All five were installed from this repository into a real copy of the tool and the reminder was
-watched firing: Claude Code, Codex, Copilot, Antigravity and Cursor.
+All six were installed into a real copy of the tool and watched working: Claude Code, Codex,
+Copilot, Antigravity, Cursor and Devin. Devin's limit above was found by running a real session
+and capturing exactly what it hands a reminder — not by reading its documentation, which describes
+a richer message than the one that actually arrives.
 
 Cursor was the last, and it is worth saying why it took two attempts. This repository briefly
 shipped a Cursor-specific listing of what it contains; Cursor preferred that file over the one it
