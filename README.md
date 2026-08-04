@@ -1,22 +1,95 @@
-# Dazzer for Claude Code
+# Dazzer
 
 Makes your AI check what you already know before answering, and save what settles instead of
 losing it when the conversation ends.
 
 ## Install
 
+Two lines in most tools. The same plugin, the same files — only the command changes.
+
+### Claude Code
+
 ```
 /plugin marketplace add dazzer-io/dazzer-plugin
 /plugin install dazzer@dazzer
 ```
 
-**If Dazzer does not already show as connected**, also run:
+Typed into Claude itself, not into your shell.
+
+**Using the desktop app?** Install it from a terminal with the same two lines. The app and the
+terminal share one set of settings, so it appears in the app on your next conversation. The
+install command does not exist inside the app, so this genuinely needs a terminal once — even if
+you never otherwise open one.
+
+### Codex — OpenAI's coding tool
+
+```
+codex plugin marketplace add dazzer-io/dazzer-plugin
+codex plugin add dazzer@dazzer
+```
+
+Codex asks you to approve a plugin's reminders before it will run them. If nothing appears in the
+run history described below, that approval is the first thing to check.
+
+### GitHub Copilot
+
+```
+copilot plugin marketplace add dazzer-io/dazzer-plugin
+copilot plugin install dazzer@dazzer
+```
+
+All three reminders work here, quietly, the same way they do in Claude's.
+
+### Antigravity — Google's coding tool
+
+It has no store to install from, so point it at a downloaded copy:
+
+```
+git clone https://github.com/dazzer-io/dazzer-plugin.git
+agy plugin install ./dazzer-plugin/plugins/dazzer
+```
+
+Two of the three reminders work. Being put back on track after a long conversation forgets itself
+does not — that moment does not exist in this tool at all, so nothing we add can fix it.
+
+### Cursor
+
+```
+cursor-agent plugin marketplace add https://github.com/dazzer-io/dazzer-plugin.git
+```
+
+Then install Dazzer from the **Customize** panel in the sidebar.
+
+One difference you will see rather than read about: Cursor has no way for a plugin to speak
+privately to the AI at the end of a reply. It only accepts a message and submits it as though you
+had typed it, so on Cursor the save prompt is visible in your conversation. Everything works; it
+just is not silent.
+
+### Reaching your Brain
+
+Everything above adds the **reminders**. They need your Brain to already be reachable from that
+tool. If it is not, each tool has its own one-time sign-in — and in Claude you can get it from the
+same place:
 
 ```
 /plugin install dazzer-connect@dazzer
 ```
 
-then sign in when a browser window opens.
+Skip that if Dazzer already shows as connected. Installing it again would replace a working
+connection with one that needs signing in.
+
+### Where reminders cannot run at all
+
+Claude's chat apps and the web app have no moment at the end of a reply for anything to run. There
+the bundled skill carries the same intent as plain text, and reaching your Brain works exactly the
+same.
+
+### What has actually been tried
+
+Four of the five were installed from this repository into a throwaway copy of the real tool, and
+the reminder was watched firing: Claude Code, Codex, Copilot and Antigravity. **Cursor was not** —
+every Cursor command needs a signed-in account. Cursor support rests on their published
+specification plus one of their own official plugins using the identical mechanism.
 
 ## Two pieces, on purpose
 
@@ -87,59 +160,6 @@ cat "${CLAUDE_PLUGIN_DATA:-$HOME/.dazzer}/capture/receipts.jsonl" | tail
 
 An empty file, or no file at all, means the plugin has never run — which is worth knowing,
 because that failure is otherwise completely silent.
-
-## Supported tools
-
-The same plugin installs in **Claude Code** and in **OpenAI's Codex** — the same files, no separate
-version. Codex reads this repository's layout as-is, and hands the plugin the same information at
-the same moments, which is why one copy serves both.
-
-Installing on Codex:
-
-```
-codex plugin marketplace add dazzer-io/dazzer-plugin
-codex plugin add dazzer@dazzer
-```
-
-Codex asks you to approve a plugin's hooks before it will run them. If nothing appears in the run
-history described above, that approval is the first thing to check.
-
-**Google's Antigravity** works too, with one real limitation. It has no store to install from, so
-point it at a copy of this repository instead:
-
-```
-git clone https://github.com/dazzer-io/dazzer-plugin.git
-agy plugin install ./dazzer-plugin/plugins/dazzer
-```
-
-Two of the three reminders work there. The third — being put back on track after a long session
-forgets itself — does not, because Antigravity has no such moment at all. Nothing we can add fixes
-that; it is simply absent from the tool, and is called out here rather than left to be discovered.
-
-**Cursor** takes it from this repository too:
-
-```
-cursor-agent plugin marketplace add https://github.com/dazzer-io/dazzer-plugin.git
-```
-
-then install Dazzer from the Customize panel in the sidebar.
-
-One difference you will see rather than read about: Cursor has no way for a plugin to speak
-privately to the AI at the end of a reply. It only accepts a message and submits it as though you
-had typed it. So on Cursor the save prompt is visible in the conversation. Everything still works;
-it just is not silent.
-
-**GitHub Copilot** takes it from this repository as well:
-
-```
-copilot plugin marketplace add dazzer-io/dazzer-plugin
-copilot plugin install dazzer@dazzer
-```
-
-All three reminders work there, quietly, the same way they do in Claude's.
-
-Where nothing can run at the end of a reply — Claude's chat apps and the web app — the bundled
-skill carries the same intent as plain text, and reaching your Brain works exactly the same.
 
 ## Uninstall
 
