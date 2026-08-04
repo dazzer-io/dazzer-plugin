@@ -54,11 +54,21 @@ does not — that moment does not exist in this tool at all, so nothing we add c
 
 ### Cursor
 
+Two steps, and the second one happens inside Cursor rather than in a terminal.
+
 ```
 cursor-agent plugin marketplace add https://github.com/dazzer-io/dazzer-plugin.git
 ```
 
-Then install Dazzer from the **Customize** panel in the sidebar.
+Then, in Cursor, type `/plugins` and choose **dazzer** from the list.
+
+Two things that cost real time when this was first tried, so they are written down here:
+
+- **If you have installed it before, remove and re-add rather than update.** Cursor's update
+  command reports success without actually re-fetching, so you keep whatever version you first
+  got. `cursor-agent plugin marketplace remove dazzer` then add it again.
+- **If you already have some other Dazzer setup wired into Cursor, take it out first**, or both
+  fire on every reply and you get the save prompt twice.
 
 One difference you will see rather than read about: Cursor has no way for a plugin to speak
 privately to the AI at the end of a reply. It only accepts a message and submits it as though you
@@ -86,10 +96,15 @@ same.
 
 ### What has actually been tried
 
-Four of the five were installed from this repository into a throwaway copy of the real tool, and
-the reminder was watched firing: Claude Code, Codex, Copilot and Antigravity. **Cursor was not** —
-every Cursor command needs a signed-in account. Cursor support rests on their published
-specification plus one of their own official plugins using the identical mechanism.
+All five were installed from this repository into a real copy of the tool and the reminder was
+watched firing: Claude Code, Codex, Copilot, Antigravity and Cursor.
+
+Cursor was the last, and it is worth saying why it took two attempts. This repository briefly
+shipped a Cursor-specific listing of what it contains; Cursor preferred that file over the one it
+had been reading happily, could not make sense of it, and silently stopped finding the plugin at
+all. Nothing reported an error — the install simply handed out a months-old version instead. The
+file has been removed. Reading a tool's documentation was not enough here, and it was not enough
+for two of the others either.
 
 ## Two pieces, on purpose
 
