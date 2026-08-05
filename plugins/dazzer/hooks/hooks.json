@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo \"[Dazzer] Before answering anything your Brain may already know, recall it - answer from what is recorded, not from assumption. As real decisions accumulate in this session, checkpoint your progress so a context reset cannot lose your place.\""
+            "command": "echo \"[Dazzer] Before answering anything your Brain may already know, recall it — answer from what is recorded, not from assumption. As real decisions accumulate in this session, checkpoint your progress so a context reset cannot lose your place.\""
           }
         ]
       }
@@ -37,7 +37,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo \"[Dazzer] Before answering anything your Brain may already know, recall it - answer from what is recorded, not from assumption. As real decisions accumulate in this session, checkpoint your progress so a context reset cannot lose your place.\""
+            "command": "echo \"[Dazzer] Before answering anything your Brain may already know, recall it — answer from what is recorded, not from assumption. As real decisions accumulate in this session, checkpoint your progress so a context reset cannot lose your place.\""
           }
         ]
       }
@@ -49,7 +49,7 @@
     ],
     "sessionStart": [
       {
-        "command": "echo \"[Dazzer] Before answering anything your Brain may already know, recall it - answer from what is recorded, not from assumption. As real decisions accumulate in this session, checkpoint your progress so a context reset cannot lose your place.\""
+        "command": "echo \"[Dazzer] Before answering anything your Brain may already know, recall it — answer from what is recorded, not from assumption. As real decisions accumulate in this session, checkpoint your progress so a context reset cannot lose your place.\""
       }
     ],
     "userPromptSubmitted": [
@@ -57,7 +57,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo \"[Dazzer] Before answering anything your Brain may already know, recall it - answer from what is recorded, not from assumption. As real decisions accumulate in this session, checkpoint your progress so a context reset cannot lose your place.\""
+            "command": "echo \"[Dazzer] Before answering anything your Brain may already know, recall it — answer from what is recorded, not from assumption. As real decisions accumulate in this session, checkpoint your progress so a context reset cannot lose your place.\""
           }
         ]
       }
