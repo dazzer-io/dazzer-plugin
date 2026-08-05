@@ -11,7 +11,7 @@ Two lines in most tools. The same plugin, the same files — only the command ch
 
 ```
 /plugin marketplace add dazzer-io/dazzer-plugin
-/plugin install dazzer@dazzer
+/plugin add dazzer@dazzer
 ```
 
 Typed into Claude itself, not into your shell.
