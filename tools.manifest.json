@@ -1,0 +1,199 @@
+{
+  "specVersion": 1,
+  "kind": "dazzer-tool-support",
+  "note": "The same facts as README.md's Install section, in a shape a screen can render. Gates keep the two identical; edit both or neither.",
+
+  "connection": {
+    "url": "https://graph.dazzer.io/mcp",
+    "serverName": "dazzer",
+    "marketplace": "dazzer-io/dazzer-plugin",
+    "repository": "https://github.com/dazzer-io/dazzer-plugin.git",
+    "remindersPlugin": "dazzer@dazzer",
+    "connectionPlugin": "dazzer-connect@dazzer"
+  },
+
+  "reminders": [
+    {
+      "id": "recall",
+      "what": "Check what you already know before answering",
+      "when": "every message"
+    },
+    {
+      "id": "capture",
+      "what": "Save what settled when a reply ends",
+      "when": "end of a reply, once enough has accumulated"
+    },
+    {
+      "id": "resume",
+      "what": "Get put back on track after a long conversation forgets itself",
+      "when": "after a context reset"
+    }
+  ],
+
+  "spokenSentences": [
+    {
+      "id": "recall",
+      "seenOn": "every message",
+      "provesInstalled": true,
+      "text": "[Dazzer] Before answering anything your Brain may already know, recall it - answer from what is recorded, not from assumption. As real decisions accumulate in this session, checkpoint your progress so a context reset cannot lose your place."
+    },
+    {
+      "id": "resume",
+      "seenOn": "only after a context reset",
+      "provesInstalled": false,
+      "text": "[Dazzer] This session restarted from a context reset, so nothing reconnected and you were never re-oriented. Call resume to restore your saved working session before continuing, and before asking the user to repeat anything."
+    }
+  ],
+
+  "verify": {
+    "what": "One line written every time the plugin runs, recording when, what it decided and why — never any of your conversation.",
+    "path": "${CLAUDE_PLUGIN_DATA:-$HOME/.dazzer}/capture/receipts.jsonl",
+    "command": "cat \"${CLAUDE_PLUGIN_DATA:-$HOME/.dazzer}/capture/receipts.jsonl\" | tail",
+    "emptyMeans": "The plugin has never run — worth knowing, because that failure is otherwise completely silent."
+  },
+
+  "tools": [
+    {
+      "id": "claude-code",
+      "name": "Claude Code",
+      "vendor": "Anthropic",
+      "status": "supported",
+      "reminders": { "recall": "works", "capture": "works", "resume": "works" },
+      "installReminders": {
+        "steps": [
+          { "kind": "run", "where": "claude", "command": "/plugin marketplace add dazzer-io/dazzer-plugin" },
+          { "kind": "run", "where": "claude", "command": "/plugin install dazzer@dazzer" }
+        ],
+        "note": "Typed into Claude itself, not into your shell."
+      },
+      "surfaces": [
+        {
+          "id": "terminal",
+          "label": "In a terminal",
+          "installableHere": true
+        },
+        {
+          "id": "desktop-app",
+          "label": "The desktop app",
+          "installableHere": false,
+          "note": "Install it from a terminal with the same two lines. The app and the terminal share one set of settings, so it appears in the app on your next conversation. The install command does not exist inside the app, so this genuinely needs a terminal once — even if you never otherwise open one."
+        }
+      ]
+    },
+
+    {
+      "id": "codex",
+      "name": "Codex",
+      "vendor": "OpenAI",
+      "describedAs": "OpenAI's coding tool",
+      "status": "supported",
+      "reminders": { "recall": "works", "capture": "works", "resume": "works" },
+      "installReminders": {
+        "steps": [
+          { "kind": "run", "where": "terminal", "command": "codex plugin marketplace add dazzer-io/dazzer-plugin" },
+          { "kind": "run", "where": "terminal", "command": "codex plugin add dazzer@dazzer" }
+        ],
+        "note": "Codex asks you to approve a plugin's reminders before it will run them. If nothing appears in the run history, that approval is the first thing to check."
+      }
+    },
+
+    {
+      "id": "copilot",
+      "name": "GitHub Copilot",
+      "vendor": "GitHub",
+      "status": "supported",
+      "reminders": { "recall": "works", "capture": "works", "resume": "works" },
+      "installReminders": {
+        "steps": [
+          { "kind": "run", "where": "terminal", "command": "copilot plugin marketplace add dazzer-io/dazzer-plugin" },
+          { "kind": "run", "where": "terminal", "command": "copilot plugin install dazzer@dazzer" }
+        ],
+        "note": "All three reminders work here, quietly, the same way they do in Claude's."
+      }
+    },
+
+    {
+      "id": "antigravity",
+      "name": "Antigravity",
+      "vendor": "Google",
+      "describedAs": "Google's coding tool",
+      "status": "supported",
+      "reminders": { "recall": "works", "capture": "works", "resume": "impossible" },
+      "installReminders": {
+        "steps": [
+          { "kind": "run", "where": "terminal", "command": "git clone https://github.com/dazzer-io/dazzer-plugin.git" },
+          { "kind": "run", "where": "terminal", "command": "agy plugin install ./dazzer-plugin/plugins/dazzer" }
+        ],
+        "note": "It has no store to install from, so point it at a downloaded copy."
+      },
+      "limits": [
+        "Two of the three reminders work. Being put back on track after a long conversation forgets itself does not — that moment does not exist in this tool at all, so nothing we add can fix it."
+      ]
+    },
+
+    {
+      "id": "cursor",
+      "name": "Cursor",
+      "status": "supported",
+      "reminders": { "recall": "works", "capture": "works-but-visible", "resume": "works" },
+      "installReminders": {
+        "steps": [
+          { "kind": "run", "where": "terminal", "command": "cursor-agent plugin marketplace add https://github.com/dazzer-io/dazzer-plugin.git" },
+          { "kind": "choose", "where": "cursor", "from": "/plugins", "label": "dazzer" }
+        ],
+        "note": "Two steps, and the second one happens inside Cursor rather than in a terminal."
+      },
+      "limits": [
+        "Cursor has no way for a plugin to speak privately to the AI at the end of a reply. It only accepts a message and submits it as though you had typed it, so on Cursor the save prompt is visible in your conversation. Everything works; it just is not silent."
+      ],
+      "gotchas": [
+        "If you have installed it before, remove and re-add rather than update. Cursor's update command reports success without actually re-fetching, so you keep whatever version you first got. Run `cursor-agent plugin marketplace remove dazzer` then add it again.",
+        "If you already have some other Dazzer setup wired into Cursor, take it out first, or both fire on every reply and you get the save prompt twice."
+      ]
+    },
+
+    {
+      "id": "devin",
+      "name": "Devin",
+      "vendor": "Cognition",
+      "status": "supported",
+      "reminders": { "recall": "works", "capture": "impossible", "resume": "works" },
+      "installReminders": {
+        "steps": [
+          { "kind": "run", "where": "terminal", "command": "devin plugins install dazzer-io/dazzer-plugin#plugins/dazzer" }
+        ]
+      },
+      "limits": [
+        "Two of the three reminders work. The save prompt does not, and cannot: Devin tells a reminder only which session and which prompt it is, with no way to tell how much conversation has built up since last time. The prompt has nothing to measure, so it stays quiet rather than firing blindly."
+      ]
+    },
+
+    {
+      "id": "claude-chat",
+      "name": "Claude (chat app and web)",
+      "vendor": "Anthropic",
+      "status": "no-reminders",
+      "reminders": { "recall": "impossible", "capture": "impossible", "resume": "impossible" },
+      "limits": [
+        "Claude's chat apps and the web app have no moment at the end of a reply for anything to run. There the bundled skill carries the same intent as plain text, and reaching your Brain works exactly the same."
+      ],
+      "useInstead": "claude-code"
+    }
+  ],
+
+  "installConnection": {
+    "conditional": true,
+    "askFirst": "Does Dazzer already show as connected?",
+    "skipWhen": "Dazzer already shows as connected.",
+    "warning": "Installing it again would replace a working connection with one that needs signing in.",
+    "steps": [
+      { "kind": "run", "where": "claude", "command": "/plugin install dazzer-connect@dazzer" }
+    ],
+    "note": "Everything above adds the reminders. They need your Brain to already be reachable from that tool. If it is not, each tool has its own one-time sign-in — and in Claude you can get it from the same place."
+  },
+
+  "provenance": {
+    "what": "All six were installed into a real copy of the tool and watched working.",
+    "tools": ["claude-code", "codex", "copilot", "antigravity", "cursor", "devin"]
+  }
+}

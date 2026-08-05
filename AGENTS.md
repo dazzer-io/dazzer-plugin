@@ -28,6 +28,8 @@ Brain, not here.**
 | `plugins/dazzer/` | The behaviour: triggers, the end-of-reply script, the skill. **Carries no connection.** |
 | `plugins/dazzer-connect/` | The connection, and nothing else, for people who have not already got one. |
 | `.claude-plugin/marketplace.json` | The list people install from. |
+| `README.md` | How to install it, written for a person. **The authority for the install steps.** |
+| `tools.manifest.json` | The same install steps in a shape a screen can render. **Mirrors the README; never leads it.** |
 | `scripts/baseline.mjs` | Runs every check. One command: `node scripts/baseline.mjs`. |
 | `scripts/checks/` | The checks themselves. Plain Node, no dependencies. |
 | `scripts/known-defects.txt` | Things broken right now, each with a test proving it. Shrink-only. |
@@ -41,6 +43,15 @@ Brain, not here.**
   registry; it is installed by copying files. Keep it that way.
 - **Every tunable value is named and lives outside the code.** A number written into the
   script is a number nobody can find or change.
+- **Changing an install step means changing it twice.** The README is what a person reads;
+  `tools.manifest.json` is what a screen renders. Edit one without the other and
+  `install-parity` refuses the run, naming both files. Adding a tool means a README block
+  and a manifest entry, together.
+- **The reminders' wording is not cosmetic.** Onboarding proves the reminders are installed
+  by looking for one of those sentences in what the AI could see — nothing else puts them
+  there. Reword one without updating `spokenSentences` and `reminder-parity` refuses. The
+  direction that matters is the quiet one: words declared that nothing says would report
+  every correctly installed person as not set up.
 
 ## Testing
 
