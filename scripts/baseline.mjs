@@ -29,6 +29,7 @@ const GATES = [
   // The two constraints that exist because something broke in the field.
   { id: "connection-isolation", name: "behaviour plugin ships no connection", cmd: CHECK("check-connection-isolation") },
   { id: "connection-address", name: "connection address is product-owned", cmd: CHECK("check-connection-address") },
+  { id: "address-parity", name: "the address we tell is the address we ship", cmd: CHECK("check-address-parity") },
 
   // Packaging truth.
   { id: "version-parity", name: "one version, agreed everywhere", cmd: CHECK("check-version-parity") },
@@ -38,9 +39,12 @@ const GATES = [
   // The defect classes, asserted against the shipped script.
   { id: "shell-contract", name: "shipped shell obeys the defect-class rules", cmd: CHECK("check-shell-contract") },
   { id: "harness-contract", name: "the test harness can actually see failures", cmd: CHECK("check-harness-contract") },
+  { id: "parity-armed", name: "the parity gates can actually see failures", cmd: CHECK("check-parity-armed") },
 
   // Documentation that would otherwise drift away from the code.
   { id: "docs-truth", name: "knobs and instructions match the code", cmd: CHECK("check-docs-truth") },
+  { id: "install-parity", name: "printed and rendered install steps agree", cmd: CHECK("check-install-parity") },
+  { id: "reminder-parity", name: "the reminders say what we tell readers to expect", cmd: CHECK("check-reminder-parity") },
 
   // CI guarding itself.
   { id: "workflow-sha-pin", name: "every action is pinned to a commit", cmd: CHECK("check-workflow-sha-pin") },
