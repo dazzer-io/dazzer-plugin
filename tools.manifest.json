@@ -4,7 +4,7 @@
   "note": "The same facts as README.md's Install section, in a shape a screen can render. Gates keep the two identical; edit both or neither.",
 
   "connection": {
-    "url": "https://graph.dazzer.io/mcp",
+    "url": "https://brain.dazzer.io/mcp",
     "serverName": "dazzer",
     "marketplace": "dazzer-io/dazzer-plugin",
     "repository": "https://github.com/dazzer-io/dazzer-plugin.git",
