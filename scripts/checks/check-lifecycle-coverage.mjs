@@ -32,10 +32,13 @@ const MANIFEST = join(REPO_ROOT, "tools.manifest.json");
 
 /** The three questions every supported tool owes an answer to. */
 const ANSWERS = [
-  { field: "installReminders", asks: "how do I get this" },
+  { field: "installReminders", asks: "how do I get this", mustBeEstablished: true },
   { field: "updateReminders", asks: "how do I get the fixed version" },
   { field: "removeReminders", asks: "how do I get rid of it" },
 ];
+
+/** Every value `status` may take. An unrecognised one silently leaves a tool uncovered. */
+const KNOWN_STATUS = new Set(["supported", "no-reminders"]);
 
 runGate({
   id: "lifecycle-coverage",
@@ -44,6 +47,17 @@ runGate({
   assert(findings) {
     const manifest = readJson(MANIFEST, findings);
     if (manifest === undefined) return;
+
+    for (const tool of manifest.tools ?? []) {
+      if (KNOWN_STATUS.has(tool?.status)) continue;
+      findings.push({
+        file: rel(MANIFEST),
+        message:
+          `"${tool?.id ?? "(unnamed tool)"}" has a status of "${tool?.status}", which nothing ` +
+          "recognises. A tool whose status is not understood is quietly held to none of the " +
+          "rules below, so a typo here buys a tool no coverage at all.",
+      });
+    }
 
     const supported = (manifest.tools ?? []).filter((t) => t?.status === "supported");
     if (supported.length === 0) {
@@ -59,7 +73,7 @@ runGate({
 
     for (const tool of supported) {
       const name = tool.id ?? "(unnamed tool)";
-      for (const { field, asks } of ANSWERS) {
+      for (const { field, asks, mustBeEstablished } of ANSWERS) {
         const answer = tool[field];
 
         if (answer === undefined || answer === null) {
@@ -83,6 +97,15 @@ runGate({
               `${name} both answers "${asks}" and says nobody has established it. Whoever ` +
               "finally worked it out left the old line behind, and the two audiences now " +
               "get different stories - delete whichever is no longer true.",
+          });
+          continue;
+        }
+        if (unestablished && mustBeEstablished) {
+          findings.push({
+            file: rel(MANIFEST),
+            message:
+              `${name} is offered as supported but nobody has established "${asks}". A tool ` +
+              "nobody can install is not a supported tool - say it is unsupported instead.",
           });
           continue;
         }

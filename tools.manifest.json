@@ -1,7 +1,7 @@
 {
   "specVersion": 1,
   "kind": "dazzer-tool-support",
-  "note": "The same facts as README.md's Install section, in a shape a screen can render. Gates keep the two identical; edit both or neither.",
+  "note": "The same facts as README.md's Install, Update and Uninstall sections, in a shape a screen can render. Gates keep the two identical; edit both or neither.",
   "connection": {
     "url": "https://graph.dazzer.io/mcp",
     "serverName": "dazzer",

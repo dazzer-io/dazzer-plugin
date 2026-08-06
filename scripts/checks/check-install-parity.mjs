@@ -5,9 +5,9 @@
  * render the same steps; the moment it did, the same instructions existed in two places
  * with nothing comparing them.
  *
- * The docs gate already covers the tuning table and the uninstall lines. It does not read
- * the install blocks at all, so a command corrected in one place and not the other passes
- * everything today.
+ * It reads all three sections a person acts on. Which tools owe an answer at all is a
+ * different question and belongs to lifecycle-coverage; this gate only asks whether the two
+ * copies of an answer say the same thing.
  *
  * Compared by COMMAND rather than by heading, on purpose. A heading is prose and gets
  * reworded; the command is the thing somebody actually runs, and it is what breaks when
@@ -15,7 +15,7 @@
  */
 
 import { join } from "node:path";
-import { REPO_ROOT, read, readJson, rel, runGate } from "./lib/gate.mjs";
+import { REPO_ROOT, read, readJson, rel, runGate, section } from "./lib/gate.mjs";
 
 const MANIFEST = join(REPO_ROOT, "tools.manifest.json");
 const README = join(REPO_ROOT, "README.md");
@@ -35,14 +35,11 @@ const SECTIONS = [
 
 /** One section of the README, heading to the next heading. */
 function sectionOf(text, heading, findings) {
-  const start = text.indexOf(`\n${heading}\n`);
-  if (start === -1) {
+  const found = section(text, heading);
+  if (found === "") {
     findings.push({ file: "README.md", message: `has no ${heading.replace("## ", "")} section` });
-    return "";
   }
-  const rest = text.slice(start + 1);
-  const end = rest.indexOf("\n## ", 1);
-  return end === -1 ? rest : rest.slice(0, end);
+  return found;
 }
 
 /** Every line inside a fenced block, which is how the README shows something to run. */
@@ -57,6 +54,18 @@ function commandsIn(section) {
     if (!fenced) continue;
     const command = line.trim();
     if (command.length > 0) out.push(command);
+  }
+  return out;
+}
+
+/** The steps somebody clicks rather than runs, for one section. */
+function clickedSteps(manifest, { field, connection }) {
+  const out = [];
+  for (const owner of [...(manifest.tools ?? []), manifest]) {
+    const key = owner === manifest ? connection : field;
+    for (const step of owner?.[key]?.steps ?? []) {
+      if (step?.kind === "choose") out.push(step);
+    }
   }
   return out;
 }
@@ -115,38 +124,62 @@ runGate({
         continue;
       }
 
-      const declaredSet = new Set(declared.map((d) => d.command));
-      const shownSet = new Set(shown);
+      // Counted, not pooled. Two answers in one section can name the same command - the
+      // connection's update repeats the refresh step the tool's does - and a set comparison
+      // lets one of the two copies be deleted while the other goes on satisfying it. The
+      // person following the shortened one then runs a step that quietly does nothing.
+      const tally = (commands) => {
+        const seen = new Map();
+        for (const c of commands) seen.set(c, (seen.get(c) ?? 0) + 1);
+        return seen;
+      };
+      const declaredCount = tally(declared.map((d) => d.command));
+      const shownCount = tally(shown);
 
-      for (const command of shownSet) {
-        if (!declaredSet.has(command)) {
+      for (const [command, times] of shownCount) {
+        const owed = declaredCount.get(command) ?? 0;
+        if (owed === 0) {
           findings.push({
             file: "README.md",
             message: `${section.heading} shows "${command}" but nothing declares it there. A screen rendering the manifest would leave that step out.`,
           });
+        } else if (times !== owed) {
+          findings.push({
+            file: "README.md",
+            message: `${section.heading} shows "${command}" ${times} time(s) while ${owed} answer(s) there declare it. One of the two has gained or lost the step, and pooling them would hide it.`,
+          });
         }
       }
 
-      for (const d of declared) {
-        if (!shownSet.has(d.command)) {
+      for (const [command, owed] of declaredCount) {
+        const times = shownCount.get(command) ?? 0;
+        if (times === 0) {
+          const who = declared.find((d) => d.command === command)?.where ?? "something";
           findings.push({
             file: rel(MANIFEST),
-            message: `${d.where} declares "${d.command}" but ${section.heading} does not show it. One of the two is telling somebody the wrong thing.`,
+            message: `${who} declares "${command}" but ${section.heading} does not show it. One of the two is telling somebody the wrong thing.`,
+          });
+        }
+      }
+
+      // A step somebody clicks rather than runs still has to be on the page, or the answer
+      // stops halfway. Cursor's update ends by picking the plugin from a menu; without it a
+      // person re-adds the plugin and never turns it back on.
+      for (const step of clickedSteps(manifest, section)) {
+        const { from, label } = step;
+        if (typeof from !== "string" || typeof label !== "string") continue;
+        // Both parts, on ONE line. Looked for separately, an unrelated command containing
+        // "/plugins" was enough to satisfy the check while the sentence telling somebody to
+        // pick anything had been deleted.
+        const told = text.split("\n").some((line) => line.includes(from) && line.includes(label));
+        if (!told) {
+          findings.push({
+            file: "README.md",
+            message: `${section.heading} never tells anybody to pick "${label}" from "${from}", which an answer there requires. That answer stops halfway on the page.`,
           });
         }
       }
     }
 
-    // A tool that a screen would offer with nothing to do.
-    for (const tool of manifest.tools ?? []) {
-      if (tool?.status !== "supported") continue;
-      const steps = tool?.installReminders?.steps ?? [];
-      if (steps.length === 0) {
-        findings.push({
-          file: rel(MANIFEST),
-          message: `"${tool.id}" is offered as supported but has no way to install the reminders. A connection on its own is not a finished setup.`,
-        });
-      }
-    }
   },
 });

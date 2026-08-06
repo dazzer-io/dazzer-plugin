@@ -29,7 +29,7 @@ Brain, not here.**
 | `plugins/dazzer-connect/` | The connection, and nothing else, for people who have not already got one. |
 | `.claude-plugin/marketplace.json` | The list people install from. |
 | `README.md` | How to install it, written for a person. **The authority for the install steps.** |
-| `tools.manifest.json` | The same install steps in a shape a screen can render. **Mirrors the README; never leads it.** |
+| `tools.manifest.json` | The same steps — install, update, remove — in a shape a screen can render. **Mirrors the README; never leads it.** |
 | `scripts/baseline.mjs` | Runs every check. One command: `node scripts/baseline.mjs`. |
 | `scripts/checks/` | The checks themselves. Plain Node, no dependencies. |
 | `scripts/known-defects.txt` | Things broken right now, each with a test proving it. Shrink-only. |
@@ -45,8 +45,10 @@ Brain, not here.**
   script is a number nobody can find or change.
 - **Changing an install step means changing it twice.** The README is what a person reads;
   `tools.manifest.json` is what a screen renders. Edit one without the other and
-  `install-parity` refuses the run, naming both files. Adding a tool means a README block
-  and a manifest entry, together.
+  `install-parity` refuses the run, naming both files — for updating and removing as well as
+  installing. Adding a tool means a README block and a manifest entry together, **and** an
+  answer to how somebody updates and removes it, or `lifecycle-coverage` refuses the run.
+  Saying plainly that nobody has established one counts; leaving it out does not.
 - **The reminders' wording is not cosmetic.** Onboarding proves the reminders are installed
   by looking for one of those sentences in what the AI could see — nothing else puts them
   there. Reword one without updating `spokenSentences` and `reminder-parity` refuses. The

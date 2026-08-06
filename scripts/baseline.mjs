@@ -48,7 +48,7 @@ const GATES = [
     name: "every tool says how to get, update and remove it",
     cmd: CHECK("check-lifecycle-coverage"),
   },
-  { id: "install-parity", name: "printed and rendered install steps agree", cmd: CHECK("check-install-parity") },
+  { id: "install-parity", name: "printed and rendered steps agree, section by section", cmd: CHECK("check-install-parity") },
   { id: "reminder-parity", name: "every tool gets a reminder it can actually read", cmd: CHECK("check-reminder-parity") },
 
   // CI guarding itself.

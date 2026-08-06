@@ -419,6 +419,63 @@ const CASES = [
     },
   },
   {
+    gate: "lifecycle-coverage",
+    what: "a tool offered as supported whose install nobody has established - which no amount of honesty makes acceptable",
+    seed(root) {
+      edit(root, MANIFEST, (manifest) => {
+        manifest.tools.find((t) => t.id === "codex").installReminders = { notEstablished: "nobody tried" };
+      });
+    },
+  },
+  {
+    gate: "lifecycle-coverage",
+    what: "a tool that both answers a question and says nobody established it, so the two audiences get different stories",
+    seed(root) {
+      edit(root, MANIFEST, (manifest) => {
+        manifest.tools.find((t) => t.id === "codex").updateReminders.notEstablished = "left behind";
+      });
+    },
+  },
+  {
+    gate: "lifecycle-coverage",
+    what: "a tool whose status is mistyped, which quietly buys it no coverage at all",
+    seed(root) {
+      edit(root, MANIFEST, (manifest) => {
+        manifest.tools.find((t) => t.id === "codex").status = "suported";
+      });
+    },
+  },
+  {
+    gate: "install-parity",
+    what: "a step of a kind nothing recognises, which drops out of the page and the screen alike",
+    seed(root) {
+      edit(root, MANIFEST, (manifest) => {
+        manifest.tools.find((t) => t.id === "codex").removeReminders.steps[0].kind = "runs";
+      });
+    },
+  },
+  {
+    gate: "install-parity",
+    what: "a step somebody clicks, deleted from the page while the manifest still tells a screen to show it",
+    seed(root) {
+      const p = join(root, "README.md");
+      const text = readFileSync(p, "utf8");
+      // The Update section's copy, not the Install one - lastIndexOf finds the later.
+      const line = "Then, in Cursor, type `/plugins` and choose **dazzer**";
+      const at = text.lastIndexOf(line);
+      writeFileSync(p, text.slice(0, at) + "Then you are done" + text.slice(at + line.length));
+    },
+  },
+  {
+    gate: "install-parity",
+    what: "one of two answers in a section losing a step they both name, which pooling them cannot see",
+    seed(root) {
+      edit(root, MANIFEST, (manifest) => {
+        manifest.updateConnection.steps.shift();
+      });
+    },
+  },
+  {
     gate: "address-parity",
     what: "the instructions moved to another address we own while the shipped one stayed put",
     seed(root) {
@@ -454,7 +511,7 @@ const CASES = [
     },
   },
   {
-    gate: "install-parity",
+    gate: "lifecycle-coverage",
     what: "a tool offered as supported with no way to install the reminders",
     seed(root) {
       edit(root, MANIFEST, (manifest) => {

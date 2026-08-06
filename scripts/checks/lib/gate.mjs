@@ -89,3 +89,16 @@ export function runGate({ id, purpose, rule, assert }) {
   }
   process.exit(1);
 }
+
+/**
+ * One section of a markdown page, its heading to the next heading of the same level.
+ * Shared on purpose: two gates reading the same page with two ideas of where a section
+ * ends agree only by luck, and stop agreeing the moment a section is added between them.
+ */
+export function section(text, heading) {
+  const start = text.indexOf(`\n${heading}\n`);
+  if (start === -1) return "";
+  const rest = text.slice(start + 1);
+  const end = rest.indexOf("\n## ", 1);
+  return end === -1 ? rest : rest.slice(0, end);
+}

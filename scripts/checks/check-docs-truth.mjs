@@ -9,7 +9,7 @@
 
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { REPO_ROOT, read, rel, runGate, walk } from "./lib/gate.mjs";
+import { REPO_ROOT, read, rel, runGate, section, walk } from "./lib/gate.mjs";
 
 const README = join(REPO_ROOT, "README.md");
 const DEFAULTS = join(REPO_ROOT, "plugins", "dazzer", "config", "capture.defaults");
@@ -61,7 +61,9 @@ runGate({
     }
 
     // Uninstall must name every installable piece.
-    const uninstall = readme.match(/##\s*Uninstall[\s\S]*$/i)?.[0] ?? "";
+    // Read to the next heading, not to the end of the file. Reading to the end, a mention
+    // sitting in some later section counted as an uninstall instruction.
+    const uninstall = section(readme, "## Uninstall");
     if (!uninstall) {
       findings.push({ file: "README.md", message: "has no uninstall instructions" });
     } else {
