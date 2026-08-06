@@ -74,6 +74,11 @@ function commandsDeclared(manifest, findings) {
     if (step === null || step?.none === true) continue;
     collect([step], `installConnection.${id}`);
   }
+  // The sign-in is printed in the README too, so it is declared here or the two drift apart.
+  for (const [id, step] of Object.entries(manifest.installConnection?.signInByTool ?? {})) {
+    if (step?.when !== "own-step") continue;
+    collect([step], `signIn.${id}`);
+  }
 
   return out;
 }
