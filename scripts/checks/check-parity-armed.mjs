@@ -15,7 +15,7 @@
 import { execFileSync } from "node:child_process";
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { REPO_ROOT, runGate } from "./lib/gate.mjs";
 
 const CHECKS = join(REPO_ROOT, "scripts", "checks");
@@ -39,6 +39,16 @@ function fixture() {
     join(REPO_ROOT, "plugins", "dazzer", "hooks", "hooks.json"),
     join(root, "plugins", "dazzer", "hooks", "hooks.json"),
   );
+  cpSync(
+    join(REPO_ROOT, ...CURSOR_HOOKS),
+    join(root, ...CURSOR_HOOKS),
+  );
+  // The two listings that say where each host looks. Left out, the wiring rules see a
+  // missing pointer in every fixture and refuse a tree that is actually fine.
+  for (const listing of [CURSOR_LISTING, CLAUDE_LISTING]) {
+    mkdirSync(dirname(join(root, ...listing)), { recursive: true });
+    cpSync(join(REPO_ROOT, ...listing), join(root, ...listing));
+  }
   // The other hooks file - the plain-words one, read by a different host than the file
   // just above it. Leaving it out of the copy is how a fault seeded in it would look
   // caught while the gate was never shown the file it lives in.
@@ -64,6 +74,9 @@ function refuses(gate, root) {
 
 /** Where the gates read from, so a file the fixture forgets cannot make a fault look caught. */
 const WRAPPED_HOOKS = ["plugins", "dazzer", "hooks", "hooks.json"];
+const CURSOR_HOOKS = ["plugins", "dazzer", "hooks", "cursor.json"];
+const CURSOR_LISTING = ["plugins", "dazzer", ".cursor-plugin", "plugin.json"];
+const CLAUDE_LISTING = ["plugins", "dazzer", ".claude-plugin", "plugin.json"];
 const BARE_HOOKS = ["plugins", "dazzer", "hooks.json"];
 const MANIFEST = ["tools.manifest.json"];
 
@@ -226,13 +239,18 @@ const CASES = [
     gate: "reminder-parity",
     what: "one tool handed the other declared sentence, which every rule that only pools them accepts",
     seed(root) {
+      // The resume words, taken from the file that legitimately says them, and put where
+      // the recall words belong. Both stay declared and both are still said somewhere, so
+      // nothing that pools sentences objects - only knowing WHICH words belong here does.
+      let resume;
       edit(root, WRAPPED_HOOKS, (hooks) => {
+        resume = unwrap(hooks.hooks.SessionStart[0].hooks[0].command)
+          .hookSpecificOutput.additionalContext;
+      });
+      edit(root, CURSOR_HOOKS, (hooks) => {
         const group = hooks.hooks.sessionStart[0];
         const doc = unwrap(group.command);
-        // Both sentences stay declared and both are still said somewhere, so nothing that
-        // pools them objects. Only knowing WHICH words belong here catches it.
-        doc.additional_context = unwrap(hooks.hooks.SessionStart[0].hooks[0].command)
-          .hookSpecificOutput.additionalContext;
+        doc.additional_context = resume;
         group.command = rewrap(doc);
       });
     },
@@ -244,7 +262,7 @@ const CASES = [
       // That host writes the hook straight into the group instead of nesting a list inside
       // it. Read only the nested shape and this entry is invisible, so its wording could
       // drift away from everyone else's with nothing to notice.
-      edit(root, WRAPPED_HOOKS, (hooks) => {
+      edit(root, CURSOR_HOOKS, (hooks) => {
         hooks.hooks.sessionStart[0].command = 'echo "[Dazzer] Reworded where nothing was looking."';
       });
     },
@@ -276,7 +294,7 @@ const CASES = [
     seed(root) {
       // Seeded on a trigger whose words are said elsewhere too, so no wording rule can
       // notice - what is wrong here is the command, not the sentence.
-      edit(root, WRAPPED_HOOKS, (hooks) => {
+      edit(root, CURSOR_HOOKS, (hooks) => {
         const hook = hooks.hooks.sessionStart[0];
         hook.command = `${hook.command}; touch /tmp/dazzer-should-never-happen`;
       });
@@ -286,28 +304,9 @@ const CASES = [
     gate: "reminder-parity",
     what: "Cursor's reminder written as plain words, which Cursor throws away without telling anyone",
     seed(root) {
-      edit(root, WRAPPED_HOOKS, (hooks) => {
+      edit(root, CURSOR_HOOKS, (hooks) => {
         const group = hooks.hooks.sessionStart[0];
         group.command = `echo "${unwrap(group.command).additional_context}"`;
-      });
-    },
-  },
-  {
-    gate: "reminder-parity",
-    what: "Antigravity's reminder written as plain words, which reaches it just as little",
-    seed(root) {
-      edit(root, WRAPPED_HOOKS, (hooks) => {
-        const hook = hooks.hooks.PreInvocation[0].hooks[0];
-        hook.command = `echo "${unwrap(hook.command).injectSteps[0].ephemeralMessage}"`;
-      });
-    },
-  },
-  {
-    gate: "reminder-parity",
-    what: "a whole tool losing its reminder, which every wording rule is blind to",
-    seed(root) {
-      edit(root, WRAPPED_HOOKS, (hooks) => {
-        delete hooks.hooks.userPromptSubmitted;
       });
     },
   },
@@ -374,6 +373,78 @@ const CASES = [
       edit(root, BARE_HOOKS, (hooks) => {
         const hook = hooks.UserPromptSubmit[0].hooks[0];
         hook.command = hook.command.replace("recall it", "recall\\tit");
+      });
+    },
+  },
+  {
+    gate: "reminder-parity",
+    what: "another tool's moment-name put back in the shared file, which stops Claude Code loading any of it",
+    seed(root) {
+      edit(root, WRAPPED_HOOKS, (hooks) => {
+        hooks.hooks.PreInvocation = [
+          { hooks: [{ type: "command", command: 'echo "[Dazzer] anything"' }] },
+        ];
+      });
+    },
+  },
+  {
+    gate: "reminder-parity",
+    what: "Cursor's own file deleted, which leaves it reading a file holding none of its moments",
+    seed(root) {
+      rmSync(join(root, ...CURSOR_HOOKS));
+    },
+  },
+  {
+    gate: "reminder-parity",
+    what: "the pointer that sends Cursor to its own file, aimed at nothing",
+    seed(root) {
+      edit(root, CURSOR_LISTING, (listing) => {
+        listing.hooks = "./hooks/does-not-exist.json";
+      });
+    },
+  },
+  {
+    gate: "reminder-parity",
+    what: "one line in Claude Code's listing handing it back the file it cannot read",
+    seed(root) {
+      edit(root, CLAUDE_LISTING, (listing) => {
+        listing.hooks = "./hooks.json";
+      });
+    },
+  },
+  {
+    gate: "reminder-parity",
+    what: "the whole-number Cursor demands, missing - which makes it refuse the file as written",
+    seed(root) {
+      edit(root, CURSOR_HOOKS, (hooks) => {
+        delete hooks.version;
+      });
+    },
+  },
+  {
+    gate: "reminder-parity",
+    what: "a reminders file answering to no host, which looks like part of the plugin and reaches nobody",
+    seed(root) {
+      writeJson(join(root, "plugins", "dazzer", "hooks", "copilot.json"), {
+        hooks: { userPromptSubmitted: [{ command: 'echo "[Dazzer] anything"' }] },
+      });
+    },
+  },
+  {
+    gate: "reminder-parity",
+    what: "another tool's moment added to the file Devin reads, which Devin discards whole",
+    seed(root) {
+      edit(root, BARE_HOOKS, (hooks) => {
+        hooks.PreInvocation = [{ hooks: [{ type: "command", command: 'echo "[Dazzer] anything"' }] }];
+      });
+    },
+  },
+  {
+    gate: "reminder-parity",
+    what: "another tool's moment added to Cursor's file, which Cursor discards just as whole",
+    seed(root) {
+      edit(root, CURSOR_HOOKS, (hooks) => {
+        hooks.hooks.Stop = [{ command: 'echo "[Dazzer] anything"' }];
       });
     },
   },

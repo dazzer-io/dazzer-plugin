@@ -5,7 +5,7 @@
       "url": "https://graph.dazzer.io/mcp",
       "headers": {
         "X-Dazzer-Distribution": "plugin",
-        "X-Dazzer-Plugin-Version": "0.7.1"
+        "X-Dazzer-Plugin-Version": "0.8.0"
       }
     }
   }
