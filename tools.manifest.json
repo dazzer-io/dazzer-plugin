@@ -289,7 +289,7 @@
     }
   },
   "provenance": {
-    "what": "All six were installed into a real copy of the tool and watched working, which proved too little: on three of them nothing reached the AI at all - Codex and Cursor discarded the words, and Claude Code never loaded the plugin. Proving the words arrive from a hand-written file proved too little in turn, because it says nothing about whether the shipped file loads, and a tool reporting its own reminders as registered proved nothing either - it says so even when it is delivering nothing. What counts is installing the real thing and asking the AI for a word only the reminder carried. Claude Code, Codex and Cursor each answer it. Devin takes the plain wording it already gets. Antigravity and Copilot are given no reminders at all rather than ones that would be silently dead.",
+    "what": "All six were installed into a real copy of the tool and watched working, which proved too little: on three of them nothing reached the AI at all - Codex and Cursor discarded the words, and Claude Code never loaded the plugin. Proving the words arrive from a hand-written file proved too little in turn, because it says nothing about whether the shipped file loads, and a tool reporting its own reminders as registered proved nothing either - it says so even when it is delivering nothing. What counts is installing the real thing and asking the AI for a word only the reminder carried. Claude Code and Cursor each answer it. Codex runs every reminder from an installed copy, which is the weaker evidence of the two. Devin takes the plain wording it already gets. Antigravity and Copilot are given no reminders at all rather than ones that would be silently dead.",
     "tools": [
       "claude-code",
       "codex",

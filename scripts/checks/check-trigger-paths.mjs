@@ -46,14 +46,15 @@ runGate({
       if (parsed === undefined) continue;
 
       for (const command of commands(parsed)) {
-        const scriptRef = command.match(/(\$\{?[A-Za-z_][A-Za-z0-9_]*\}?)?[^\s"']*\.sh/);
-        if (!scriptRef) continue; // a trigger that just prints text runs no script
+        if (!command.includes(".sh")) continue; // a trigger that just prints text runs no script
 
-        // Two acceptable forms, and only two. Most tools hand a plugin a variable holding
-        // its own folder. Google's hands it nothing, so the only way its trigger can find
-        // the script is to name the folder that tool always installs into - which is a
-        // known location, not a developer's own machine.
-        const rootVar = PLUGIN_ROOT_VARS.find((v) => command.includes(v));
+        // A command must address its script from a variable holding the plugin's own
+        // folder. It may carry a default for a tool that hands over no variable at all -
+        // without one, that tool prints a shell error on every single reply instead of
+        // quietly doing nothing. The default is read THROUGH rather than treated as a
+        // reason to skip: bailing out on it is what left this check blind to the one
+        // command in the file it most needed to see.
+        const rootVar = PLUGIN_ROOT_VARS.find((v) => command.includes(v.replace("}", "")));
 
         if (rootVar === undefined) {
           findings.push({
@@ -70,7 +71,8 @@ runGate({
         // entirely and a script that does not exist could ship in it; spelled as a pattern
         // over any name, an unset variable would pass - the same wildcard the list above
         // exists to refuse.
-        const after = command.slice(command.indexOf(rootVar) + rootVar.length);
+        const opensAt = command.indexOf(rootVar.replace("}", ""));
+        const after = command.slice(command.indexOf("}", opensAt) + 1);
         const scriptPath = after.match(/^\/[^\s"']+\.sh/)?.[0];
         if (!scriptPath) continue;
 

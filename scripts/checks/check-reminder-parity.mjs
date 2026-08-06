@@ -486,7 +486,9 @@ function spokenByHooks(findings, declaredById) {
           Array.isArray(groups) &&
           groups.some((group) =>
             (Array.isArray(group?.hooks) ? group.hooks : [group]).some(
-              (hook) => typeof hook?.command === "string" && hook.command.includes(RUNS_THE_SWEEP),
+              (hook) => typeof hook?.command === "string" && typeof hook?.command === "string" &&
+                hook.command.trim().startsWith("sh ") &&
+                hook.command.includes(RUNS_THE_SWEEP),
             ),
           );
         if (!present) {
