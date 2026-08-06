@@ -224,13 +224,16 @@ const CASES = [
   },
   {
     gate: "reminder-parity",
-    what: "a wrapper with no words inside it, which arrives correctly shaped and says nothing",
+    what: "one tool handed the other declared sentence, which every rule that only pools them accepts",
     seed(root) {
       edit(root, WRAPPED_HOOKS, (hooks) => {
-        const hook = hooks.hooks.UserPromptSubmit[0].hooks[0];
-        const doc = unwrap(hook.command);
-        doc.hookSpecificOutput.additionalContext = undefined;
-        hook.command = rewrap(doc);
+        const group = hooks.hooks.sessionStart[0];
+        const doc = unwrap(group.command);
+        // Both sentences stay declared and both are still said somewhere, so nothing that
+        // pools them objects. Only knowing WHICH words belong here catches it.
+        doc.additional_context = unwrap(hooks.hooks.SessionStart[0].hooks[0].command)
+          .hookSpecificOutput.additionalContext;
+        group.command = rewrap(doc);
       });
     },
   },
@@ -345,9 +348,32 @@ const CASES = [
     gate: "reminder-parity",
     what: "a reminder split across two lines, where a shell deletes the join and runs the halves together",
     seed(root) {
+      // Seeded in the plain-words file: there the sentence sits in double quotes, where a
+      // trailing backslash continues the line. Inside single quotes it would be literal and
+      // this would test nothing.
+      edit(root, BARE_HOOKS, (hooks) => {
+        const hook = hooks.UserPromptSubmit[0].hooks[0];
+        hook.command = hook.command.replace(" already know", " already\\\nknow");
+      });
+    },
+  },
+  {
+    gate: "reminder-parity",
+    what: "an unquoted payload, which some shells tear in half before the command ever sees it",
+    seed(root) {
       edit(root, WRAPPED_HOOKS, (hooks) => {
         const hook = hooks.hooks.UserPromptSubmit[0].hooks[0];
-        hook.command = hook.command.replace(" already know", " already\\\nknow");
+        hook.command = `printf %s ${JSON.stringify(unwrap(hook.command))}`;
+      });
+    },
+  },
+  {
+    gate: "reminder-parity",
+    what: "a backslash handed to echo, which shells disagree about",
+    seed(root) {
+      edit(root, BARE_HOOKS, (hooks) => {
+        const hook = hooks.UserPromptSubmit[0].hooks[0];
+        hook.command = hook.command.replace("recall it", "recall\\tit");
       });
     },
   },
