@@ -129,6 +129,22 @@ agy plugin install ./dazzer-plugin/plugins/dazzer-connect
 devin plugins install dazzer-io/dazzer-plugin#plugins/dazzer-connect
 ```
 
+### Signing in
+
+**When the sign-in happens is not the same on every tool**, and assuming otherwise cost us a day.
+
+**Claude Code** opens it for you. The connection line above brings up the sign-in itself, one click, and there is no way to miss it.
+
+**Codex** does not. Nothing appears when the connection installs. The sign-in surfaces only when something first tries to reach your Brain, and if it fails there it fails quietly, leaving an AI told to check something it cannot open. Do it up front instead:
+
+```
+codex mcp login dazzer
+```
+
+For **GitHub Copilot, Antigravity, Cursor and Devin** this is not established. Follow that tool's own way of signing a connection in.
+
+**Whoever you are already signed in as is who it signs in as.** Nothing asks and nothing warns. If you are testing with a different account, sign out of Dazzer in your browser first, or the memories land under the wrong person and the dashboard you are watching never shows them.
+
 Two of these have been run and watched working: Claude Code, where it registers the connection and
 asks to sign in, and Codex, where the connection then appears with a sign-in waiting. The other
 four follow each tool's own established shape and have not yet been run. Where that matters is

@@ -286,6 +286,41 @@
         "command": "devin plugins install dazzer-io/dazzer-plugin#plugins/dazzer-connect",
         "proven": null
       }
+    },
+    "signInByTool": {
+      "claude-code": {
+        "when": "during-install",
+        "note": "The connection line opens the sign-in itself. One click, and there is no way to miss it.",
+        "proven": "watched on a clean Claude Code"
+      },
+      "codex": {
+        "when": "own-step",
+        "kind": "run",
+        "where": "terminal",
+        "command": "codex mcp login dazzer",
+        "note": "Nothing appears when the connection installs. Without this the first thing that reaches your Brain fails, quietly.",
+        "proven": null
+      },
+      "copilot": {
+        "when": "unknown",
+        "note": "Not established. Follow the tool's own way of signing a connection in.",
+        "proven": null
+      },
+      "antigravity": {
+        "when": "unknown",
+        "note": "Not established. Follow the tool's own way of signing a connection in.",
+        "proven": null
+      },
+      "cursor": {
+        "when": "unknown",
+        "note": "Not established. Follow the tool's own way of signing a connection in.",
+        "proven": null
+      },
+      "devin": {
+        "when": "unknown",
+        "note": "Not established. Follow the tool's own way of signing a connection in.",
+        "proven": null
+      }
     }
   },
   "provenance": {

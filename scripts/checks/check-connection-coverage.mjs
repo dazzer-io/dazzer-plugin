@@ -20,6 +20,12 @@
  *
  * A TOOL MAY HAVE NO WAY IN, and that is allowed, but only out loud: set its entry to null
  * with the reason. Silence is the failure this exists to refuse.
+ *
+ * WHEN THE SIGN-IN HAPPENS IS ALSO PER TOOL, and that caught us a second time. On Claude the
+ * connection line opens the sign-in itself, so nobody can miss it. On Codex nothing appears at
+ * all: the sign-in surfaces only when something first tries to reach the Brain, and if it fails
+ * there it fails quietly. Setup that ends without a sign-in step on a tool that needs one leaves
+ * a person exactly where the missing connection line left them.
  */
 
 import { join } from "node:path";
@@ -97,6 +103,25 @@ runGate({
           message: `"${tool.id}" has a connection entry with nothing in it a person could follow.`,
         });
         continue;
+      }
+
+      // Every tool has to say WHEN its sign-in happens, and a tool whose sign-in needs its own
+      // step has to say what that step is. "Unknown" is allowed and honest; missing is not.
+      const signIn = manifest.installConnection?.signInByTool?.[tool.id];
+      if (signIn === undefined) {
+        findings.push({
+          file: rel(MANIFEST),
+          message:
+            `"${tool.id}" never says when its sign-in happens. On one tool the connection opens ` +
+            "it; on another nothing appears until something first reaches the Brain, and a person " +
+            "given no step there is left with an AI that fails quietly.",
+        });
+      } else if (signIn.when === "own-step" && !isUsable(signIn)) {
+        findings.push({
+          file: rel(MANIFEST),
+          message:
+            `"${tool.id}" says its sign-in needs a step of its own and then does not give one.`,
+        });
       }
 
       // A connection line that reads exactly like the reminders line is the mistake this
