@@ -44,7 +44,7 @@ const GATES = [
   // Documentation that would otherwise drift away from the code.
   { id: "docs-truth", name: "knobs and instructions match the code", cmd: CHECK("check-docs-truth") },
   { id: "install-parity", name: "printed and rendered install steps agree", cmd: CHECK("check-install-parity") },
-  { id: "reminder-parity", name: "the reminders say what we tell readers to expect", cmd: CHECK("check-reminder-parity") },
+  { id: "reminder-parity", name: "every tool gets a reminder it can actually read", cmd: CHECK("check-reminder-parity") },
 
   // CI guarding itself.
   { id: "workflow-sha-pin", name: "every action is pinned to a commit", cmd: CHECK("check-workflow-sha-pin") },

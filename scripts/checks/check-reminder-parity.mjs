@@ -26,8 +26,266 @@ const MANIFEST = join(REPO_ROOT, "tools.manifest.json");
 /** Every reminder we speak opens with this, which is what makes one findable in a reply. */
 const SPOKEN_MARK = "[Dazzer]";
 
-/** `echo "..."` - the only shape a hook uses to say something to the model. */
-const ECHOED = /^echo\s+"([\s\S]*)"$/;
+/** A reminder speaks by printing. The end-of-reply script runs a file and is not one. */
+const EMITTER = new Set(["printf", "echo"]);
+
+/**
+ * Anything that would make a shell do something rather than just hand over words. None of
+ * these belong in a reminder, and the presence of one is the difference between a sentence
+ * and an instruction.
+ */
+const MAKES_IT_DO_SOMETHING_EVEN_QUOTED = new Set(["$", "`"]);
+const MAKES_IT_DO_SOMETHING = new Set([
+  ...MAKES_IT_DO_SOMETHING_EVEN_QUOTED,
+  ";", "|", "&", "<", ">", "(", ")", "\n",
+]);
+
+/**
+ * Characters a shell would try to match against filenames. `[Dazzer]` unquoted is not a
+ * word, it is a pattern matching any one of D, a, z, e, r - so in a folder holding a file
+ * called `r`, the marker every reader looks for is replaced by that filename before the
+ * reminder is ever spoken.
+ */
+const MATCHED_AGAINST_FILENAMES = new Set(["*", "?", "[", "]", "~"]);
+
+/** Inside double quotes a backslash escapes only these; before anything else it is literal. */
+const ESCAPABLE_IN_DOUBLE_QUOTES = new Set(['"', "\\", "$", "`"]);
+
+/**
+ * The words a shell would hand to the command, worked out rather than obtained by running
+ * it.
+ *
+ * Why not just run it: this file is checked on every proposed change, including changes
+ * proposed by strangers, and the commands live in a file those changes can edit. Running
+ * them would mean any proposal could make our own checks carry out its instructions. The
+ * workflow beside this one promises there is "no supply chain to trust", and executing the
+ * thing under test is exactly how that promise would quietly stop being true.
+ *
+ * Why not read it as text either: the wording sits inside quoting, and one apostrophe in
+ * ordinary English - "what's recorded" - ends that quoting early. The sentence still reads
+ * perfectly; only the quoting is wrong. A pattern over the raw line cannot see that, which
+ * is how a version of this reported the shipped defect as fine.
+ *
+ * So the quoting is followed properly, the way a shell would: quotes open and close, a
+ * backslash escapes the next character, and anything that would start a second command
+ * stops the walk. Throws for a caller to turn into a finding.
+ */
+const CONTINUED =
+  "it is split across lines with a backslash, and a shell deletes both that backslash and " +
+  "the newline - so the words either side run together into something else";
+
+function wordsOf(command) {
+  const words = [];
+  let word = "";
+  let started = false;
+  let quote = "";
+
+  for (let i = 0; i < command.length; i++) {
+    const ch = command[i];
+
+    if (quote === "'") {
+      // Nothing is special inside single quotes, which is what makes '\'' work: it closes,
+      // hands over one escaped apostrophe, and opens again.
+      if (ch === "'") quote = "";
+      else { word += ch; started = true; }
+      continue;
+    }
+
+    if (quote === '"') {
+      // A backslash here escapes only a few characters. Before anything else the shell
+      // keeps BOTH, so dropping it would have this gate vouch for one sentence while the
+      // person receives another.
+      if (ch === "\\" && command[i + 1] === "\n") throw new Error(CONTINUED);
+      if (ch === "\\" && ESCAPABLE_IN_DOUBLE_QUOTES.has(command[i + 1])) {
+        word += command[++i];
+        continue;
+      }
+      if (ch === '"') { quote = ""; continue; }
+      if (MAKES_IT_DO_SOMETHING_EVEN_QUOTED.has(ch)) {
+        throw new Error(`"${ch}" would make a shell do something, even inside quotes`);
+      }
+      word += ch;
+      continue;
+    }
+
+    if (ch === "'" || ch === '"') { quote = ch; started = true; continue; }
+    if (ch === "\\" && command[i + 1] === "\n") throw new Error(CONTINUED);
+    if (ch === "\\" && i + 1 < command.length) { word += command[++i]; started = true; continue; }
+    if (ch === " " || ch === "\t") {
+      if (started) { words.push(word); word = ""; started = false; }
+      continue;
+    }
+    if (ch === "#" && !started) throw new Error("a comment starts here, so the rest is never said");
+    if (MAKES_IT_DO_SOMETHING.has(ch)) {
+      throw new Error(`"${ch}" would make a shell do something beyond saying words`);
+    }
+    if (MATCHED_AGAINST_FILENAMES.has(ch)) {
+      throw new Error(`"${ch}" is matched against filenames unless it is quoted`);
+    }
+    word += ch;
+    started = true;
+  }
+
+  if (command.endsWith("\\")) throw new Error("it ends on a backslash, which the shell swallows");
+  if (quote !== "") throw new Error("the quoting never closes - an apostrophe in the wording is the usual cause");
+  if (started) words.push(word);
+  return words;
+}
+
+/**
+ * What a hook says, or undefined if it says nothing this gate can vouch for. A reason it
+ * cannot is reported rather than skipped, because a silent skip is how a gate stops
+ * watching a file without anyone noticing.
+ */
+function saidBy(command, trigger, file, findings, required) {
+  const cmd = command.trim();
+
+  // Is this a reminder at all? Only the first word decides, and it is never quoted. The
+  // end-of-reply script runs a file and legitimately needs the things a reminder may not
+  // contain, so it must be set aside before any of them are objected to.
+  if (!EMITTER.has(cmd.split(/\s/, 1)[0])) {
+    if (required) {
+      findings.push({
+        file,
+        message:
+          `the ${trigger} reminder does not say anything - it runs something instead. The host ` +
+          "that answers this trigger has no other way to hear from us.",
+      });
+    }
+    return undefined;
+  }
+
+  let words;
+  try {
+    words = wordsOf(cmd);
+  } catch (e) {
+    findings.push({
+      file,
+      message:
+        `the ${trigger} reminder would not reach a shell intact: ${e.message}. Write each ` +
+        "lone ' as '\\'' inside the quoted part, and keep everything else out.",
+    });
+    return undefined;
+  }
+
+  // `printf %s WORDS`, or `echo WORDS`. Any other spelling of "print this" is fine as long
+  // as it reduces to the words themselves.
+  const [name, ...rest] = words;
+  const isPrintf = name === "printf";
+  const args = isPrintf ? (rest[0] === "%s" ? rest.slice(1) : undefined) : rest;
+  // `printf %s a b` reuses the format for each argument and prints "ab"; `echo a b` puts a
+  // space between them. Joining both the same way would misreport one of them.
+  const spoken = (args ?? []).join(isPrintf ? "" : " ").trim();
+  if (!isPrintf && spoken.includes("\\")) {
+    findings.push({
+      file,
+      message:
+        `the ${trigger} reminder hands a backslash to echo, and shells disagree about what ` +
+        "echo does with one - some print it, some turn it into something else entirely. " +
+        "Print it with printf instead, where the words are handed over untouched.",
+    });
+    return undefined;
+  }
+  if (spoken === "") {
+    findings.push({
+      file,
+      message: `the ${trigger} reminder prints nothing anyone can read back.`,
+    });
+    return undefined;
+  }
+
+  // The words as printed, plus whatever they parse as. Which of the two a host reads is
+  // decided by the trigger, not here.
+  let doc;
+  try {
+    doc = JSON.parse(spoken);
+  } catch {
+    doc = undefined;
+  }
+  return { spoken, doc };
+}
+
+/**
+ * What each host actually reads, per trigger.
+ *
+ * These are not interchangeable and they are not a matter of taste. Every one of them was
+ * paid for: Codex refuses anything else AND shows the person an error on every message;
+ * Cursor throws plain words away without a word to anyone; Antigravity takes a step to
+ * inject rather than a field of context; and Copilot's per-message trigger does not read
+ * its reminder's output at all, which is why its words are said at the start of a session
+ * instead. A reminder printed in any other shape is not a quieter reminder, it is none.
+ *
+ * Copilot is deliberately absent from this table. Its own reference says the moment it
+ * answers does not read what a reminder prints - but that same reference was already found
+ * wrong about this tool once, by running it, so nothing here is changed on its word alone.
+ */
+const claudeShaped = (event) => (doc) =>
+  doc?.hookSpecificOutput?.hookEventName === event ? doc.hookSpecificOutput.additionalContext : undefined;
+
+/**
+ * Every trigger that must carry a reminder, and who loses one if it goes missing.
+ *
+ * The two wording rules cannot see this. They pool the sentences from both files and ask
+ * whether each is spoken SOMEWHERE, so one tool's reminder can be deleted outright and the
+ * run stays green as long as another tool still says the same words. That is not a
+ * hypothetical: a reminder was removed from this file on the strength of a tool's
+ * documentation, and nothing objected.
+ */
+const MUST_CARRY_A_REMINDER = new Map([
+  ["UserPromptSubmit", "Claude Code and Codex, on every message"],
+  ["SessionStart", "Claude Code and Codex, after a reset"],
+  ["PreInvocation", "Antigravity"],
+  ["sessionStart", "Cursor"],
+  ["userPromptSubmitted", "Copilot"],
+]);
+
+/** The plain-words file answers to one host, and losing its two moments is just as silent. */
+const MUST_CARRY_IN_THE_PLAIN_FILE = new Map([
+  ["UserPromptSubmit", "Devin, on every message"],
+  ["SessionStart", "Devin, after a reset"],
+]);
+
+const SHAPES = new Map([
+  [
+    "UserPromptSubmit",
+    {
+      hosts: "Claude Code and Codex",
+      read: claudeShaped("UserPromptSubmit"),
+      looks: '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"..."}}',
+    },
+  ],
+  [
+    "SessionStart",
+    {
+      hosts: "Claude Code and Codex",
+      read: claudeShaped("SessionStart"),
+      looks: '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"..."}}',
+    },
+  ],
+  [
+    "sessionStart",
+    {
+      hosts: "Cursor",
+      read: (doc) => doc?.additional_context,
+      looks: '{"additional_context":"..."}',
+    },
+  ],
+  [
+    "PreInvocation",
+    {
+      hosts: "Antigravity",
+      read: (doc) => doc?.injectSteps?.[0]?.ephemeralMessage,
+      looks: '{"injectSteps":[{"ephemeralMessage":"..."}]}',
+    },
+  ],
+]);
+
+/**
+ * The only top-level fields a hooks file may carry. Codex refuses the ENTIRE file on
+ * anything else - "unknown field `version`" silently cost us every reminder in it - so an
+ * extra key here is never cosmetic.
+ */
+const ALLOWED_TOP_LEVEL = new Set(["description", "hooks"]);
 
 /**
  * Every sentence any hook speaks, with where it was found. Parsed, never pattern-matched
@@ -40,22 +298,108 @@ function spokenByHooks(findings) {
   for (const file of walk(join(REPO_ROOT, "plugins"))) {
     if (!file.endsWith("hooks.json")) continue;
 
+    const where = rel(file);
     const parsed = readJson(file, findings);
     if (parsed === undefined) continue;
 
-    // Both shapes ship: a bare map of triggers, and one wrapped in `hooks`.
-    const triggers = parsed.hooks ?? parsed;
+    // Both shapes ship: a bare map of triggers, and one wrapped in `hooks`. A file using the
+    // wrapper form is the one a strict host parses, and it refuses the whole file over any
+    // other key sitting beside it - so nothing may.
+    // Decided by WHICH FILE this is, never by what it contains. Keyed on content, deleting
+    // one wrapper line would switch every shape rule below off at once and leave the run
+    // green - the exact edit these rules exist to refuse.
+    // Which file this is, by identity. Keyed on content instead, deleting one wrapper line
+    // would switch every shape rule off at once and leave the run green. Keyed on any
+    // trailing "hooks/hooks.json", a second plugin growing a hooks folder would be told it
+    // owes every host a reminder it was never meant to carry.
+    const strict = file.endsWith(join("dazzer", "hooks", "hooks.json"));
+    const plain = file.endsWith(join("dazzer", "hooks.json")) && !strict;
+
+    // Every key in the file, whichever shape it takes, must be something its hosts expect.
+    // Both kinds of host throw away an entire file over one entry they do not recognise -
+    // the strict one names the key in a warning, the other simply goes quiet - so a stray
+    // key is never cosmetic. In the wrapper shape only two names are allowed beside the
+    // hooks; in the bare shape every key is a trigger, and a trigger holds a list.
+    for (const [key, value] of Object.entries(parsed)) {
+      const fine = strict ? ALLOWED_TOP_LEVEL.has(key) : Array.isArray(value);
+      if (fine) continue;
+      findings.push({
+        file: where,
+        message:
+          `carries "${key}", which is not something a host reading this file expects. One ` +
+          "unrecognised entry costs the whole file: every reminder in it reaches nobody, and " +
+          "the person gets a warning or silence instead.",
+      });
+    }
+
+    const triggers = strict ? parsed.hooks : parsed;
     if (triggers === null || typeof triggers !== "object") continue;
+
+    const spoke = new Set();
 
     for (const [trigger, groups] of Object.entries(triggers)) {
       if (!Array.isArray(groups)) continue;
       for (const group of groups) {
-        for (const hook of group?.hooks ?? []) {
+        // Two shapes for the same thing: a group holding a list of hooks, and - the shape
+        // one host uses - the hook written straight into the group. Reading only the first
+        // is how this gate never once looked at that host's reminders.
+        const hooks = Array.isArray(group?.hooks) ? group.hooks : [group];
+        for (const hook of hooks) {
           if (typeof hook?.command !== "string") continue;
-          const said = ECHOED.exec(hook.command.trim())?.[1];
-          if (said === undefined || !said.startsWith(SPOKEN_MARK)) continue;
-          out.push({ file: rel(file), trigger, text: said });
+
+          // Devin's file is the plain-words one and wants exactly that, so the shape table
+          // applies only where a host is known to read structure.
+          const shape = strict ? SHAPES.get(trigger) : undefined;
+          const said = saidBy(hook.command, trigger, where, findings, shape !== undefined);
+
+          if (shape === undefined) {
+            // No host here reads structure, so the words themselves are the reminder. A
+            // hook that says nothing is simply not one, and is left alone.
+            if (said !== undefined && said.spoken.startsWith(SPOKEN_MARK)) {
+              spoke.add(trigger);
+              out.push({ file: where, trigger, text: said.spoken });
+            }
+            continue;
+          }
+
+          if (said === undefined) continue; // already reported, in detail, by saidBy
+
+          const text = said.doc === undefined ? undefined : shape.read(said.doc);
+          if (typeof text !== "string") {
+            findings.push({
+              file: where,
+              message:
+                `the ${trigger} reminder is not in the shape ${shape.hosts} read, so it reaches ` +
+                `nobody there. It has to print ${shape.looks}`,
+            });
+            continue;
+          }
+          if (!text.startsWith(SPOKEN_MARK)) {
+            findings.push({
+              file: where,
+              message:
+                `the ${trigger} reminder says "${text.slice(0, 40)}", which is not one of ours. ` +
+                "Nothing downstream can tell the reminders arrived.",
+            });
+            continue;
+          }
+          spoke.add(trigger);
+          out.push({ file: where, trigger, text });
         }
+      }
+    }
+
+    // Only the two files that carry reminders owe anybody one.
+    if (strict || plain) {
+      for (const [trigger, who] of strict ? MUST_CARRY_A_REMINDER : MUST_CARRY_IN_THE_PLAIN_FILE) {
+        if (spoke.has(trigger)) continue;
+        findings.push({
+          file: where,
+          message:
+            `nothing here speaks to ${who}. The ${trigger} reminder is missing or silent, and ` +
+            "because the other rules only ask whether a sentence is said somewhere, losing a " +
+            "whole tool this way is invisible to them.",
+        });
       }
     }
   }
@@ -87,7 +431,7 @@ function declared(findings) {
 runGate({
   id: "reminder-parity",
   purpose: "What the reminders say and what we tell readers to expect are one set of sentences.",
-  rule: "every sentence a hook speaks is declared, and every declared sentence is spoken",
+  rule: "every tool gets a reminder, in the shape it reads, saying the words we declare",
   assert(findings) {
     const spoken = spokenByHooks(findings);
     const said = declared(findings);
