@@ -18,7 +18,7 @@
  * full in two separate hook files, and until now nothing compared those two either.
  */
 
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { REPO_ROOT, readJson, rel, runGate, walk } from "./lib/gate.mjs";
 
 const MANIFEST = join(REPO_ROOT, "tools.manifest.json");
@@ -47,6 +47,14 @@ const MAKES_IT_DO_SOMETHING = new Set([
  * reminder is ever spoken.
  */
 const MATCHED_AGAINST_FILENAMES = new Set(["*", "?", "[", "]", "~"]);
+
+/**
+ * Braces. Some shells rewrite `{a,b}` into two words before the command runs and some do
+ * not, so an unquoted payload arrives whole on one machine and torn in half on the next,
+ * with nothing to say which you got. Every shape here is a JSON object, which makes this
+ * the worst character to be relaxed about.
+ */
+const REWRITTEN_ON_SOME_MACHINES = new Set(["{", "}"]);
 
 /** Inside double quotes a backslash escapes only these; before anything else it is literal. */
 const ESCAPABLE_IN_DOUBLE_QUOTES = new Set(['"', "\\", "$", "`"]);
@@ -121,6 +129,9 @@ function wordsOf(command) {
     }
     if (MATCHED_AGAINST_FILENAMES.has(ch)) {
       throw new Error(`"${ch}" is matched against filenames unless it is quoted`);
+    }
+    if (REWRITTEN_ON_SOME_MACHINES.has(ch)) {
+      throw new Error(`"${ch}" is rewritten by some shells and not others unless it is quoted`);
     }
     word += ch;
     started = true;
@@ -215,9 +226,10 @@ function saidBy(command, trigger, file, findings, required) {
  * its reminder's output at all, which is why its words are said at the start of a session
  * instead. A reminder printed in any other shape is not a quieter reminder, it is none.
  *
- * Copilot is deliberately absent from this table. Its own reference says the moment it
- * answers does not read what a reminder prints - but that same reference was already found
- * wrong about this tool once, by running it, so nothing here is changed on its word alone.
+ * Copilot is deliberately absent from this table, and is NOT covered by some other moment
+ * instead - it has exactly one, and it still speaks plain words. Its own reference says that
+ * moment ignores whatever a reminder prints, but the same reference was already caught being
+ * wrong about this tool by running it, so nothing is changed here on its word alone.
  */
 const claudeShaped = (event) => (doc) =>
   doc?.hookSpecificOutput?.hookEventName === event ? doc.hookSpecificOutput.additionalContext : undefined;
@@ -232,17 +244,17 @@ const claudeShaped = (event) => (doc) =>
  * documentation, and nothing objected.
  */
 const MUST_CARRY_A_REMINDER = new Map([
-  ["UserPromptSubmit", "Claude Code and Codex, on every message"],
-  ["SessionStart", "Claude Code and Codex, after a reset"],
-  ["PreInvocation", "Antigravity"],
-  ["sessionStart", "Cursor"],
-  ["userPromptSubmitted", "Copilot"],
+  ["UserPromptSubmit", { who: "Claude Code and Codex, on every message", says: "recall" }],
+  ["SessionStart", { who: "Claude Code and Codex, after a reset", says: "resume" }],
+  ["PreInvocation", { who: "Antigravity", says: "recall" }],
+  ["sessionStart", { who: "Cursor", says: "recall" }],
+  ["userPromptSubmitted", { who: "Copilot", says: "recall" }],
 ]);
 
 /** The plain-words file answers to one host, and losing its two moments is just as silent. */
 const MUST_CARRY_IN_THE_PLAIN_FILE = new Map([
-  ["UserPromptSubmit", "Devin, on every message"],
-  ["SessionStart", "Devin, after a reset"],
+  ["UserPromptSubmit", { who: "Devin, on every message", says: "recall" }],
+  ["SessionStart", { who: "Devin, after a reset", says: "resume" }],
 ]);
 
 const SHAPES = new Map([
@@ -292,11 +304,11 @@ const ALLOWED_TOP_LEVEL = new Set(["description", "hooks"]);
  * against the raw file: a hook is structured, and reading it as text is how the first
  * defect in this repository happened.
  */
-function spokenByHooks(findings) {
+function spokenByHooks(findings, declaredById) {
   const out = [];
 
   for (const file of walk(join(REPO_ROOT, "plugins"))) {
-    if (!file.endsWith("hooks.json")) continue;
+    if (!file.endsWith(sep + "hooks.json")) continue;
 
     const where = rel(file);
     const parsed = readJson(file, findings);
@@ -321,7 +333,7 @@ function spokenByHooks(findings) {
     // key is never cosmetic. In the wrapper shape only two names are allowed beside the
     // hooks; in the bare shape every key is a trigger, and a trigger holds a list.
     for (const [key, value] of Object.entries(parsed)) {
-      const fine = strict ? ALLOWED_TOP_LEVEL.has(key) : Array.isArray(value);
+      const fine = parsed.hooks !== undefined ? ALLOWED_TOP_LEVEL.has(key) : Array.isArray(value);
       if (fine) continue;
       findings.push({
         file: where,
@@ -332,10 +344,12 @@ function spokenByHooks(findings) {
       });
     }
 
-    const triggers = strict ? parsed.hooks : parsed;
+    // Read whichever form the file is written in. Taken from the path instead, removing one
+    // wrapper line left nothing to read and the whole file went unchecked.
+    const triggers = parsed.hooks ?? parsed;
     if (triggers === null || typeof triggers !== "object") continue;
 
-    const spoke = new Set();
+    const spoke = new Map();
 
     for (const [trigger, groups] of Object.entries(triggers)) {
       if (!Array.isArray(groups)) continue;
@@ -356,7 +370,7 @@ function spokenByHooks(findings) {
             // No host here reads structure, so the words themselves are the reminder. A
             // hook that says nothing is simply not one, and is left alone.
             if (said !== undefined && said.spoken.startsWith(SPOKEN_MARK)) {
-              spoke.add(trigger);
+              spoke.set(trigger, said.spoken);
               out.push({ file: where, trigger, text: said.spoken });
             }
             continue;
@@ -383,7 +397,7 @@ function spokenByHooks(findings) {
             });
             continue;
           }
-          spoke.add(trigger);
+          spoke.set(trigger, text);
           out.push({ file: where, trigger, text });
         }
       }
@@ -391,15 +405,30 @@ function spokenByHooks(findings) {
 
     // Only the two files that carry reminders owe anybody one.
     if (strict || plain) {
-      for (const [trigger, who] of strict ? MUST_CARRY_A_REMINDER : MUST_CARRY_IN_THE_PLAIN_FILE) {
-        if (spoke.has(trigger)) continue;
-        findings.push({
-          file: where,
-          message:
-            `nothing here speaks to ${who}. The ${trigger} reminder is missing or silent, and ` +
-            "because the other rules only ask whether a sentence is said somewhere, losing a " +
-            "whole tool this way is invisible to them.",
-        });
+      for (const [trigger, { who, says }] of strict ? MUST_CARRY_A_REMINDER : MUST_CARRY_IN_THE_PLAIN_FILE) {
+        const said = spoke.get(trigger);
+        if (said === undefined) {
+          findings.push({
+            file: where,
+            message:
+              `nothing here speaks to ${who}. The ${trigger} reminder is missing or silent, and ` +
+              "because the other rules only ask whether a sentence is said somewhere, losing a " +
+              "whole tool this way is invisible to them.",
+          });
+          continue;
+        }
+        // WHICH words, not merely some words. Both declared sentences are always said
+        // somewhere, so one standing in for the other satisfies every rule that only pools
+        // them - and the words onboarding looks for are the ones that went missing.
+        const owed = declaredById.get(says);
+        if (owed !== undefined && said !== owed) {
+          findings.push({
+            file: where,
+            message:
+              `${who} is given the wrong reminder: this is where the "${says}" words belong, ` +
+              "and it says different ones. Anything looking for them here finds nothing.",
+          });
+        }
       }
     }
   }
@@ -433,8 +462,8 @@ runGate({
   purpose: "What the reminders say and what we tell readers to expect are one set of sentences.",
   rule: "every tool gets a reminder, in the shape it reads, saying the words we declare",
   assert(findings) {
-    const spoken = spokenByHooks(findings);
     const said = declared(findings);
+    const spoken = spokenByHooks(findings, new Map(said.map((d) => [d.id, d.text])));
 
     if (spoken.length === 0) {
       findings.push({ file: "plugins/", message: "no hook speaks anything; either the reminders are gone or this gate has stopped seeing them" });
