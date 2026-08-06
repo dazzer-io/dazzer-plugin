@@ -111,6 +111,23 @@ Copilot, Antigravity, Cursor and Devin. Devin's limit above was found by running
 and capturing exactly what it hands a reminder — not by reading its documentation, which describes
 a richer message than the one that actually arrives.
 
+**Watching it work was not enough, and it is worth saying exactly how it failed.** Watching
+proved a person saw the plugin do something. It did not prove the reminder's words ever reached
+the AI. On Codex they never did: one unexpected line made it throw the whole reminders file away,
+and it wants a reply in a particular shape, so plain words were discarded and reported as an error
+on every single message. On Cursor they never did either, and Cursor said nothing at all about it.
+
+So the bar is now a harder one. A reminder is given a word the AI could not otherwise know, and
+the AI is asked that word back. **Claude Code, Codex and Cursor each answered it**, so on those
+three the words are proven to arrive. Devin takes the plain wording it already gets.
+
+**Antigravity and Copilot are not settled, and are marked that way on purpose.** Antigravity's
+required shape comes from its published reference rather than from a run. Copilot's reference says
+it does not read anything a reminder prints at the per-message moment — which would mean its
+recall reminder cannot arrive — but that same reference was already caught being wrong about this
+tool once, by running it, so nothing here has been changed on its word. Copilot's moments are
+still the ones a real session confirmed. Settling those two needs a run, not more reading.
+
 Cursor was the last, and it is worth saying why it took two attempts. This repository briefly
 shipped a Cursor-specific listing of what it contains; Cursor preferred that file over the one it
 had been reading happily, could not make sense of it, and silently stopped finding the plugin at

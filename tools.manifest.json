@@ -144,7 +144,7 @@
         "note": "Two steps, and the second one happens inside Cursor rather than in a terminal."
       },
       "limits": [
-        "Cursor has no way for a plugin to speak privately to the AI at the end of a reply. It only accepts a message and submits it as though you had typed it, so on Cursor the save prompt is visible in your conversation. Everything works; it just is not silent."
+        "Cursor has no way for a plugin to speak privately to the AI at the end of a reply. It only accepts a message and submits it as though you had typed it, so on Cursor the save prompt is visible in your conversation. The save prompt still does its job; it just is not silent."
       ],
       "gotchas": [
         "If you have installed it before, remove and re-add rather than update. Cursor's update command reports success without actually re-fetching, so you keep whatever version you first got. Run `cursor-agent plugin marketplace remove dazzer` then add it again.",
@@ -193,7 +193,7 @@
   },
 
   "provenance": {
-    "what": "All six were installed into a real copy of the tool and watched working.",
+    "what": "All six were installed into a real copy of the tool and watched working, which proved too little: on two of them the reminder never reached the AI at all. Claude Code, Codex and Cursor are now proven by giving the AI a word only the reminder carried and asking for it back. Antigravity rests on its own published reference, not on a run. Copilot keeps the moments a real session confirmed: its reference says one of them ignores what a reminder prints, but that same reference was already caught being wrong about this tool, so nothing was changed on its word.",
     "tools": ["claude-code", "codex", "copilot", "antigravity", "cursor", "devin"]
   }
 }

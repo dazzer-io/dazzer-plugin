@@ -1,12 +1,11 @@
 {
-  "version": 1,
   "hooks": {
     "UserPromptSubmit": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "echo \"[Dazzer] Before answering anything your Brain may already know, recall it - answer from what is recorded, not from assumption. As real decisions accumulate in this session, checkpoint your progress so a context reset cannot lose your place.\""
+            "command": "printf %s '{\"hookSpecificOutput\":{\"hookEventName\":\"UserPromptSubmit\",\"additionalContext\":\"[Dazzer] Before answering anything your Brain may already know, recall it - answer from what is recorded, not from assumption. As real decisions accumulate in this session, checkpoint your progress so a context reset cannot lose your place.\"}}'"
           }
         ]
       }
@@ -17,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo \"[Dazzer] This session restarted from a context reset, so nothing reconnected and you were never re-oriented. Call resume to restore your saved working session before continuing, and before asking the user to repeat anything.\""
+            "command": "printf %s '{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":\"[Dazzer] This session restarted from a context reset, so nothing reconnected and you were never re-oriented. Call resume to restore your saved working session before continuing, and before asking the user to repeat anything.\"}}'"
           }
         ]
       }
@@ -37,7 +36,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo \"[Dazzer] Before answering anything your Brain may already know, recall it - answer from what is recorded, not from assumption. As real decisions accumulate in this session, checkpoint your progress so a context reset cannot lose your place.\""
+            "command": "printf %s '{\"injectSteps\":[{\"ephemeralMessage\":\"[Dazzer] Before answering anything your Brain may already know, recall it - answer from what is recorded, not from assumption. As real decisions accumulate in this session, checkpoint your progress so a context reset cannot lose your place.\"}]}'"
           }
         ]
       }
@@ -49,7 +48,7 @@
     ],
     "sessionStart": [
       {
-        "command": "echo \"[Dazzer] Before answering anything your Brain may already know, recall it - answer from what is recorded, not from assumption. As real decisions accumulate in this session, checkpoint your progress so a context reset cannot lose your place.\""
+        "command": "printf %s '{\"additional_context\":\"[Dazzer] Before answering anything your Brain may already know, recall it - answer from what is recorded, not from assumption. As real decisions accumulate in this session, checkpoint your progress so a context reset cannot lose your place.\"}'"
       }
     ],
     "userPromptSubmitted": [
