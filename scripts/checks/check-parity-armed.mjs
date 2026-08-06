@@ -23,39 +23,47 @@ const CHECKS = join(REPO_ROOT, "scripts", "checks");
 const readJson = (p) => JSON.parse(readFileSync(p, "utf8"));
 const writeJson = (p, v) => writeFileSync(p, `${JSON.stringify(v, null, 2)}\n`);
 
+/** Where the gates read from, so a file the fixture forgets cannot make a fault look caught. */
+const WRAPPED_HOOKS = ["plugins", "dazzer", "hooks", "hooks.json"];
+const CURSOR_HOOKS = ["plugins", "dazzer", "hooks", "cursor.json"];
+const CURSOR_LISTING = ["plugins", "dazzer", ".cursor-plugin", "plugin.json"];
+const CLAUDE_LISTING = ["plugins", "dazzer", ".claude-plugin", "plugin.json"];
+const DEVIN_LISTING = ["plugins", "dazzer", ".devin-plugin", "plugin.json"];
+// The script the end-of-reply prompt names. Without it the path check refuses a copy of a
+// tree it accepts in place, which reads as a broken gate rather than a short fixture.
+const SWEEP = ["plugins", "dazzer", "scripts", "capture-sweep.sh"];
+const BARE_HOOKS = ["plugins", "dazzer", "hooks.json"];
+const MANIFEST = ["tools.manifest.json"];
+const README = ["README.md"];
+const CONNECTION = ["plugins", "dazzer-connect", ".mcp.json"];
+
+/**
+ * Everything the fixture holds - EVERY file any parity gate reads, listed in one place.
+ * A file left out of this is how a fault seeded in it would look caught while the gate was
+ * never shown the file it lives in; and the listings that say where each host looks are
+ * here for the opposite reason, because without them the wiring rules see a missing pointer
+ * in every fixture and refuse a tree that is actually fine.
+ */
+const FIXTURE_FILES = [
+  README,
+  MANIFEST,
+  CONNECTION,
+  WRAPPED_HOOKS,
+  CURSOR_HOOKS,
+  BARE_HOOKS,
+  CURSOR_LISTING,
+  CLAUDE_LISTING,
+  DEVIN_LISTING,
+  SWEEP,
+];
+
 /** A throwaway copy of the parts of the repo the parity gates read. */
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), "dazzer-parity-"));
-  mkdirSync(join(root, "plugins", "dazzer-connect"), { recursive: true });
-  mkdirSync(join(root, "plugins", "dazzer", "hooks"), { recursive: true });
-
-  cpSync(join(REPO_ROOT, "README.md"), join(root, "README.md"));
-  cpSync(join(REPO_ROOT, "tools.manifest.json"), join(root, "tools.manifest.json"));
-  cpSync(
-    join(REPO_ROOT, "plugins", "dazzer-connect", ".mcp.json"),
-    join(root, "plugins", "dazzer-connect", ".mcp.json"),
-  );
-  cpSync(
-    join(REPO_ROOT, "plugins", "dazzer", "hooks", "hooks.json"),
-    join(root, "plugins", "dazzer", "hooks", "hooks.json"),
-  );
-  cpSync(
-    join(REPO_ROOT, ...CURSOR_HOOKS),
-    join(root, ...CURSOR_HOOKS),
-  );
-  // The two listings that say where each host looks. Left out, the wiring rules see a
-  // missing pointer in every fixture and refuse a tree that is actually fine.
-  for (const listing of [CURSOR_LISTING, CLAUDE_LISTING, DEVIN_LISTING]) {
-    mkdirSync(dirname(join(root, ...listing)), { recursive: true });
-    cpSync(join(REPO_ROOT, ...listing), join(root, ...listing));
+  for (const where of FIXTURE_FILES) {
+    mkdirSync(dirname(join(root, ...where)), { recursive: true });
+    cpSync(join(REPO_ROOT, ...where), join(root, ...where));
   }
-  // The other hooks file - the plain-words one, read by a different host than the file
-  // just above it. Leaving it out of the copy is how a fault seeded in it would look
-  // caught while the gate was never shown the file it lives in.
-  cpSync(
-    join(REPO_ROOT, "plugins", "dazzer", "hooks.json"),
-    join(root, "plugins", "dazzer", "hooks.json"),
-  );
   return root;
 }
 
@@ -71,15 +79,6 @@ function refuses(gate, root) {
     return true;
   }
 }
-
-/** Where the gates read from, so a file the fixture forgets cannot make a fault look caught. */
-const WRAPPED_HOOKS = ["plugins", "dazzer", "hooks", "hooks.json"];
-const CURSOR_HOOKS = ["plugins", "dazzer", "hooks", "cursor.json"];
-const CURSOR_LISTING = ["plugins", "dazzer", ".cursor-plugin", "plugin.json"];
-const CLAUDE_LISTING = ["plugins", "dazzer", ".claude-plugin", "plugin.json"];
-const DEVIN_LISTING = ["plugins", "dazzer", ".devin-plugin", "plugin.json"];
-const BARE_HOOKS = ["plugins", "dazzer", "hooks.json"];
-const MANIFEST = ["tools.manifest.json"];
 
 /** Read, change, write back. Every seed is one of these, so only the fault itself shows. */
 function edit(root, where, change) {
@@ -263,8 +262,16 @@ const CASES = [
       // That host writes the hook straight into the group instead of nesting a list inside
       // it. Read only the nested shape and this entry is invisible, so its wording could
       // drift away from everyone else's with nothing to notice.
+      //
+      // Reworded INSIDE the shape Cursor reads, so no shape rule refuses first. Written as
+      // plain words instead, this stopped proving its own rule and became a duplicate of the
+      // plain-words case below - both were refused for the shape, and the rewording that
+      // gives this case its name was never reached.
       edit(root, CURSOR_HOOKS, (hooks) => {
-        hooks.hooks.sessionStart[0].command = 'echo "[Dazzer] Reworded where nothing was looking."';
+        const group = hooks.hooks.sessionStart[0];
+        const doc = unwrap(group.command);
+        doc.additional_context = "[Dazzer] Reworded where nothing was looking.";
+        group.command = rewrap(doc);
       });
     },
   },
@@ -313,15 +320,16 @@ const CASES = [
   },
   {
     gate: "reminder-parity",
-    what: "the one wrapper line removed, which would switch every shape rule off at once",
+    what: "the one wrapper line removed, which the host reading this file discards it over",
     seed(root) {
+      // The wrapper and nothing else - every word left exactly as it was. Seeded with the
+      // reminders degraded to plain words as well, this was refused for the wording and the
+      // missing wrapper went untested; the rules are keyed on which file this is, so the
+      // wrapper has to be the whole fault for its absence to be what gets caught.
       edit(root, WRAPPED_HOOKS, (hooks) => {
         const triggers = hooks.hooks;
         delete hooks.hooks;
         for (const [name, groups] of Object.entries(triggers)) hooks[name] = groups;
-        // ...and with the shapes no longer demanded, plain words again.
-        const hook = hooks.UserPromptSubmit[0].hooks[0];
-        hook.command = `echo "${unwrap(hook.command).hookSpecificOutput.additionalContext}"`;
       });
     },
   },
@@ -472,6 +480,34 @@ const CASES = [
     seed(root) {
       edit(root, CURSOR_HOOKS, (hooks) => {
         delete hooks.hooks.stop;
+      });
+    },
+  },
+  {
+    gate: "trigger-paths",
+    what: "a script named in a file the check had never looked at, which does not exist",
+    seed(root) {
+      edit(root, CURSOR_HOOKS, (hooks) => {
+        const hook = hooks.hooks.stop[0];
+        hook.command = hook.command.replace("capture-sweep.sh", "does-not-exist.sh");
+      });
+    },
+  },
+  {
+    gate: "reminder-parity",
+    what: "the end-of-reply prompt silenced rather than deleted, which any presence test would accept",
+    seed(root) {
+      edit(root, WRAPPED_HOOKS, (hooks) => {
+        hooks.hooks.Stop[0].hooks[0].command = ": # disabled for now";
+      });
+    },
+  },
+  {
+    gate: "reminder-parity",
+    what: "a trigger written one level too shallow, which used to throw and hide every other finding",
+    seed(root) {
+      edit(root, WRAPPED_HOOKS, (hooks) => {
+        hooks.hooks.Stop = { hooks: [{ command: "x" }] };
       });
     },
   },
