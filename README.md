@@ -212,11 +212,14 @@ until you tell it otherwise, so a fix published today reaches you only when you 
 
 ### Claude
 
+**These two go in a terminal, unlike the install steps above.** Typing `/plugin update` into
+Claude opens a menu and quietly keeps the copy you already had — there is no such command.
+
 ```
-/plugin marketplace update dazzer
+claude plugin marketplace update dazzer
 ```
 ```
-/plugin update dazzer@dazzer
+claude plugin update dazzer@dazzer
 ```
 
 ### Codex
@@ -242,12 +245,26 @@ cursor-agent plugin marketplace remove dazzer
 cursor-agent plugin marketplace add https://github.com/dazzer-io/dazzer-plugin.git
 ```
 
+Then, in Cursor, type `/plugins` and choose **dazzer** — the same last step as installing.
+Re-adding makes it available again; it does not switch it back on.
+
+### The connection
+
+Only if you installed `dazzer-connect` as well:
+
+```
+claude plugin marketplace update dazzer
+```
+```
+claude plugin update dazzer-connect@dazzer
+```
+
 ### Copilot, Antigravity and Devin
 
-**Not established.** Nobody has run an update against these three, and their own
-documentation has already been wrong about this plugin once, so nothing is printed here
-rather than a guess that fails quietly. Reinstalling with the steps at the top of this file
-is the honest fallback.
+**Not established.** Nobody has run an update against these three, so nothing is printed
+here rather than a guess that fails quietly — and for two of them their own documentation
+has already been wrong about this plugin once. Reinstalling with the steps at the top of
+this file is the honest fallback.
 
 ## Uninstall
 

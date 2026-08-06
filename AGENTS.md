@@ -73,11 +73,14 @@ disagree on exactly the comparison one defect lives on.
 git config core.hooksPath .githooks
 ```
 
-That runs the whole suite on every push and refuses one that would take a stale instruction
-with it. It is a convenience, not the guarantee — that setting lives in your clone, and
-there is no install step here to attach it to on your behalf. **The enforcement is the
-workflow, which runs the same suite on every proposed change and cannot be skipped.**
-The hook only saves you the round trip.
+That runs the suite on every push and refuses one that would take a stale instruction with
+it. Two honest limits. It runs the suite **once**, under your system shell — on a Mac that
+is bash, so it never exercises the dash path the paragraph above warns about, which the
+workflow does run. And the setting lives in your clone: there is no install step here to
+attach it to on your behalf, so a fresh clone is unprotected until someone runs that line.
+
+**The enforcement is the workflow**, which runs the suite under both shells on every
+proposed change and cannot be skipped. The hook only saves you the round trip.
 
 ## Critical rules
 

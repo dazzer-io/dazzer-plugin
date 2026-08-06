@@ -396,13 +396,26 @@ const CASES = [
     },
   },
   {
-    gate: "lifecycle-coverage",
-    what: "a command a screen would hand somebody that the page never shows them",
+    gate: "install-parity",
+    what: "an update command a screen would hand somebody that the page never shows them",
     seed(root) {
       edit(root, MANIFEST, (manifest) => {
         manifest.tools.find((t) => t.id === "codex").updateReminders.steps[0].command =
           "codex plugin marketplace upgrade dazzer --invented-flag";
       });
+    },
+  },
+  {
+    gate: "install-parity",
+    what: "an update step deleted from its own section while the same line survives under Install",
+    seed(root) {
+      const p = join(root, "README.md");
+      const text = readFileSync(p, "utf8");
+      const line = "cursor-agent plugin marketplace add https://github.com/dazzer-io/dazzer-plugin.git";
+      // Remove only the LAST occurrence - the one under Update. Somebody following those
+      // steps would remove the plugin and never put it back.
+      const at = text.lastIndexOf(line);
+      writeFileSync(p, text.slice(0, at) + text.slice(at + line.length));
     },
   },
   {

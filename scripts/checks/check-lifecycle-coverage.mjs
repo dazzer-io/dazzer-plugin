@@ -2,7 +2,7 @@
 /**
  * @purpose Stop a tool shipping with no way to update or remove it. Every supported tool
  * has to answer all three questions - how do I get this, how do I get the fixed version,
- * how do I get rid of it - and the answers have to reach a person, not only a screen.
+ * how do I get rid of it - before it can be offered as supported.
  *
  * The blind spot this closes. install-parity compares the install steps in the two places
  * they are written, so a command corrected in one and not the other fails. Nothing looked
@@ -14,20 +14,21 @@
  * Unbiased by construction, the same way the components gate is:
  *   - The TOOL set is read from what the repo actually claims to support, not from a list
  *     kept here. Add a seventh tool and it is covered with no edit to this file.
- *   - "Documented" means a command a person can run, in BOTH places. A step that exists
- *     only in the machine-readable copy is invisible to whoever reads the page.
  *   - A tool nobody has run the commands against is not silently skipped: it must say so
  *     in as many words. An unanswered question stays visible instead of looking answered.
+ *
+ * This gate asks only whether an answer EXISTS. Whether the two copies of that answer agree
+ * is install-parity's job, section by section and in both directions; splitting it the
+ * other way had both gates half-doing both jobs with two different readers of one page.
  *
  * Fails closed. Discovering no tools at all is a broken read, not a clean run, and is
  * refused - a coverage gate that checks nothing is the exact trap it exists to prevent.
  */
 
 import { join } from "node:path";
-import { REPO_ROOT, read, readJson, rel, runGate } from "./lib/gate.mjs";
+import { REPO_ROOT, readJson, rel, runGate } from "./lib/gate.mjs";
 
 const MANIFEST = join(REPO_ROOT, "tools.manifest.json");
-const README = join(REPO_ROOT, "README.md");
 
 /** The three questions every supported tool owes an answer to. */
 const ANSWERS = [
@@ -36,28 +37,13 @@ const ANSWERS = [
   { field: "removeReminders", asks: "how do I get rid of it" },
 ];
 
-/** Every line inside a fenced block, which is how the page shows something to run. */
-function shownToAPerson(text) {
-  const lines = [];
-  let fenced = false;
-  for (const line of text.split("\n")) {
-    if (line.trimEnd().startsWith("```")) {
-      fenced = !fenced;
-      continue;
-    }
-    if (fenced && line.trim() !== "") lines.push(line.trim());
-  }
-  return new Set(lines);
-}
-
 runGate({
   id: "lifecycle-coverage",
   purpose: "No tool ships without saying how to get it, update it, and remove it.",
-  rule: "every supported tool answers all three, in the page as well as the manifest",
+  rule: "every supported tool answers all three, or says plainly that nobody has established one",
   assert(findings) {
     const manifest = readJson(MANIFEST, findings);
-    const page = read(README, findings);
-    if (manifest === undefined || page === undefined) return;
+    if (manifest === undefined) return;
 
     const supported = (manifest.tools ?? []).filter((t) => t?.status === "supported");
     if (supported.length === 0) {
@@ -70,8 +56,6 @@ runGate({
       });
       return;
     }
-
-    const runnable = shownToAPerson(page);
 
     for (const tool of supported) {
       const name = tool.id ?? "(unnamed tool)";
@@ -88,11 +72,21 @@ runGate({
 
         // Saying plainly that nobody has established it is a real answer. Guessing is not,
         // and silence is how a person ends up running a command that quietly does nothing.
-        if (typeof answer.notEstablished === "string" && answer.notEstablished.trim() !== "") {
+        const unestablished =
+          typeof answer.notEstablished === "string" && answer.notEstablished.trim() !== "";
+        const steps = answer.steps ?? [];
+
+        if (unestablished && steps.length > 0) {
+          findings.push({
+            file: rel(MANIFEST),
+            message:
+              `${name} both answers "${asks}" and says nobody has established it. Whoever ` +
+              "finally worked it out left the old line behind, and the two audiences now " +
+              "get different stories - delete whichever is no longer true.",
+          });
           continue;
         }
-
-        const steps = answer.steps ?? [];
+        if (unestablished) continue;
         if (steps.length === 0) {
           findings.push({
             file: rel(MANIFEST),
@@ -103,28 +97,13 @@ runGate({
           continue;
         }
 
-        for (const step of steps) {
-          // Not every step is a command. One tool has no way to install from a terminal at
-          // all and finishes by picking the plugin from a menu; that step is followed by
-          // clicking, so there is nothing for the page to show in a block.
-          if (step?.kind !== "run") continue;
-
-          const command = step?.command;
-          if (typeof command !== "string" || command.trim() === "") {
-            findings.push({
-              file: rel(MANIFEST),
-              message: `${name} has a step for "${asks}" with nothing to run in it.`,
-            });
-            continue;
-          }
-          if (!runnable.has(command.trim())) {
-            findings.push({
-              file: rel(README),
-              message:
-                `${name} answers "${asks}" with \`${command.trim()}\`, which the page never ` +
-                "shows. A step only a screen can see is one a reader cannot follow.",
-            });
-          }
+        // Not every step is a command. One tool has no way to install from a terminal at
+        // all and finishes by picking the plugin from a menu.
+        if (!steps.some((step) => step?.kind === "run" || step?.kind === "choose")) {
+          findings.push({
+            file: rel(MANIFEST),
+            message: `${name} answers "${asks}" with nothing anybody could actually do.`,
+          });
         }
       }
     }

@@ -20,11 +20,24 @@ import { REPO_ROOT, read, readJson, rel, runGate } from "./lib/gate.mjs";
 const MANIFEST = join(REPO_ROOT, "tools.manifest.json");
 const README = join(REPO_ROOT, "README.md");
 
-/** The Install section only - later sections carry commands that are not install steps. */
-function installSection(text, findings) {
-  const start = text.indexOf("\n## Install\n");
+/**
+ * The three sections a person acts on, and the manifest fields that must match each. Kept
+ * apart on purpose: a command is only in the right place if it is under the heading that
+ * asks for it. Matched against the whole page instead, a step could vanish from Update and
+ * still pass because the same line appears under Install - and somebody following Update
+ * would remove the plugin and never put it back.
+ */
+const SECTIONS = [
+  { heading: "## Install", field: "installReminders", connection: "installConnection" },
+  { heading: "## Update", field: "updateReminders", connection: "updateConnection" },
+  { heading: "## Uninstall", field: "removeReminders", connection: "removeConnection" },
+];
+
+/** One section of the README, heading to the next heading. */
+function sectionOf(text, heading, findings) {
+  const start = text.indexOf(`\n${heading}\n`);
   if (start === -1) {
-    findings.push({ file: "README.md", message: "has no Install section" });
+    findings.push({ file: "README.md", message: `has no ${heading.replace("## ", "")} section` });
     return "";
   }
   const rest = text.slice(start + 1);
@@ -48,13 +61,20 @@ function commandsIn(section) {
   return out;
 }
 
-/** Every command the manifest hands a screen, from any tool and from the connection. */
-function commandsDeclared(manifest, findings) {
+/** Every command the manifest hands a screen for one section, tools and connection alike. */
+function commandsDeclared(manifest, { field, connection }, findings) {
   const out = [];
 
   const collect = (steps, where) => {
     for (const step of steps ?? []) {
-      if (step?.kind !== "run") continue;
+      // A step that is neither something to run nor something to click is a typo nobody
+      // would see: it would simply drop out of both this list and the page.
+      if (step?.kind !== "run") {
+        if (step?.kind !== "choose") {
+          findings.push({ file: rel(MANIFEST), message: `${where} has a step of an unknown kind "${step?.kind}"` });
+        }
+        continue;
+      }
       if (typeof step.command !== "string" || step.command.length === 0) {
         findings.push({ file: rel(MANIFEST), message: `${where} has a run step with no command` });
         continue;
@@ -64,50 +84,56 @@ function commandsDeclared(manifest, findings) {
   };
 
   for (const tool of manifest.tools ?? []) {
-    collect(tool?.installReminders?.steps, `tools.${tool?.id ?? "?"}`);
+    collect(tool?.[field]?.steps, `tools.${tool?.id ?? "?"}.${field}`);
   }
-  collect(manifest.installConnection?.steps, "installConnection");
+  collect(manifest[connection]?.steps, connection);
 
   return out;
 }
 
 runGate({
   id: "install-parity",
-  purpose: "The install commands in the README and in the manifest are one set.",
-  rule: "every command the README shows is declared, and every declared command is shown",
+  purpose: "The commands in the README and in the manifest are one set, section by section.",
+  rule: "getting it, updating it and removing it each read the same in both places",
   assert(findings) {
     const manifest = readJson(MANIFEST, findings);
     if (manifest === undefined) return;
+    const page = read(README);
 
-    const section = installSection(read(README), findings);
-    if (section === "") return;
+    for (const section of SECTIONS) {
+      const text = sectionOf(page, section.heading, findings);
+      if (text === "") continue;
 
-    const shown = commandsIn(section);
-    const declared = commandsDeclared(manifest, findings);
+      const shown = commandsIn(text);
+      const declared = commandsDeclared(manifest, section, findings);
 
-    if (shown.length === 0) {
-      findings.push({ file: "README.md", message: "the Install section shows no commands; either it changed shape or this gate has stopped seeing it" });
-      return;
-    }
-
-    const declaredSet = new Set(declared.map((d) => d.command));
-    const shownSet = new Set(shown);
-
-    for (const command of shownSet) {
-      if (!declaredSet.has(command)) {
+      if (shown.length === 0 && declared.length === 0) {
         findings.push({
           file: "README.md",
-          message: `shows "${command}" but no tool declares it. A screen rendering the manifest would leave that step out.`,
+          message: `the ${section.heading.replace("## ", "")} section shows no commands and nothing declares any; either it changed shape or this gate has stopped seeing it`,
         });
+        continue;
       }
-    }
 
-    for (const d of declared) {
-      if (!shownSet.has(d.command)) {
-        findings.push({
-          file: rel(MANIFEST),
-          message: `${d.where} declares "${d.command}" but the README does not show it. One of the two is telling somebody the wrong thing.`,
-        });
+      const declaredSet = new Set(declared.map((d) => d.command));
+      const shownSet = new Set(shown);
+
+      for (const command of shownSet) {
+        if (!declaredSet.has(command)) {
+          findings.push({
+            file: "README.md",
+            message: `${section.heading} shows "${command}" but nothing declares it there. A screen rendering the manifest would leave that step out.`,
+          });
+        }
+      }
+
+      for (const d of declared) {
+        if (!shownSet.has(d.command)) {
+          findings.push({
+            file: rel(MANIFEST),
+            message: `${d.where} declares "${d.command}" but ${section.heading} does not show it. One of the two is telling somebody the wrong thing.`,
+          });
+        }
       }
     }
 

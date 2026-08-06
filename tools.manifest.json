@@ -90,15 +90,16 @@
         "steps": [
           {
             "kind": "run",
-            "where": "claude",
-            "command": "/plugin marketplace update dazzer"
+            "where": "terminal",
+            "command": "claude plugin marketplace update dazzer"
           },
           {
             "kind": "run",
-            "where": "claude",
-            "command": "/plugin update dazzer@dazzer"
+            "where": "terminal",
+            "command": "claude plugin update dazzer@dazzer"
           }
-        ]
+        ],
+        "note": "These two go in a terminal, unlike the install steps. Typing /plugin update into Claude opens a menu and quietly keeps the copy you already had."
       },
       "removeReminders": {
         "steps": [
@@ -188,10 +189,10 @@
         "note": "All three reminders work here, quietly, the same way they do in Claude's."
       },
       "updateReminders": {
-        "notEstablished": "Not established. Nobody has run this against the real program, and this tool’s own documentation has already been wrong about it once, so nothing is printed here rather than printing a guess."
+        "notEstablished": "Not established. Nobody has run this against the real program, and this tool’s own documentation has already been wrong about this plugin once, so a guess would be the same mistake twice."
       },
       "removeReminders": {
-        "notEstablished": "Not established. Nobody has run this against the real program, and this tool’s own documentation has already been wrong about it once, so nothing is printed here rather than printing a guess."
+        "notEstablished": "Not established. Nobody has run this against the real program, and this tool’s own documentation has already been wrong about this plugin once, so a guess would be the same mistake twice."
       }
     },
     {
@@ -224,10 +225,10 @@
         "Two of the three reminders work. Being put back on track after a long conversation forgets itself does not — that moment does not exist in this tool at all, so nothing we add can fix it."
       ],
       "updateReminders": {
-        "notEstablished": "Not established. Nobody has run this against the real program, and this tool’s own documentation has already been wrong about it once, so nothing is printed here rather than printing a guess."
+        "notEstablished": "Not established. Nobody has run this against the real program, so nothing is printed here rather than a guess that would fail quietly."
       },
       "removeReminders": {
-        "notEstablished": "Not established. Nobody has run this against the real program, and this tool’s own documentation has already been wrong about it once, so nothing is printed here rather than printing a guess."
+        "notEstablished": "Not established. Nobody has run this against the real program, so nothing is printed here rather than a guess that would fail quietly."
       }
     },
     {
@@ -273,6 +274,12 @@
             "kind": "run",
             "where": "terminal",
             "command": "cursor-agent plugin marketplace add https://github.com/dazzer-io/dazzer-plugin.git"
+          },
+          {
+            "kind": "choose",
+            "where": "cursor",
+            "from": "/plugins",
+            "label": "dazzer"
           }
         ],
         "note": "Removing and adding again, not updating. Cursor reports a successful update without fetching anything, so you keep whatever version you first got."
@@ -310,10 +317,10 @@
         "Two of the three reminders work. The save prompt does not, and cannot: Devin tells a reminder only which session and which prompt it is, with no way to tell how much conversation has built up since last time. The prompt has nothing to measure, so it stays quiet rather than firing blindly."
       ],
       "updateReminders": {
-        "notEstablished": "Not established. Nobody has run this against the real program, and this tool’s own documentation has already been wrong about it once, so nothing is printed here rather than printing a guess."
+        "notEstablished": "Not established. Nobody has run this against the real program, and this tool’s own documentation has already been wrong about this plugin once, so a guess would be the same mistake twice."
       },
       "removeReminders": {
-        "notEstablished": "Not established. Nobody has run this against the real program, and this tool’s own documentation has already been wrong about it once, so nothing is printed here rather than printing a guess."
+        "notEstablished": "Not established. Nobody has run this against the real program, and this tool’s own documentation has already been wrong about this plugin once, so a guess would be the same mistake twice."
       }
     },
     {
@@ -356,5 +363,29 @@
       "cursor",
       "devin"
     ]
+  },
+  "updateConnection": {
+    "steps": [
+      {
+        "kind": "run",
+        "where": "terminal",
+        "command": "claude plugin marketplace update dazzer"
+      },
+      {
+        "kind": "run",
+        "where": "terminal",
+        "command": "claude plugin update dazzer-connect@dazzer"
+      }
+    ]
+  },
+  "removeConnection": {
+    "steps": [
+      {
+        "kind": "run",
+        "where": "claude",
+        "command": "/plugin uninstall dazzer-connect@dazzer"
+      }
+    ],
+    "note": "Leave this in place if Dazzer is still how you reach your Brain - removing it takes the connection with it."
   }
 }
