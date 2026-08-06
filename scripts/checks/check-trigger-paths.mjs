@@ -16,14 +16,6 @@ import { REPO_ROOT, readJson, rel, runGate, walk } from "./lib/gate.mjs";
  * pointing at an unset variable fails silently on somebody else's machine.
  */
 const PLUGIN_ROOT_VARS = ["${CLAUDE_PLUGIN_ROOT}", "${CURSOR_PLUGIN_ROOT}"];
-const PLUGIN_ROOT = PLUGIN_ROOT_VARS[0];
-
-/**
- * Folders a tool always installs plugins into. Naming one of these is the fallback for a
- * tool that hands a plugin no variable at all - it is a known location, not somebody's
- * own machine. Verified by installing there and reading back where the files landed.
- */
-const INSTALL_DIRS = ["$HOME/.gemini/config/plugins/"];
 
 /** Every command string declared anywhere in a trigger file. */
 function commands(node, out = []) {
@@ -54,30 +46,38 @@ runGate({
       if (parsed === undefined) continue;
 
       for (const command of commands(parsed)) {
-        const scriptRef = command.match(/(\$\{?[A-Za-z_][A-Za-z0-9_]*\}?)?[^\s"']*\.sh/);
-        if (!scriptRef) continue; // a trigger that just prints text runs no script
+        if (!command.includes(".sh")) continue; // a trigger that just prints text runs no script
 
-        // Two acceptable forms, and only two. Most tools hand a plugin a variable holding
-        // its own folder. Google's hands it nothing, so the only way its trigger can find
-        // the script is to name the folder that tool always installs into - which is a
-        // known location, not a developer's own machine.
-        const usesPluginRoot = PLUGIN_ROOT_VARS.some((v) => command.includes(v));
-        const usesKnownInstallDir = INSTALL_DIRS.some((d) => command.includes(d));
+        // A command must address its script from a variable holding the plugin's own
+        // folder. It may carry a default for a tool that hands over no variable at all -
+        // without one, that tool prints a shell error on every single reply instead of
+        // quietly doing nothing. The default is read THROUGH rather than treated as a
+        // reason to skip: bailing out on it is what left this check blind to the one
+        // command in the file it most needed to see.
+        // Matched without its closing brace, so `${VAR}` and `${VAR:-default}` both count.
+        // Sliced rather than string-replaced: a replace only touches the first brace it
+        // finds, which reads as sanitisation and is not what is meant here.
+        const opensWith = (v) => v.slice(0, -1);
+        const rootVar = PLUGIN_ROOT_VARS.find((v) => command.includes(opensWith(v)));
 
-        if (!usesPluginRoot && !usesKnownInstallDir) {
+        if (rootVar === undefined) {
           findings.push({
             file: rel(file),
             message:
               `runs a script from a path that only works on the machine it was written on: ${command.trim()}. ` +
-              `Address it from one of ${PLUGIN_ROOT_VARS.join(" / ")}, or from a folder the tool ` +
-            `always installs into ` +
-              `(${INSTALL_DIRS.join(", ")}).`,
+              `Address it from one of ${PLUGIN_ROOT_VARS.join(" / ")}.`,
           });
           continue;
         }
-        if (usesKnownInstallDir) continue; // resolved at run time, nothing to check here
 
-        const scriptPath = command.match(/\$\{CLAUDE_PLUGIN_ROOT\}(\/[^\s"']+\.sh)/)?.[1];
+        // Read from whichever variable this command actually used. Spelled as its own pattern
+        // over one hard-coded name, the file a second tool reads sat outside this check
+        // entirely and a script that does not exist could ship in it; spelled as a pattern
+        // over any name, an unset variable would pass - the same wildcard the list above
+        // exists to refuse.
+        const opensAt = command.indexOf(opensWith(rootVar));
+        const after = command.slice(command.indexOf("}", opensAt) + 1);
+        const scriptPath = after.match(/^\/[^\s"']+\.sh/)?.[0];
         if (!scriptPath) continue;
 
         const pluginDir = join(REPO_ROOT, rel(file).split("/").slice(0, 2).join("/"));

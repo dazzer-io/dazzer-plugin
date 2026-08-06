@@ -193,18 +193,17 @@ and it wants a reply in a particular shape, so plain words were discarded and re
 on every single message. On Cursor they never did either, and Cursor said nothing at all about it.
 On Claude Code the whole plugin never loaded.
 
-**Then the bar was raised again, because even that was not enough.** Proving the right words
-reach the AI from a hand-written file says nothing about whether the shipped file loads. That gap
-is exactly how the Claude Code failure hid behind a passing test. What counts now is all three,
-in order: install the real thing, have the tool itself confirm it loaded, then ask the AI for a
-word only the reminder carried.
+**Then the bar was raised again, twice, because each version proved too little.** Showing the
+right words reach the AI from a hand-written file says nothing about whether the shipped file
+loads — that gap is exactly how the Claude Code failure hid behind a passing test. And a tool
+reporting its own reminders as registered proves nothing either: it says so while delivering
+nothing at all. What counts is two things and no others — install the real thing, then ask the
+AI for a word only the reminder could have carried.
 
-Against that bar: **Claude Code passes all three** — installed from a listing, reported as
-loaded with its three moments registered, and it answered back a word only the reminder carried.
-**Codex** runs every reminder from an installed copy with no warning and no error. **Cursor**
-answered the planted word, but through its own settings rather than an installed plugin, and its
-reminders have since moved to a file of their own — so on Cursor the words are proven and the new
-location is not. Devin takes the plain wording it already gets.
+Against that bar: **Claude Code passes** — installed from a listing, it answered back a word
+only the reminder carried.
+**Codex** runs every reminder from an installed copy with no warning and no error. **Cursor** answers it too, from an
+installed plugin reading the file of its own it moved to. Devin takes the plain wording it already gets.
 
 Cursor was the last, and it is worth saying why it took two attempts. This repository briefly
 shipped a Cursor-specific listing of what it contains; Cursor preferred that file over the one it
