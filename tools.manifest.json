@@ -193,7 +193,7 @@
   },
 
   "provenance": {
-    "what": "All six were installed into a real copy of the tool and watched working, which proved too little: on two of them the reminder never reached the AI at all. Claude Code, Codex and Cursor are now proven by giving the AI a word only the reminder carried and asking for it back. Antigravity rests on its own published reference, not on a run. Copilot keeps the moments a real session confirmed: its reference says one of them ignores what a reminder prints, but that same reference was already caught being wrong about this tool, so nothing was changed on its word.",
+    "what": "All six were installed into a real copy of the tool and watched working, which proved too little: on two of them the reminder never reached the AI at all. Claude Code is proven the whole way: installed from a listing, the tool reports it loaded, and it answered back a word only the reminder carried. Codex runs every reminder from an installed copy. Cursor answered that word too, but through its own settings, and its reminders have since moved to a file nobody has run. Antigravity rests on its own published reference, not on a run. Copilot keeps the moments a real session confirmed: its reference says one of them ignores what a reminder prints, but that same reference was already caught being wrong about this tool, so nothing was changed on its word.",
     "tools": ["claude-code", "codex", "copilot", "antigravity", "cursor", "devin"]
   }
 }

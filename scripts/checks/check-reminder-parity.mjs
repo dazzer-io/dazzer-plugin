@@ -18,6 +18,7 @@
  * full in two separate hook files, and until now nothing compared those two either.
  */
 
+import { existsSync } from "node:fs";
 import { join, sep } from "node:path";
 import { REPO_ROOT, readJson, rel, runGate, walk } from "./lib/gate.mjs";
 
@@ -36,7 +37,7 @@ const SPOKEN_MARK = "[Dazzer]";
  * Deliberately just the moments we use, rather than a copy of the host's whole list: a name
  * outside these belongs in one of the other two files.
  */
-const CLAUDE_CODE_ACCEPTS = new Set(["UserPromptSubmit", "SessionStart", "Stop"]);
+const SHARED_FILE_MOMENTS = new Set(["UserPromptSubmit", "SessionStart", "Stop"]);
 
 /** A reminder speaks by printing. The end-of-reply script runs a file and is not one. */
 const EMITTER = new Set(["printf", "echo"]);
@@ -314,6 +315,14 @@ const SHAPES = new Map([
 const ALLOWED_TOP_LEVEL = new Set(["description", "hooks"]);
 
 /**
+ * Cursor is the opposite case, and getting this backwards left it with nothing. It validates
+ * its file as written, and refuses one without a whole-number `version` - while Codex refuses
+ * the shared file over that very key. So the rule cannot be one rule.
+ */
+const CURSOR_TOP_LEVEL = new Set(["version", "hooks", "description"]);
+const CURSOR_REQUIRES = ["version"];
+
+/**
  * Every sentence any hook speaks, with where it was found. Parsed, never pattern-matched
  * against the raw file: a hook is structured, and reading it as text is how the first
  * defect in this repository happened.
@@ -357,7 +366,12 @@ function spokenByHooks(findings, declaredById) {
     // key is never cosmetic. In the wrapper shape only two names are allowed beside the
     // hooks; in the bare shape every key is a trigger, and a trigger holds a list.
     for (const [key, value] of Object.entries(parsed)) {
-      const fine = parsed.hooks !== undefined ? ALLOWED_TOP_LEVEL.has(key) : Array.isArray(value);
+      const allowed = forCursor
+        ? CURSOR_TOP_LEVEL
+        : parsed.hooks !== undefined
+          ? ALLOWED_TOP_LEVEL
+          : undefined;
+      const fine = allowed === undefined ? Array.isArray(value) : allowed.has(key);
       if (fine) continue;
       findings.push({
         file: where,
@@ -430,15 +444,38 @@ function spokenByHooks(findings, declaredById) {
     // Only the two files that carry reminders owe anybody one.
     if (strict) {
       for (const trigger of Object.keys(triggers)) {
-        if (CLAUDE_CODE_ACCEPTS.has(trigger)) continue;
+        if (SHARED_FILE_MOMENTS.has(trigger)) continue;
         findings.push({
           file: where,
           message:
-            `"${trigger}" belongs to another tool, and Claude Code refuses this entire file over ` +
-            "one name it does not know - every reminder in it, for every tool that reads it. " +
-            "Put it in the file at the plugin root, which Claude Code does not read.",
+            `"${trigger}" is not one of the moments this file is for. Claude Code reads it and ` +
+            "refuses the WHOLE file over a single name it does not recognise, taking every " +
+            "reminder in it for every tool. Another tool's moment belongs in that tool's file.",
         });
       }
+    }
+
+    if (forCursor) {
+      for (const required of CURSOR_REQUIRES) {
+        if (parsed[required] !== undefined) continue;
+        findings.push({
+          file: where,
+          message:
+            `is missing "${required}", which the host reading this file requires. It checks this ` +
+            "file as written rather than converting it first, and refuses the whole thing " +
+            "without that key - so every reminder in it reaches nobody.",
+        });
+      }
+    }
+
+    if (!strict && !forCursor && !plain) {
+      findings.push({
+        file: where,
+        message:
+          "declares reminders but is not one of the three files any host reads. It is held to " +
+          "no shape and owes no tool anything, so whatever it says reaches nobody while looking " +
+          "like part of the plugin.",
+      });
     }
 
     const owed = strict
@@ -501,11 +538,57 @@ function declared(findings) {
   return out;
 }
 
+/**
+ * The wiring the three homes depend on, which nothing else looks at. Each of these was
+ * silent when it broke: a missing file, a pointer aimed at nothing, or one extra line in
+ * Claude Code's own listing that puts a file it cannot read back in front of it.
+ */
+function homesAreWired(findings) {
+  const plugin = join(REPO_ROOT, "plugins", "dazzer");
+
+  const cursorFile = join(plugin, "hooks", "cursor.json");
+  if (!existsSync(cursorFile)) {
+    findings.push({
+      file: rel(cursorFile),
+      message:
+        "is missing, and Cursor reads this file INSTEAD of the shared one rather than as well " +
+        "as it - so losing it leaves Cursor with no reminders and nothing else objecting.",
+    });
+  }
+
+  const cursorListing = join(plugin, ".cursor-plugin", "plugin.json");
+  const cursorDeclared = readJson(cursorListing, findings)?.hooks;
+  if (cursorDeclared !== "./hooks/cursor.json") {
+    findings.push({
+      file: rel(cursorListing),
+      message:
+        `points Cursor at "${cursorDeclared}". Without the pointer Cursor falls back to the ` +
+        "shared file, which holds none of its moment-names; aimed at a file that is not there " +
+        "it reads nothing at all. Either way it goes quiet with no error.",
+    });
+  }
+
+  // Claude Code reads a declared path IN ADDITION TO the shared one, so one line here would
+  // hand it the very file the whole layout exists to keep away from it.
+  const claudeListing = join(plugin, ".claude-plugin", "plugin.json");
+  const claudeDeclared = readJson(claudeListing, findings)?.hooks;
+  if (claudeDeclared !== undefined) {
+    findings.push({
+      file: rel(claudeListing),
+      message:
+        `names "${claudeDeclared}" as another place to read reminders from. Claude Code reads ` +
+        "that as well as the shared file, not instead of it, so any moment-name it does not " +
+        "recognise in there brings the whole plugin down again.",
+    });
+  }
+}
+
 runGate({
   id: "reminder-parity",
   purpose: "What the reminders say and what we tell readers to expect are one set of sentences.",
   rule: "every tool gets a reminder, in the shape it reads, saying the words we declare",
   assert(findings) {
+    homesAreWired(findings);
     const said = declared(findings);
     const spoken = spokenByHooks(findings, new Map(said.map((d) => [d.id, d.text])));
 

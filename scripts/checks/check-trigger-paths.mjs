@@ -42,7 +42,7 @@ runGate({
   purpose: "Every trigger runs a script that is really there.",
   rule: "a trigger that runs a script must address it from a folder variable its tool sets, and the script must exist",
   assert(findings) {
-    const triggerFiles = walk(join(REPO_ROOT, "plugins")).filter((f) => /(^|\/)hooks\.json$/.test(f));
+    const triggerFiles = walk(join(REPO_ROOT, "plugins")).filter((f) => /(^|\/)hooks\.json$/.test(f) || /\/hooks\/[^/]+\.json$/.test(f));
 
     if (triggerFiles.length === 0) {
       findings.push({ file: "plugins/", message: "no triggers are declared at all" });

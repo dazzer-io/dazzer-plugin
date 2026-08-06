@@ -15,7 +15,7 @@
 import { execFileSync } from "node:child_process";
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { REPO_ROOT, runGate } from "./lib/gate.mjs";
 
 const CHECKS = join(REPO_ROOT, "scripts", "checks");
@@ -43,6 +43,12 @@ function fixture() {
     join(REPO_ROOT, ...CURSOR_HOOKS),
     join(root, ...CURSOR_HOOKS),
   );
+  // The two listings that say where each host looks. Left out, the wiring rules see a
+  // missing pointer in every fixture and refuse a tree that is actually fine.
+  for (const listing of [CURSOR_LISTING, CLAUDE_LISTING]) {
+    mkdirSync(dirname(join(root, ...listing)), { recursive: true });
+    cpSync(join(REPO_ROOT, ...listing), join(root, ...listing));
+  }
   // The other hooks file - the plain-words one, read by a different host than the file
   // just above it. Leaving it out of the copy is how a fault seeded in it would look
   // caught while the gate was never shown the file it lives in.
@@ -69,6 +75,8 @@ function refuses(gate, root) {
 /** Where the gates read from, so a file the fixture forgets cannot make a fault look caught. */
 const WRAPPED_HOOKS = ["plugins", "dazzer", "hooks", "hooks.json"];
 const CURSOR_HOOKS = ["plugins", "dazzer", "hooks", "cursor.json"];
+const CURSOR_LISTING = ["plugins", "dazzer", ".cursor-plugin", "plugin.json"];
+const CLAUDE_LISTING = ["plugins", "dazzer", ".claude-plugin", "plugin.json"];
 const BARE_HOOKS = ["plugins", "dazzer", "hooks.json"];
 const MANIFEST = ["tools.manifest.json"];
 
@@ -395,6 +403,49 @@ const CASES = [
         hooks.hooks.PreInvocation = [
           { hooks: [{ type: "command", command: 'echo "[Dazzer] anything"' }] },
         ];
+      });
+    },
+  },
+  {
+    gate: "reminder-parity",
+    what: "Cursor's own file deleted, which leaves it reading a file holding none of its moments",
+    seed(root) {
+      rmSync(join(root, ...CURSOR_HOOKS));
+    },
+  },
+  {
+    gate: "reminder-parity",
+    what: "the pointer that sends Cursor to its own file, aimed at nothing",
+    seed(root) {
+      edit(root, CURSOR_LISTING, (listing) => {
+        listing.hooks = "./hooks/does-not-exist.json";
+      });
+    },
+  },
+  {
+    gate: "reminder-parity",
+    what: "one line in Claude Code's listing handing it back the file it cannot read",
+    seed(root) {
+      edit(root, CLAUDE_LISTING, (listing) => {
+        listing.hooks = "./hooks.json";
+      });
+    },
+  },
+  {
+    gate: "reminder-parity",
+    what: "the whole-number Cursor demands, missing - which makes it refuse the file as written",
+    seed(root) {
+      edit(root, CURSOR_HOOKS, (hooks) => {
+        delete hooks.version;
+      });
+    },
+  },
+  {
+    gate: "reminder-parity",
+    what: "a reminders file answering to no host, which looks like part of the plugin and reaches nobody",
+    seed(root) {
+      writeJson(join(root, "plugins", "dazzer", "hooks", "copilot.json"), {
+        hooks: { userPromptSubmitted: [{ command: 'echo "[Dazzer] anything"' }] },
       });
     },
   },
