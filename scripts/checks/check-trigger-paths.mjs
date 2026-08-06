@@ -54,7 +54,11 @@ runGate({
         // quietly doing nothing. The default is read THROUGH rather than treated as a
         // reason to skip: bailing out on it is what left this check blind to the one
         // command in the file it most needed to see.
-        const rootVar = PLUGIN_ROOT_VARS.find((v) => command.includes(v.replace("}", "")));
+        // Matched without its closing brace, so `${VAR}` and `${VAR:-default}` both count.
+        // Sliced rather than string-replaced: a replace only touches the first brace it
+        // finds, which reads as sanitisation and is not what is meant here.
+        const opensWith = (v) => v.slice(0, -1);
+        const rootVar = PLUGIN_ROOT_VARS.find((v) => command.includes(opensWith(v)));
 
         if (rootVar === undefined) {
           findings.push({
@@ -71,7 +75,7 @@ runGate({
         // entirely and a script that does not exist could ship in it; spelled as a pattern
         // over any name, an unset variable would pass - the same wildcard the list above
         // exists to refuse.
-        const opensAt = command.indexOf(rootVar.replace("}", ""));
+        const opensAt = command.indexOf(opensWith(rootVar));
         const after = command.slice(command.indexOf("}", opensAt) + 1);
         const scriptPath = after.match(/^\/[^\s"']+\.sh/)?.[0];
         if (!scriptPath) continue;
