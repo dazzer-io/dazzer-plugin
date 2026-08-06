@@ -38,7 +38,7 @@ copilot plugin marketplace add dazzer-io/dazzer-plugin
 copilot plugin install dazzer@dazzer
 ```
 
-All three reminders work here, quietly, the same way they do in Claude's.
+**The reminders do not reach Copilot at the moment** — see below for why, and what would undo it. Installing still gives you the skill and, if you add it, the connection.
 
 ### Antigravity — Google's coding tool
 
@@ -49,8 +49,9 @@ git clone https://github.com/dazzer-io/dazzer-plugin.git
 agy plugin install ./dazzer-plugin/plugins/dazzer
 ```
 
-Two of the three reminders work. Being put back on track after a long conversation forgets itself
-does not — that moment does not exist in this tool at all, so nothing we add can fix it.
+**The reminders do not reach Antigravity at the moment** — see below for why, and what would
+undo it. Being put back on track after a long conversation forgets itself was never possible
+here anyway: that moment does not exist in this tool at all.
 
 ### Cursor
 
@@ -112,16 +113,29 @@ the whole file over a single name it does not know — and the shared file carri
 to other tools. It reported `failed to load` and registered nothing. Nobody noticed, because the
 reminders people saw came from their own settings rather than from here.
 
-So each tool now reads a file it can accept:
+Every tool does this. Claude Code says so out loud; the rest just go quiet. So each now reads a
+file holding its own moments and nothing else:
 
 | File | Read by |
 | --- | --- |
-| `hooks/hooks.json` | Claude Code and Codex — the moments they both answer, and the only names Claude Code allows |
-| `hooks/cursor.json` | Cursor, which takes a file its own listing names in preference to the shared one |
-| `hooks.json` | Devin, Antigravity and Copilot — at the plugin root, which Claude Code does not read at all |
+| `hooks/hooks.json` | Claude Code and Codex — the three moments they both answer |
+| `hooks/cursor.json` | Cursor, which takes a file its own listing names in preference to the shared one, and refuses one without a whole-number `version` — a key the shared file must not carry, because Codex refuses a file over it |
+| `hooks.json` | Devin — at the plugin root, which Claude Code does not read at all |
 
 That last row is load-bearing and was established by experiment: a name Claude Code rejects was
 put in the root file, and the plugin still loaded.
+
+### Antigravity and Copilot get no reminders for now
+
+Their moments can only live in the file Claude Code also reads, and Claude Code refuses that
+whole file over any name it does not recognise. There is no third place to put them: a separate
+file for Antigravity was tried once and its own importer overwrote it, and Copilot follows the
+same layout Claude Code does.
+
+So rather than ship something that is either dead or takes every other tool down with it,
+**nothing is declared for those two**. Both installed and were watched working before; neither
+has been shown to receive a reminder under a test that would have caught this. Give either of
+them a run that proves it reads a file of its own and this is a few lines to undo.
 
 ### What has actually been tried
 
@@ -148,13 +162,6 @@ loaded with its three moments registered, and it answered back a word only the r
 answered the planted word, but through its own settings rather than an installed plugin, and its
 reminders have since moved to a file of their own — so on Cursor the words are proven and the new
 location is not. Devin takes the plain wording it already gets.
-
-**Antigravity and Copilot are not settled, and are marked that way on purpose.** Antigravity's
-required shape comes from its published reference rather than from a run. Copilot's reference says
-it does not read anything a reminder prints at the per-message moment — which would mean its
-recall reminder cannot arrive — but that same reference was already caught being wrong about this
-tool once, by running it, so nothing here has been changed on its word. Copilot's moments are
-still the ones a real session confirmed. Settling those two needs a run, not more reading.
 
 Cursor was the last, and it is worth saying why it took two attempts. This repository briefly
 shipped a Cursor-specific listing of what it contains; Cursor preferred that file over the one it

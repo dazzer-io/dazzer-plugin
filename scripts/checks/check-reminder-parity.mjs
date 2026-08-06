@@ -38,6 +38,8 @@ const SPOKEN_MARK = "[Dazzer]";
  * outside these belongs in one of the other two files.
  */
 const SHARED_FILE_MOMENTS = new Set(["UserPromptSubmit", "SessionStart", "Stop"]);
+const CURSOR_FILE_MOMENTS = new Set(["sessionStart", "stop"]);
+const PLAIN_FILE_MOMENTS = new Set(["UserPromptSubmit", "SessionStart"]);
 
 /** A reminder speaks by printing. The end-of-reply script runs a file and is not one. */
 const EMITTER = new Set(["printf", "echo"]);
@@ -268,8 +270,6 @@ const MUST_CARRY_FOR_CURSOR = new Map([["sessionStart", { who: "Cursor", says: "
 const MUST_CARRY_IN_THE_PLAIN_FILE = new Map([
   ["UserPromptSubmit", { who: "Devin, on every message", says: "recall" }],
   ["SessionStart", { who: "Devin, after a reset", says: "resume" }],
-  ["PreInvocation", { who: "Antigravity", says: "recall" }],
-  ["userPromptSubmitted", { who: "Copilot", says: "recall" }],
 ]);
 
 const SHAPES = new Map([
@@ -298,7 +298,7 @@ const SHAPES = new Map([
     },
   ],
   [
-    "root:PreInvocation",
+    "unused:PreInvocation",
     {
       hosts: "Antigravity",
       read: (doc) => doc?.injectSteps?.[0]?.ephemeralMessage,
@@ -442,15 +442,23 @@ function spokenByHooks(findings, declaredById) {
     }
 
     // Only the two files that carry reminders owe anybody one.
-    if (strict) {
+    const allowedMoments = strict
+      ? SHARED_FILE_MOMENTS
+      : forCursor
+        ? CURSOR_FILE_MOMENTS
+        : plain
+          ? PLAIN_FILE_MOMENTS
+          : undefined;
+    if (allowedMoments !== undefined) {
       for (const trigger of Object.keys(triggers)) {
-        if (SHARED_FILE_MOMENTS.has(trigger)) continue;
+        if (allowedMoments.has(trigger)) continue;
         findings.push({
           file: where,
           message:
-            `"${trigger}" is not one of the moments this file is for. Claude Code reads it and ` +
-            "refuses the WHOLE file over a single name it does not recognise, taking every " +
-            "reminder in it for every tool. Another tool's moment belongs in that tool's file.",
+            `"${trigger}" is not one of the moments this file is for. Every host that reads one ` +
+            "of these files discards the WHOLE file over a single name it does not recognise - " +
+            "Claude Code says so out loud, the others just go quiet. Another tool's moment " +
+            "here costs every reminder in the file, for every tool that reads it.",
         });
       }
     }

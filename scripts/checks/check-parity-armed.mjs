@@ -312,25 +312,6 @@ const CASES = [
   },
   {
     gate: "reminder-parity",
-    what: "Antigravity's reminder written as plain words, which reaches it just as little",
-    seed(root) {
-      edit(root, BARE_HOOKS, (hooks) => {
-        const hook = hooks.PreInvocation[0].hooks[0];
-        hook.command = `echo "${unwrap(hook.command).injectSteps[0].ephemeralMessage}"`;
-      });
-    },
-  },
-  {
-    gate: "reminder-parity",
-    what: "a whole tool losing its reminder, which every wording rule is blind to",
-    seed(root) {
-      edit(root, BARE_HOOKS, (hooks) => {
-        delete hooks.userPromptSubmitted;
-      });
-    },
-  },
-  {
-    gate: "reminder-parity",
     what: "the one wrapper line removed, which would switch every shape rule off at once",
     seed(root) {
       edit(root, WRAPPED_HOOKS, (hooks) => {
@@ -446,6 +427,24 @@ const CASES = [
     seed(root) {
       writeJson(join(root, "plugins", "dazzer", "hooks", "copilot.json"), {
         hooks: { userPromptSubmitted: [{ command: 'echo "[Dazzer] anything"' }] },
+      });
+    },
+  },
+  {
+    gate: "reminder-parity",
+    what: "another tool's moment added to the file Devin reads, which Devin discards whole",
+    seed(root) {
+      edit(root, BARE_HOOKS, (hooks) => {
+        hooks.PreInvocation = [{ hooks: [{ type: "command", command: 'echo "[Dazzer] anything"' }] }];
+      });
+    },
+  },
+  {
+    gate: "reminder-parity",
+    what: "another tool's moment added to Cursor's file, which Cursor discards just as whole",
+    seed(root) {
+      edit(root, CURSOR_HOOKS, (hooks) => {
+        hooks.hooks.Stop = [{ command: 'echo "[Dazzer] anything"' }];
       });
     },
   },
