@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "stop": [
+      {
+        "command": "sh \"${CURSOR_PLUGIN_ROOT}/scripts/capture-sweep.sh\""
+      }
+    ],
+    "sessionStart": [
+      {
+        "command": "printf %s '{\"additional_context\":\"[Dazzer] Before answering anything your Brain may already know, recall it - answer from what is recorded, not from assumption. As real decisions accumulate in this session, checkpoint your progress so a context reset cannot lose your place.\"}'"
+      }
+    ]
+  }
+}

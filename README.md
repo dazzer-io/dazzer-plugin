@@ -104,22 +104,50 @@ Claude's chat apps and the web app have no moment at the end of a reply for anyt
 the bundled skill carries the same intent as plain text, and reaching your Brain works exactly the
 same.
 
+### Why the reminders live in three files
+
+One file cannot serve every tool, and finding that out cost a release where **Claude Code
+loaded none of this at all**. It checks every moment-name against a fixed list and throws out
+the whole file over a single name it does not know — and the shared file carried five belonging
+to other tools. It reported `failed to load` and registered nothing. Nobody noticed, because the
+reminders people saw came from their own settings rather than from here.
+
+So each tool now reads a file it can accept:
+
+| File | Read by |
+| --- | --- |
+| `hooks/hooks.json` | Claude Code and Codex — the moments they both answer, and the only names Claude Code allows |
+| `hooks/cursor.json` | Cursor, which takes a file its own listing names in preference to the shared one |
+| `hooks.json` | Devin, Antigravity and Copilot — at the plugin root, which Claude Code does not read at all |
+
+That last row is load-bearing and was established by experiment: a name Claude Code rejects was
+put in the root file, and the plugin still loaded.
+
 ### What has actually been tried
 
-All six were installed into a real copy of the tool and watched working: Claude Code, Codex,
-Copilot, Antigravity, Cursor and Devin. Devin's limit above was found by running a real session
-and capturing exactly what it hands a reminder — not by reading its documentation, which describes
-a richer message than the one that actually arrives.
+Devin's limit above was found by running a real session and capturing exactly what it hands a
+reminder — not by reading its documentation, which describes a richer message than the one that
+actually arrives.
 
 **Watching it work was not enough, and it is worth saying exactly how it failed.** Watching
 proved a person saw the plugin do something. It did not prove the reminder's words ever reached
 the AI. On Codex they never did: one unexpected line made it throw the whole reminders file away,
 and it wants a reply in a particular shape, so plain words were discarded and reported as an error
 on every single message. On Cursor they never did either, and Cursor said nothing at all about it.
+On Claude Code the whole plugin never loaded.
 
-So the bar is now a harder one. A reminder is given a word the AI could not otherwise know, and
-the AI is asked that word back. **Claude Code, Codex and Cursor each answered it**, so on those
-three the words are proven to arrive. Devin takes the plain wording it already gets.
+**Then the bar was raised again, because even that was not enough.** Proving the right words
+reach the AI from a hand-written file says nothing about whether the shipped file loads. That gap
+is exactly how the Claude Code failure hid behind a passing test. What counts now is all three,
+in order: install the real thing, have the tool itself confirm it loaded, then ask the AI for a
+word only the reminder carried.
+
+Against that bar: **Claude Code passes all three** — installed from a listing, reported as
+loaded with its three moments registered, and it answered back a word only the reminder carried.
+**Codex** runs every reminder from an installed copy with no warning and no error. **Cursor**
+answered the planted word, but through its own settings rather than an installed plugin, and its
+reminders have since moved to a file of their own — so on Cursor the words are proven and the new
+location is not. Devin takes the plain wording it already gets.
 
 **Antigravity and Copilot are not settled, and are marked that way on purpose.** Antigravity's
 required shape comes from its published reference rather than from a run. Copilot's reference says

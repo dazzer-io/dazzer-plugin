@@ -16,5 +16,6 @@
     "brain",
     "mcp"
   ],
-  "category": "developer-tools"
+  "category": "developer-tools",
+  "hooks": "./hooks/cursor.json"
 }

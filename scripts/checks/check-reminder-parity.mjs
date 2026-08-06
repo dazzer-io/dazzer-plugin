@@ -26,6 +26,18 @@ const MANIFEST = join(REPO_ROOT, "tools.manifest.json");
 /** Every reminder we speak opens with this, which is what makes one findable in a reply. */
 const SPOKEN_MARK = "[Dazzer]";
 
+/**
+ * Every moment-name Claude Code will accept from us. It checks the shared file against a
+ * closed list and throws out the WHOLE file over a single name it does not know - so one
+ * entry belonging to another tool takes every reminder with it, for every host that reads
+ * that file. It reported "failed to load" and registered nothing, and nobody noticed
+ * because the reminders people saw were coming from their own settings instead.
+ *
+ * Deliberately just the moments we use, rather than a copy of the host's whole list: a name
+ * outside these belongs in one of the other two files.
+ */
+const CLAUDE_CODE_ACCEPTS = new Set(["UserPromptSubmit", "SessionStart", "Stop"]);
+
 /** A reminder speaks by printing. The end-of-reply script runs a file and is not one. */
 const EMITTER = new Set(["printf", "echo"]);
 
@@ -246,20 +258,22 @@ const claudeShaped = (event) => (doc) =>
 const MUST_CARRY_A_REMINDER = new Map([
   ["UserPromptSubmit", { who: "Claude Code and Codex, on every message", says: "recall" }],
   ["SessionStart", { who: "Claude Code and Codex, after a reset", says: "resume" }],
-  ["PreInvocation", { who: "Antigravity", says: "recall" }],
-  ["sessionStart", { who: "Cursor", says: "recall" }],
-  ["userPromptSubmitted", { who: "Copilot", says: "recall" }],
 ]);
+
+/** Cursor takes a file its own manifest names in preference to the shared one. */
+const MUST_CARRY_FOR_CURSOR = new Map([["sessionStart", { who: "Cursor", says: "recall" }]]);
 
 /** The plain-words file answers to one host, and losing its two moments is just as silent. */
 const MUST_CARRY_IN_THE_PLAIN_FILE = new Map([
   ["UserPromptSubmit", { who: "Devin, on every message", says: "recall" }],
   ["SessionStart", { who: "Devin, after a reset", says: "resume" }],
+  ["PreInvocation", { who: "Antigravity", says: "recall" }],
+  ["userPromptSubmitted", { who: "Copilot", says: "recall" }],
 ]);
 
 const SHAPES = new Map([
   [
-    "UserPromptSubmit",
+    "shared:UserPromptSubmit",
     {
       hosts: "Claude Code and Codex",
       read: claudeShaped("UserPromptSubmit"),
@@ -267,7 +281,7 @@ const SHAPES = new Map([
     },
   ],
   [
-    "SessionStart",
+    "shared:SessionStart",
     {
       hosts: "Claude Code and Codex",
       read: claudeShaped("SessionStart"),
@@ -275,7 +289,7 @@ const SHAPES = new Map([
     },
   ],
   [
-    "sessionStart",
+    "cursor:sessionStart",
     {
       hosts: "Cursor",
       read: (doc) => doc?.additional_context,
@@ -283,7 +297,7 @@ const SHAPES = new Map([
     },
   ],
   [
-    "PreInvocation",
+    "root:PreInvocation",
     {
       hosts: "Antigravity",
       read: (doc) => doc?.injectSteps?.[0]?.ephemeralMessage,
@@ -308,7 +322,11 @@ function spokenByHooks(findings, declaredById) {
   const out = [];
 
   for (const file of walk(join(REPO_ROOT, "plugins"))) {
-    if (!file.endsWith(sep + "hooks.json")) continue;
+    // Every file that declares reminders, not only the ones called hooks.json. A host that
+    // reads a file of its own name would otherwise sit outside every rule here, which is
+    // how the one file this gate was not looking at could say anything at all.
+    const inHooksDir = file.includes(`${sep}hooks${sep}`) && file.endsWith(".json");
+    if (!inHooksDir && !file.endsWith(`${sep}hooks.json`)) continue;
 
     const where = rel(file);
     const parsed = readJson(file, findings);
@@ -324,7 +342,13 @@ function spokenByHooks(findings, declaredById) {
     // would switch every shape rule off at once and leave the run green. Keyed on any
     // trailing "hooks/hooks.json", a second plugin growing a hooks folder would be told it
     // owes every host a reminder it was never meant to carry.
+    // Three homes, because one file cannot serve every host. Claude Code checks every name
+    // in the shared file against a closed list and refuses the WHOLE file over one it does
+    // not know, so only the names it shares with Codex may live there. Cursor takes a file
+    // its own manifest names. Everyone else's live at the plugin root, which Claude Code
+    // does not read at all - proven by putting a name it rejects there and watching it load.
     const strict = file.endsWith(join("dazzer", "hooks", "hooks.json"));
+    const forCursor = file.endsWith(join("dazzer", "hooks", "cursor.json"));
     const plain = file.endsWith(join("dazzer", "hooks.json")) && !strict;
 
     // Every key in the file, whichever shape it takes, must be something its hosts expect.
@@ -363,7 +387,7 @@ function spokenByHooks(findings, declaredById) {
 
           // Devin's file is the plain-words one and wants exactly that, so the shape table
           // applies only where a host is known to read structure.
-          const shape = strict ? SHAPES.get(trigger) : undefined;
+          const shape = SHAPES.get(`${strict ? "shared" : forCursor ? "cursor" : plain ? "root" : "?"}:${trigger}`);
           const said = saidBy(hook.command, trigger, where, findings, shape !== undefined);
 
           if (shape === undefined) {
@@ -404,8 +428,28 @@ function spokenByHooks(findings, declaredById) {
     }
 
     // Only the two files that carry reminders owe anybody one.
-    if (strict || plain) {
-      for (const [trigger, { who, says }] of strict ? MUST_CARRY_A_REMINDER : MUST_CARRY_IN_THE_PLAIN_FILE) {
+    if (strict) {
+      for (const trigger of Object.keys(triggers)) {
+        if (CLAUDE_CODE_ACCEPTS.has(trigger)) continue;
+        findings.push({
+          file: where,
+          message:
+            `"${trigger}" belongs to another tool, and Claude Code refuses this entire file over ` +
+            "one name it does not know - every reminder in it, for every tool that reads it. " +
+            "Put it in the file at the plugin root, which Claude Code does not read.",
+        });
+      }
+    }
+
+    const owed = strict
+      ? MUST_CARRY_A_REMINDER
+      : forCursor
+        ? MUST_CARRY_FOR_CURSOR
+        : plain
+          ? MUST_CARRY_IN_THE_PLAIN_FILE
+          : undefined;
+    if (owed !== undefined) {
+      for (const [trigger, { who, says }] of owed) {
         const said = spoke.get(trigger);
         if (said === undefined) {
           findings.push({
