@@ -247,14 +247,46 @@
     "askFirst": "Does Dazzer already show as connected?",
     "skipWhen": "Dazzer already shows as connected.",
     "warning": "Installing it again would replace a working connection with one that needs signing in.",
-    "steps": [
-      {
+    "note": "Everything above adds the reminders. They do not reach your Brain by themselves, so a tool with the reminders and no connection has an AI being told to check something it cannot open. One line per tool below, in that tool's own wording.",
+    "byTool": {
+      "claude-code": {
         "kind": "run",
         "where": "claude",
-        "command": "/plugin install dazzer-connect@dazzer"
+        "command": "/plugin install dazzer-connect@dazzer",
+        "proven": "run on a clean Claude Code; it registers the connection and asks to sign in"
+      },
+      "codex": {
+        "kind": "run",
+        "where": "terminal",
+        "command": "codex plugin add dazzer-connect@dazzer",
+        "proven": "run on a clean Codex; `codex mcp list` then shows dazzer with a sign-in waiting"
+      },
+      "copilot": {
+        "kind": "run",
+        "where": "terminal",
+        "command": "copilot plugin install dazzer-connect@dazzer",
+        "proven": null
+      },
+      "antigravity": {
+        "kind": "run",
+        "where": "terminal",
+        "command": "agy plugin install ./dazzer-plugin/plugins/dazzer-connect",
+        "proven": null
+      },
+      "cursor": {
+        "kind": "choose",
+        "where": "cursor",
+        "from": "/plugins",
+        "label": "dazzer-connect",
+        "proven": null
+      },
+      "devin": {
+        "kind": "run",
+        "where": "terminal",
+        "command": "devin plugins install dazzer-io/dazzer-plugin#plugins/dazzer-connect",
+        "proven": null
       }
-    ],
-    "note": "Everything above adds the reminders. They need your Brain to already be reachable from that tool. If it is not, each tool has its own one-time sign-in — and in Claude you can get it from the same place."
+    }
   },
   "provenance": {
     "what": "All six were installed into a real copy of the tool and watched working, which proved too little: on two of them the reminder never reached the AI at all. Claude Code is proven the whole way: installed from a listing, the tool reports it loaded, and it answered back a word only the reminder carried. Codex runs every reminder from an installed copy. Cursor answered that word too, but through its own settings, and its reminders have since moved to a file nobody has run. Antigravity rests on its own published reference, not on a run. Copilot keeps the moments a real session confirmed: its reference says one of them ignores what a reminder prints, but that same reference was already caught being wrong about this tool, so nothing was changed on its word.",

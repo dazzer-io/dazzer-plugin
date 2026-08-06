@@ -66,7 +66,14 @@ function commandsDeclared(manifest, findings) {
   for (const tool of manifest.tools ?? []) {
     collect(tool?.installReminders?.steps, `tools.${tool?.id ?? "?"}`);
   }
-  collect(manifest.installConnection?.steps, "installConnection");
+  // The connection is written PER TOOL, because one line in one tool's wording is what left
+  // every other tool's setup ending with no way to reach the Brain. Reading only the old
+  // single-step shape here would go quiet the moment that was fixed, and this gate would then
+  // pass while the README and the manifest disagreed about five of the six tools.
+  for (const [id, step] of Object.entries(manifest.installConnection?.byTool ?? {})) {
+    if (step === null || step?.none === true) continue;
+    collect([step], `installConnection.${id}`);
+  }
 
   return out;
 }

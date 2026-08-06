@@ -88,16 +88,59 @@ since last time. The prompt has nothing to measure, so it stays quiet rather tha
 
 ### Reaching your Brain
 
-Everything above adds the **reminders**. They need your Brain to already be reachable from that
-tool. If it is not, each tool has its own one-time sign-in — and in Claude you can get it from the
-same place:
+Everything above adds the **reminders**. They do not reach your Brain by themselves. A tool with
+the reminders and no connection has an AI being told to check something it cannot open, which is
+worse than having neither: it goes looking, and it finds whatever else it has.
+
+**Skip this if Dazzer already shows as connected.** Installing it again would replace a working
+connection with one that needs signing in.
+
+One line per tool, in that tool's own wording.
+
+**Claude Code** — typed into Claude itself:
 
 ```
 /plugin install dazzer-connect@dazzer
 ```
 
-Skip that if Dazzer already shows as connected. Installing it again would replace a working
-connection with one that needs signing in.
+**Codex** — in a terminal:
+
+```
+codex plugin add dazzer-connect@dazzer
+```
+
+**GitHub Copilot** — in a terminal:
+
+```
+copilot plugin install dazzer-connect@dazzer
+```
+
+**Antigravity** — in a terminal, against the copy you downloaded:
+
+```
+agy plugin install ./dazzer-plugin/plugins/dazzer-connect
+```
+
+**Cursor** — type `/plugins` in Cursor and choose **dazzer-connect**.
+
+**Devin** — in a terminal:
+
+```
+devin plugins install dazzer-io/dazzer-plugin#plugins/dazzer-connect
+```
+
+Two of these have been run and watched working: Claude Code, where it registers the connection and
+asks to sign in, and Codex, where the connection then appears with a sign-in waiting. The other
+four follow each tool's own established shape and have not yet been run. Where that matters is
+written down rather than smoothed over — see what has actually been tried, below.
+
+**This section existed in one wording only, Claude's, and every other tool's setup simply ended
+after the reminders.** Someone followed the Codex instructions to the letter on a clean machine,
+was never asked to sign in because there was nothing to sign in to, and watched his AI go hunting
+through an unrelated archive for the memory it had just been told to check. The command it needed
+existed and worked the whole time. Nobody had written it down, and no rule asked whether anything
+was missing — every rule here compared what we say against what we ship, and both said the same
+thing. A rule that asks the missing question now exists.
 
 ### Where reminders cannot run at all
 
