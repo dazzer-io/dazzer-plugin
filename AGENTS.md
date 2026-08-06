@@ -45,8 +45,10 @@ Brain, not here.**
   script is a number nobody can find or change.
 - **Changing an install step means changing it twice.** The README is what a person reads;
   `tools.manifest.json` is what a screen renders. Edit one without the other and
-  `install-parity` refuses the run, naming both files. Adding a tool means a README block
-  and a manifest entry, together.
+  `install-parity` refuses the run, naming both files — for updating and removing as well as
+  installing. Adding a tool means a README block and a manifest entry together, **and** an
+  answer to how somebody updates and removes it, or `lifecycle-coverage` refuses the run.
+  Saying plainly that nobody has established one counts; leaving it out does not.
 - **The reminders' wording is not cosmetic.** Onboarding proves the reminders are installed
   by looking for one of those sentences in what the AI could see — nothing else puts them
   there. Reword one without updating `spokenSentences` and `reminder-parity` refuses. The
@@ -66,6 +68,21 @@ fix something, delete its line.
 The suite takes its interpreter from `SHELL_UNDER_TEST`. Never name a shell inside the
 suite: the system shell is bash-in-posix-mode on a Mac and dash on a Linux runner, and they
 disagree on exactly the comparison one defect lives on.
+
+**Run it before you push, once per clone:**
+
+```
+git config core.hooksPath .githooks
+```
+
+That runs the suite on every push and refuses one that would take a stale instruction with
+it. Two honest limits. It runs the suite **once**, under your system shell — on a Mac that is
+bash, so it never exercises the dash path the paragraph above warns about, which the workflow
+does run. And the setting lives in your clone: there is no install step here to attach it to
+on your behalf, so a fresh clone is unprotected until someone runs that line.
+
+**The enforcement is the workflow**, which runs the suite under both shells on every proposed
+change and cannot be skipped. The hook only saves you the round trip.
 
 ## Critical rules
 

@@ -1,0 +1,8 @@
+#!/bin/sh
+# Everything this repository ships is either a command somebody runs or an instruction
+# somebody follows, so "the docs are stale" and "the code is broken" are the same failure
+# here. The whole suite is a few seconds; there is no fast partial worth having.
+#
+# Escape hatch, emergencies only: git push --no-verify
+set -e
+node scripts/baseline.mjs

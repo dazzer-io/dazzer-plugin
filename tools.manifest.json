@@ -85,7 +85,31 @@
           "installableHere": false,
           "note": "Install it from a terminal with the same two lines. The app and the terminal share one set of settings, so it appears in the app on your next conversation. The install command does not exist inside the app, so this genuinely needs a terminal once — even if you never otherwise open one."
         }
-      ]
+      ],
+      "updateReminders": {
+        "steps": [
+          {
+            "kind": "run",
+            "where": "terminal",
+            "command": "claude plugin marketplace update dazzer"
+          },
+          {
+            "kind": "run",
+            "where": "terminal",
+            "command": "claude plugin update dazzer@dazzer"
+          }
+        ],
+        "note": "These two go in a terminal, unlike the install steps. Typing /plugin update into Claude opens a menu and quietly keeps the copy you already had."
+      },
+      "removeReminders": {
+        "steps": [
+          {
+            "kind": "run",
+            "where": "claude",
+            "command": "/plugin uninstall dazzer@dazzer"
+          }
+        ]
+      }
     },
     {
       "id": "codex",
@@ -112,6 +136,31 @@
           }
         ],
         "note": "Codex asks you to approve a plugin's reminders before it will run them. If nothing appears in the run history, that approval is the first thing to check."
+      },
+      "updateReminders": {
+        "steps": [
+          {
+            "kind": "run",
+            "where": "terminal",
+            "command": "codex plugin marketplace upgrade dazzer"
+          },
+          {
+            "kind": "run",
+            "where": "terminal",
+            "command": "codex plugin add dazzer@dazzer"
+          }
+        ],
+        "note": "Adding it again replaces the copy you had, so the reminders never fire twice."
+      },
+      "removeReminders": {
+        "steps": [
+          {
+            "kind": "run",
+            "where": "terminal",
+            "command": "codex plugin remove dazzer@dazzer"
+          }
+        ],
+        "note": "The marketplace has to be named alongside the plugin. Codex refuses the plugin name on its own."
       }
     },
     {
@@ -138,6 +187,12 @@
           }
         ],
         "note": "Its moments can only live in the file Claude Code also reads, and Claude Code refuses that whole file over any name it does not recognise - which is how it came to load nothing at all. Until this tool can be run and shown to read a file of its own, nothing is declared for it rather than declared and silently dead."
+      },
+      "updateReminders": {
+        "notEstablished": "Not established. Nobody has run this against the real program, so nothing is printed here rather than a guess that would fail quietly."
+      },
+      "removeReminders": {
+        "notEstablished": "Not established. Nobody has run this against the real program, so nothing is printed here rather than a guess that would fail quietly."
       }
     },
     {
@@ -168,7 +223,13 @@
       },
       "limits": [
         "No reminders reach this tool at present. Its moments can only live in the file Claude Code also reads, and that file has to stay clean or Claude Code loads none of it. Being put back on track after a long conversation forgets itself was never possible here anyway - that moment does not exist in this tool."
-      ]
+      ],
+      "updateReminders": {
+        "notEstablished": "Not established. Nobody has run this against the real program, so nothing is printed here rather than a guess that would fail quietly."
+      },
+      "removeReminders": {
+        "notEstablished": "Not established. Nobody has run this against the real program, so nothing is printed here rather than a guess that would fail quietly."
+      }
     },
     {
       "id": "cursor",
@@ -201,7 +262,37 @@
       "gotchas": [
         "If you have installed it before, remove and re-add rather than update. Cursor's update command reports success without actually re-fetching, so you keep whatever version you first got. Run `cursor-agent plugin marketplace remove dazzer` then add it again.",
         "If you already have some other Dazzer setup wired into Cursor, take it out first, or both fire on every reply and you get the save prompt twice."
-      ]
+      ],
+      "updateReminders": {
+        "steps": [
+          {
+            "kind": "run",
+            "where": "terminal",
+            "command": "cursor-agent plugin marketplace remove dazzer"
+          },
+          {
+            "kind": "run",
+            "where": "terminal",
+            "command": "cursor-agent plugin marketplace add https://github.com/dazzer-io/dazzer-plugin.git"
+          },
+          {
+            "kind": "choose",
+            "where": "cursor",
+            "from": "/plugins",
+            "label": "dazzer"
+          }
+        ],
+        "note": "Removing and adding again, not updating. Cursor reports a successful update without fetching anything, so you keep whatever version you first got."
+      },
+      "removeReminders": {
+        "steps": [
+          {
+            "kind": "run",
+            "where": "terminal",
+            "command": "cursor-agent plugin marketplace remove dazzer"
+          }
+        ]
+      }
     },
     {
       "id": "devin",
@@ -224,7 +315,13 @@
       },
       "limits": [
         "Two of the three reminders work. The save prompt does not, and cannot: Devin tells a reminder only which session and which prompt it is, with no way to tell how much conversation has built up since last time. The prompt has nothing to measure, so it stays quiet rather than firing blindly."
-      ]
+      ],
+      "updateReminders": {
+        "notEstablished": "Not established. Nobody has run this against the real program, so nothing is printed here rather than a guess that would fail quietly."
+      },
+      "removeReminders": {
+        "notEstablished": "Not established. Nobody has run this against the real program, so nothing is printed here rather than a guess that would fail quietly."
+      }
     },
     {
       "id": "claude-chat",
@@ -298,5 +395,15 @@
       "cursor",
       "devin"
     ]
+  },
+  "removeConnection": {
+    "steps": [
+      {
+        "kind": "run",
+        "where": "claude",
+        "command": "/plugin uninstall dazzer-connect@dazzer"
+      }
+    ],
+    "note": "Leave this in place if Dazzer is still how you reach your Brain - removing it takes the connection with it."
   }
 }

@@ -547,7 +547,7 @@ const CASES = [
     },
   },
   {
-    gate: "install-parity",
+    gate: "lifecycle-coverage",
     what: "a tool offered as supported with no way to install the reminders",
     seed(root) {
       edit(root, MANIFEST, (manifest) => {
