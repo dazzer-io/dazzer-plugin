@@ -378,6 +378,34 @@ const CASES = [
     },
   },
   {
+    gate: "lifecycle-coverage",
+    what: "a tool with no way to update it, which is how a fix reaches only new installs",
+    seed(root) {
+      edit(root, MANIFEST, (manifest) => {
+        delete manifest.tools.find((t) => t.id === "codex").updateReminders;
+      });
+    },
+  },
+  {
+    gate: "lifecycle-coverage",
+    what: "a tool with no way to remove it",
+    seed(root) {
+      edit(root, MANIFEST, (manifest) => {
+        manifest.tools.find((t) => t.id === "codex").removeReminders = { steps: [] };
+      });
+    },
+  },
+  {
+    gate: "lifecycle-coverage",
+    what: "a command a screen would hand somebody that the page never shows them",
+    seed(root) {
+      edit(root, MANIFEST, (manifest) => {
+        manifest.tools.find((t) => t.id === "codex").updateReminders.steps[0].command =
+          "codex plugin marketplace upgrade dazzer --invented-flag";
+      });
+    },
+  },
+  {
     gate: "address-parity",
     what: "the instructions moved to another address we own while the shipped one stayed put",
     seed(root) {

@@ -67,6 +67,18 @@ The suite takes its interpreter from `SHELL_UNDER_TEST`. Never name a shell insi
 suite: the system shell is bash-in-posix-mode on a Mac and dash on a Linux runner, and they
 disagree on exactly the comparison one defect lives on.
 
+**Run it before you push, once per clone:**
+
+```
+git config core.hooksPath .githooks
+```
+
+That runs the whole suite on every push and refuses one that would take a stale instruction
+with it. It is a convenience, not the guarantee — that setting lives in your clone, and
+there is no install step here to attach it to on your behalf. **The enforcement is the
+workflow, which runs the same suite on every proposed change and cannot be skipped.**
+The hook only saves you the round trip.
+
 ## Critical rules
 
 Violating either of these means the work is not done. Both exist because something already

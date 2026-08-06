@@ -205,13 +205,79 @@ cat "${CLAUDE_PLUGIN_DATA:-$HOME/.dazzer}/capture/receipts.jsonl" | tail
 An empty file, or no file at all, means the plugin has never run — which is worth knowing,
 because that failure is otherwise completely silent.
 
+## Update
+
+**Installing once does not keep you current.** Each tool keeps the copy it first downloaded
+until you tell it otherwise, so a fix published today reaches you only when you ask for it.
+
+### Claude
+
+```
+/plugin marketplace update dazzer
+```
+```
+/plugin update dazzer@dazzer
+```
+
+### Codex
+
+```
+codex plugin marketplace upgrade dazzer
+```
+```
+codex plugin add dazzer@dazzer
+```
+
+Adding it again replaces the copy you had, so the reminders never fire twice.
+
+### Cursor
+
+Removing and adding again, **not** updating — Cursor reports a successful update without
+fetching anything, so an update leaves you on whatever version you first got.
+
+```
+cursor-agent plugin marketplace remove dazzer
+```
+```
+cursor-agent plugin marketplace add https://github.com/dazzer-io/dazzer-plugin.git
+```
+
+### Copilot, Antigravity and Devin
+
+**Not established.** Nobody has run an update against these three, and their own
+documentation has already been wrong about this plugin once, so nothing is printed here
+rather than a guess that fails quietly. Reinstalling with the steps at the top of this file
+is the honest fallback.
+
 ## Uninstall
 
-Remove the part that changes behaviour:
+Remove the part that changes behaviour.
+
+### Claude
 
 ```
 /plugin uninstall dazzer@dazzer
 ```
+
+### Codex
+
+```
+codex plugin remove dazzer@dazzer
+```
+
+The marketplace has to be named alongside the plugin. Codex refuses the plugin name on its own.
+
+### Cursor
+
+```
+cursor-agent plugin marketplace remove dazzer
+```
+
+### Copilot, Antigravity and Devin
+
+**Not established**, for the same reason as updating.
+
+### The connection
 
 If you also installed the connection, and you want that gone too:
 
