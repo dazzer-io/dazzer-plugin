@@ -261,12 +261,16 @@ const claudeShaped = (event) => (doc) =>
 const MUST_CARRY_A_REMINDER = new Map([
   ["UserPromptSubmit", { who: "Claude Code and Codex, on every message", says: "recall" }],
   ["SessionStart", { who: "Claude Code and Codex, after a reset", says: "resume" }],
+  ["Stop", { who: "Claude Code and Codex", runs: true }],
 ]);
 
 /** Cursor takes a file its own manifest names in preference to the shared one. */
-const MUST_CARRY_FOR_CURSOR = new Map([["sessionStart", { who: "Cursor", says: "recall" }]]);
+const MUST_CARRY_FOR_CURSOR = new Map([
+  ["sessionStart", { who: "Cursor", says: "recall" }],
+  ["stop", { who: "Cursor", runs: true }],
+]);
 
-/** The plain-words file answers to one host, and losing its two moments is just as silent. */
+/** The plain-words file answers to Devin alone, and losing its moments is just as silent. */
 const MUST_CARRY_IN_THE_PLAIN_FILE = new Map([
   ["UserPromptSubmit", { who: "Devin, on every message", says: "recall" }],
   ["SessionStart", { who: "Devin, after a reset", says: "resume" }],
@@ -295,14 +299,6 @@ const SHAPES = new Map([
       hosts: "Cursor",
       read: (doc) => doc?.additional_context,
       looks: '{"additional_context":"..."}',
-    },
-  ],
-  [
-    "unused:PreInvocation",
-    {
-      hosts: "Antigravity",
-      read: (doc) => doc?.injectSteps?.[0]?.ephemeralMessage,
-      looks: '{"injectSteps":[{"ephemeralMessage":"..."}]}',
     },
   ],
 ]);
@@ -441,7 +437,7 @@ function spokenByHooks(findings, declaredById) {
       }
     }
 
-    // Only the two files that carry reminders owe anybody one.
+    // Only the files that actually carry reminders owe anybody one.
     const allowedMoments = strict
       ? SHARED_FILE_MOMENTS
       : forCursor
@@ -494,7 +490,28 @@ function spokenByHooks(findings, declaredById) {
           ? MUST_CARRY_IN_THE_PLAIN_FILE
           : undefined;
     if (owed !== undefined) {
-      for (const [trigger, { who, says }] of owed) {
+      for (const [trigger, { who, says, runs }] of owed) {
+        // The end-of-reply prompt runs a file rather than saying one of our sentences, so
+        // "did anyone speak here" cannot see it go. Every wording rule was blind to it, and
+        // it could be deleted from every file at once with nothing objecting.
+        if (runs) {
+          const present = (triggers[trigger] ?? []).some((group) =>
+            (Array.isArray(group?.hooks) ? group.hooks : [group]).some(
+              (hook) => typeof hook?.command === "string" && hook.command.trim() !== "",
+            ),
+          );
+          if (!present) {
+            findings.push({
+              file: where,
+              message:
+                `nothing runs at the end of a reply for ${who}. That is where settled work gets ` +
+                "saved, and it says none of our sentences - so no rule about wording can " +
+                "notice it has gone.",
+            });
+          }
+          continue;
+        }
+
         const said = spoke.get(trigger);
         if (said === undefined) {
           findings.push({
@@ -576,17 +593,23 @@ function homesAreWired(findings) {
     });
   }
 
-  // Claude Code reads a declared path IN ADDITION TO the shared one, so one line here would
-  // hand it the very file the whole layout exists to keep away from it.
-  const claudeListing = join(plugin, ".claude-plugin", "plugin.json");
-  const claudeDeclared = readJson(claudeListing, findings)?.hooks;
-  if (claudeDeclared !== undefined) {
+  // A listing that names another place to read reminders from sends its host to a file
+  // shaped for somebody else. Claude Code reads such a path AS WELL AS the shared one, so a
+  // single line brings back the failure this layout exists to prevent; Devin discards a whole
+  // file over one moment it does not recognise, which is how it broke here once already.
+  for (const [dir, host] of [
+    [".claude-plugin", "Claude Code"],
+    [".devin-plugin", "Devin"],
+  ]) {
+    const listing = join(plugin, dir, "plugin.json");
+    const declared = readJson(listing, findings)?.hooks;
+    if (declared === undefined) continue;
     findings.push({
-      file: rel(claudeListing),
+      file: rel(listing),
       message:
-        `names "${claudeDeclared}" as another place to read reminders from. Claude Code reads ` +
-        "that as well as the shared file, not instead of it, so any moment-name it does not " +
-        "recognise in there brings the whole plugin down again.",
+        `names "${declared}" as another place for ${host} to read reminders from. That sends it ` +
+        "to a file holding moments meant for someone else, and every host here throws out a " +
+        "whole file over one name it does not recognise.",
     });
   }
 }
@@ -628,7 +651,7 @@ runGate({
       }
     }
 
-    // The two hook files carry the same sentences by hand; a reworded one is a real defect.
+    // The hook files carry the same sentences by hand; a reworded one is a real defect.
     const byText = new Map();
     for (const s of spoken) {
       if (!byText.has(s.trigger)) byText.set(s.trigger, new Map());

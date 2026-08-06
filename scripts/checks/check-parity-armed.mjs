@@ -45,7 +45,7 @@ function fixture() {
   );
   // The two listings that say where each host looks. Left out, the wiring rules see a
   // missing pointer in every fixture and refuse a tree that is actually fine.
-  for (const listing of [CURSOR_LISTING, CLAUDE_LISTING]) {
+  for (const listing of [CURSOR_LISTING, CLAUDE_LISTING, DEVIN_LISTING]) {
     mkdirSync(dirname(join(root, ...listing)), { recursive: true });
     cpSync(join(REPO_ROOT, ...listing), join(root, ...listing));
   }
@@ -77,6 +77,7 @@ const WRAPPED_HOOKS = ["plugins", "dazzer", "hooks", "hooks.json"];
 const CURSOR_HOOKS = ["plugins", "dazzer", "hooks", "cursor.json"];
 const CURSOR_LISTING = ["plugins", "dazzer", ".cursor-plugin", "plugin.json"];
 const CLAUDE_LISTING = ["plugins", "dazzer", ".claude-plugin", "plugin.json"];
+const DEVIN_LISTING = ["plugins", "dazzer", ".devin-plugin", "plugin.json"];
 const BARE_HOOKS = ["plugins", "dazzer", "hooks.json"];
 const MANIFEST = ["tools.manifest.json"];
 
@@ -381,9 +382,7 @@ const CASES = [
     what: "another tool's moment-name put back in the shared file, which stops Claude Code loading any of it",
     seed(root) {
       edit(root, WRAPPED_HOOKS, (hooks) => {
-        hooks.hooks.PreInvocation = [
-          { hooks: [{ type: "command", command: 'echo "[Dazzer] anything"' }] },
-        ];
+        hooks.hooks.PreInvocation = structuredClone(hooks.hooks.UserPromptSubmit);
       });
     },
   },
@@ -425,8 +424,9 @@ const CASES = [
     gate: "reminder-parity",
     what: "a reminders file answering to no host, which looks like part of the plugin and reaches nobody",
     seed(root) {
+      const shared = readJson(join(root, ...WRAPPED_HOOKS));
       writeJson(join(root, "plugins", "dazzer", "hooks", "copilot.json"), {
-        hooks: { userPromptSubmitted: [{ command: 'echo "[Dazzer] anything"' }] },
+        hooks: { UserPromptSubmit: shared.hooks.UserPromptSubmit },
       });
     },
   },
@@ -435,7 +435,7 @@ const CASES = [
     what: "another tool's moment added to the file Devin reads, which Devin discards whole",
     seed(root) {
       edit(root, BARE_HOOKS, (hooks) => {
-        hooks.PreInvocation = [{ hooks: [{ type: "command", command: 'echo "[Dazzer] anything"' }] }];
+        hooks.PreInvocation = structuredClone(hooks.UserPromptSubmit);
       });
     },
   },
@@ -444,7 +444,34 @@ const CASES = [
     what: "another tool's moment added to Cursor's file, which Cursor discards just as whole",
     seed(root) {
       edit(root, CURSOR_HOOKS, (hooks) => {
-        hooks.hooks.Stop = [{ command: 'echo "[Dazzer] anything"' }];
+        hooks.hooks.Stop = structuredClone(hooks.hooks.sessionStart);
+      });
+    },
+  },
+  {
+    gate: "reminder-parity",
+    what: "one line in Devin's listing sending it to a file shaped for somebody else",
+    seed(root) {
+      edit(root, DEVIN_LISTING, (listing) => {
+        listing.hooks = "./hooks/hooks.json";
+      });
+    },
+  },
+  {
+    gate: "reminder-parity",
+    what: "the end-of-reply prompt deleted, which says none of our sentences so no wording rule can miss it",
+    seed(root) {
+      edit(root, WRAPPED_HOOKS, (hooks) => {
+        delete hooks.hooks.Stop;
+      });
+    },
+  },
+  {
+    gate: "reminder-parity",
+    what: "the same, in Cursor's file",
+    seed(root) {
+      edit(root, CURSOR_HOOKS, (hooks) => {
+        delete hooks.hooks.stop;
       });
     },
   },

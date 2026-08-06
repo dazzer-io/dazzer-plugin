@@ -77,7 +77,10 @@ runGate({
         }
         if (usesKnownInstallDir) continue; // resolved at run time, nothing to check here
 
-        const scriptPath = command.match(/\$\{CLAUDE_PLUGIN_ROOT\}(\/[^\s"']+\.sh)/)?.[1];
+        // Any tool's plugin-root variable, not just one of them. Matching a single name left the
+        // file a second tool reads outside this check entirely, so a script that does not exist
+        // could ship in it.
+        const scriptPath = command.match(/\$\{[A-Z_]*PLUGIN_ROOT[^}]*\}(\/[^\s"\']+\.sh)/)?.[1];
         if (!scriptPath) continue;
 
         const pluginDir = join(REPO_ROOT, rel(file).split("/").slice(0, 2).join("/"));

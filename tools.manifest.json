@@ -167,7 +167,7 @@
         "note": "Its moments can only live in the file Claude Code also reads, and Claude Code refuses that whole file over any name it does not recognise - which is how it came to load nothing at all. Until this tool can be run and shown to read a file of its own, nothing is declared for it rather than declared and silently dead."
       },
       "limits": [
-        "Two of the three reminders work. Being put back on track after a long conversation forgets itself does not — that moment does not exist in this tool at all, so nothing we add can fix it."
+        "No reminders reach this tool at present. Its moments can only live in the file Claude Code also reads, and that file has to stay clean or Claude Code loads none of it. Being put back on track after a long conversation forgets itself was never possible here anyway - that moment does not exist in this tool."
       ]
     },
     {
@@ -289,7 +289,7 @@
     }
   },
   "provenance": {
-    "what": "All six were installed into a real copy of the tool and watched working, which proved too little: on two of them the reminder never reached the AI at all. Claude Code is proven the whole way: installed from a listing, the tool reports it loaded, and it answered back a word only the reminder carried. Codex runs every reminder from an installed copy. Cursor answered that word too, but through its own settings, and its reminders have since moved to a file nobody has run. Antigravity rests on its own published reference, not on a run. Copilot keeps the moments a real session confirmed: its reference says one of them ignores what a reminder prints, but that same reference was already caught being wrong about this tool, so nothing was changed on its word.",
+    "what": "All six were installed into a real copy of the tool and watched working, which proved too little: on three of them nothing reached the AI at all - Codex and Cursor discarded the words, and Claude Code never loaded the plugin. Proving the words arrive from a hand-written file proved too little in turn, because it says nothing about whether the shipped file loads, and a tool reporting its own reminders as registered proved nothing either - it says so even when it is delivering nothing. What counts is installing the real thing and asking the AI for a word only the reminder carried. Claude Code, Codex and Cursor each answer it. Devin takes the plain wording it already gets. Antigravity and Copilot are given no reminders at all rather than ones that would be silently dead.",
     "tools": [
       "claude-code",
       "codex",

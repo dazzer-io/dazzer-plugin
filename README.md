@@ -199,12 +199,12 @@ is exactly how the Claude Code failure hid behind a passing test. What counts no
 in order: install the real thing, have the tool itself confirm it loaded, then ask the AI for a
 word only the reminder carried.
 
-Against that bar: **Claude Code passes all three** — installed from a listing, reported as
-loaded with its three moments registered, and it answered back a word only the reminder carried.
-**Codex** runs every reminder from an installed copy with no warning and no error. **Cursor**
-answered the planted word, but through its own settings rather than an installed plugin, and its
-reminders have since moved to a file of their own — so on Cursor the words are proven and the new
-location is not. Devin takes the plain wording it already gets.
+Against that bar: **Claude Code passes** — installed from a listing, it answered back a word
+only the reminder carried. Note the middle step of that bar turned out to be worthless: the tool
+reports its reminders as registered even when it is delivering nothing, so only the planted word
+counts.
+**Codex** runs every reminder from an installed copy with no warning and no error. **Cursor** answers it too, from an
+installed plugin reading the file of its own it moved to. Devin takes the plain wording it already gets.
 
 Cursor was the last, and it is worth saying why it took two attempts. This repository briefly
 shipped a Cursor-specific listing of what it contains; Cursor preferred that file over the one it

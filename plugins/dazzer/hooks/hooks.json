@@ -26,7 +26,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh \"${CLAUDE_PLUGIN_ROOT:-$HOME/.gemini/config/plugins/dazzer}/scripts/capture-sweep.sh\""
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/capture-sweep.sh\""
           }
         ]
       }
