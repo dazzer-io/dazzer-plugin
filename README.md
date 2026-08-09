@@ -7,7 +7,7 @@ losing it when the conversation ends.
 
 Two lines in most tools. The same plugin, the same files — only the command changes.
 
-### Claude Code — Anthropic's coding tool, and not the Claude you chat with
+### Claude Code — Anthropic's coding tool, separate from the Claude desktop app
 
 ```
 /plugin marketplace add dazzer-io/dazzer-plugin

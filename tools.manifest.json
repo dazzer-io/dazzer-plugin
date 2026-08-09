@@ -52,7 +52,7 @@
       "id": "claude-code",
       "name": "Claude Code",
       "vendor": "Anthropic",
-      "describedAs": "Anthropic's coding tool, and not the Claude you chat with",
+      "describedAs": "Anthropic's coding tool, separate from the Claude desktop app",
       "status": "supported",
       "reminders": {
         "recall": "works",
