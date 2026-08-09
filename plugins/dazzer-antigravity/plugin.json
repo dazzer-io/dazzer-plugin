@@ -1,0 +1,19 @@
+{
+  "name": "dazzer-antigravity",
+  "displayName": "Dazzer reminders for Antigravity",
+  "version": "0.8.0",
+  "description": "The Dazzer reminders, in the one shape Antigravity accepts. Install alongside the main Dazzer plugin - Antigravity cannot read that one's reminders file, and this carries them instead.",
+  "author": {
+    "name": "Dazzer",
+    "url": "https://dazzer.io"
+  },
+  "homepage": "https://dazzer.io",
+  "repository": "https://github.com/dazzer-io/dazzer-plugin",
+  "license": "MIT",
+  "keywords": [
+    "memory",
+    "knowledge",
+    "brain",
+    "mcp"
+  ]
+}

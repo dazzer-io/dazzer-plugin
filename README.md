@@ -53,11 +53,15 @@ It has no store to install from, so point it at a downloaded copy:
 ```
 git clone https://github.com/dazzer-io/dazzer-plugin.git
 agy plugin install ./dazzer-plugin/plugins/dazzer
+agy plugin install ./dazzer-plugin/plugins/dazzer-antigravity
 ```
 
-**The reminders do not reach Antigravity at the moment** — see below for why, and what would
-undo it. Being put back on track after a long conversation forgets itself was never possible
-here anyway: that moment does not exist in this tool at all.
+Two installs here rather than one, and it is not tidiness — Antigravity cannot read the first
+one's reminders file, so the second carries them. See below for why.
+
+**The check-your-Brain reminder arrives.** Saving what settled at the end of a reply does not yet,
+and being put back on track after a long conversation forgets itself never can: that moment does
+not exist in this tool at all.
 
 ### Cursor
 
@@ -222,14 +226,24 @@ does not reach the instruction until that line is run again.
 
 ### Antigravity gets no reminders for now
 
-Its moments can only live in the file Claude Code also reads, and Claude Code refuses that whole
-file over any name it does not recognise. A separate file was tried once and Antigravity's own
-importer overwrote it.
+The reason recorded here before — that a separate file was tried and Antigravity's own importer
+overwrote it — was wrong, and it kept a working capability shut off. Antigravity has a documented
+way to carry reminders, its own moments fire, and **what a reminder says there does reach the
+model**: asked to quote the sentence back, it did, word for word.
 
-So rather than ship something either dead or damaging to every other tool, **nothing is declared
-for it**. It installed and was watched working; it has never been shown to receive a reminder under
-a test that would have caught failure. The standing-instruction route that solved Copilot is the
-obvious thing to try here and has not been tried — it reads a similar file.
+**What is actually in the way is a name collision with Devin.** Both look for a file called
+`hooks.json` at the plugin root, and they want different shapes inside it. Antigravity discards the
+whole file over one entry it does not recognise — the same behaviour as Claude Code. Proven by
+putting both shapes in one file and watching every reminder vanish.
+
+So Antigravity's reminders ship as **a second small plugin of their own**, `plugins/dazzer-antigravity`,
+which is the extra install line above. Two further things were proven rather than assumed: given its
+own file it works, and **a broken neighbour sitting beside it does not drag it down** — the failing
+mixed file was left in place deliberately while the good one was tested.
+
+**Saving what settled is not declared here yet, and the reason is narrow.** The moment it needs does
+fire — that is proven — but what a reminder has to say back at that moment has not been established,
+and this repository does not declare a reminder it has not watched arrive.
 
 ### What has actually been tried
 
@@ -349,3 +363,17 @@ If you also installed the connection, and you want that gone too:
 
 Leave that second one in place if Dazzer is still how you reach your Brain — removing it
 takes the connection with it.
+
+On Antigravity there is a third piece, because its reminders could not travel in the same file as
+everyone else's:
+
+```
+/plugin uninstall dazzer-antigravity@dazzer
+```
+
+On Copilot, the check-your-Brain instruction is a file rather than a plugin, so removing the plugin
+leaves it behind. Delete it as well:
+
+```
+rm ~/.copilot/instructions/dazzer.instructions.md
+```

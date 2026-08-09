@@ -36,6 +36,10 @@ const BARE_HOOKS = ["plugins", "dazzer", "hooks.json"];
 const MANIFEST = ["tools.manifest.json"];
 const README = ["README.md"];
 const CONNECTION = ["plugins", "dazzer-connect", ".mcp.json"];
+// Antigravity's reminders live in a plugin folder of their OWN, because it and Devin both look
+// for `hooks.json` at the plugin root and want different shapes inside it.
+const AGY_HOOKS = ["plugins", "dazzer-antigravity", "hooks.json"];
+const AGY_LISTING = ["plugins", "dazzer-antigravity", "plugin.json"];
 
 /**
  * Everything the fixture holds - EVERY file any parity gate reads, listed in one place.
@@ -54,6 +58,8 @@ const FIXTURE_FILES = [
   CURSOR_LISTING,
   CLAUDE_LISTING,
   DEVIN_LISTING,
+  AGY_HOOKS,
+  AGY_LISTING,
   SWEEP,
 ];
 
@@ -435,6 +441,24 @@ const CASES = [
       const shared = readJson(join(root, ...WRAPPED_HOOKS));
       writeJson(join(root, "plugins", "dazzer", "hooks", "copilot.json"), {
         hooks: { UserPromptSubmit: shared.hooks.UserPromptSubmit },
+      });
+    },
+  },
+  {
+    gate: "reminder-parity",
+    what: "another tool's moment added to Antigravity's own file, which it discards just as whole",
+    seed(root) {
+      edit(root, AGY_HOOKS, (hooks) => {
+        hooks.dazzer.UserPromptSubmit = structuredClone(hooks.dazzer.PreInvocation);
+      });
+    },
+  },
+  {
+    gate: "reminder-parity",
+    what: "Antigravity's reminder rewritten into the shape a different tool reads, so its words reach nobody",
+    seed(root) {
+      edit(root, AGY_HOOKS, (hooks) => {
+        hooks.dazzer.PreInvocation[0].command = "printf %s '{\"additional_context\":\"hello\"}'";
       });
     },
   },
