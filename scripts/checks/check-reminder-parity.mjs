@@ -31,6 +31,21 @@ const SPOKEN_MARK = "[Dazzer]";
  * working prompt from one somebody silenced without removing. */
 const RUNS_THE_SWEEP = "capture-sweep.sh";
 
+/**
+ * Does this command actually run the script, rather than merely mention it?
+ *
+ * Still `sh <file>` and nothing cleverer - `: # disabled for now` is a command too, and it
+ * would satisfy a non-empty test while the end-of-reply prompt quietly stopped running.
+ * What is allowed in front of it is plain settings of the form NAME=value, because one tool
+ * hands over no way to tell which tool a script is running inside, and there the script has
+ * to be TOLD. Guessing it from the path works until somebody installs somewhere unexpected,
+ * and being wrong there is silent: the word for "act on this before you stop" is not the
+ * same everywhere, and the wrong one reads as permission to stop.
+ *
+ * A setting cannot switch the script off, which is what this rule is really guarding.
+ */
+const runsAScript = (command) => /^(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*sh\s/.test(command.trim());
+
 /** A reminder speaks by printing. The end-of-reply script runs a file and is not one. */
 const EMITTER = new Set(["printf", "echo"]);
 
@@ -364,6 +379,7 @@ const HOMES = [
           },
         },
       ],
+      ["Stop", { who: "Antigravity", runs: true }],
     ]),
   },
 ];
@@ -525,8 +541,7 @@ function spokenByHooks(findings, declaredById) {
           Array.isArray(groups) &&
           groups.some((group) =>
             (Array.isArray(group?.hooks) ? group.hooks : [group]).some(
-              (hook) => typeof hook?.command === "string" && typeof hook?.command === "string" &&
-                hook.command.trim().startsWith("sh ") &&
+              (hook) => typeof hook?.command === "string" && runsAScript(hook.command) &&
                 hook.command.includes(RUNS_THE_SWEEP),
             ),
           );

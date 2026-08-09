@@ -80,9 +80,22 @@ runGate({
         const scriptPath = after.match(/^\/[^\s"']+\.sh/)?.[0];
         if (!scriptPath) continue;
 
-        const pluginDir = join(REPO_ROOT, rel(file).split("/").slice(0, 2).join("/"));
-        if (!existsSync(join(pluginDir, scriptPath))) {
-          findings.push({ file: rel(file), message: `names ${scriptPath}, which does not exist in ${rel(pluginDir)}` });
+        // Normally a trigger's script sits in its own plugin. One does not, and cannot: a
+        // tool that needs its reminders in a plugin of their own still shares the one
+        // end-of-reply script rather than carrying a second copy of it. Where the default
+        // spells out a sibling plugin by name, that is the folder to look in - taken from
+        // the command itself rather than from a list here, so a command claiming a folder
+        // that does not exist is still refused.
+        const ownDir = join(REPO_ROOT, rel(file).split("/").slice(0, 2).join("/"));
+        const named = command.slice(opensAt).match(/plugins\/([A-Za-z0-9._-]+)/)?.[1];
+        const namedDir = named === undefined ? undefined : join(REPO_ROOT, "plugins", named);
+        const lookedIn = [ownDir, ...(namedDir === undefined ? [] : [namedDir])];
+
+        if (!lookedIn.some((dir) => existsSync(join(dir, scriptPath)))) {
+          findings.push({
+            file: rel(file),
+            message: `names ${scriptPath}, which does not exist in ${lookedIn.map(rel).join(" or ")}`,
+          });
         }
       }
     }

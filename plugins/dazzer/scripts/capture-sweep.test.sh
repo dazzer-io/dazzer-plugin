@@ -165,6 +165,21 @@ case_run "reentry-blocked-with-trailing-fields" silent \
 
 # --- cadence -----------------------------------------------------------------
 
+# --- the tool that never says "this is your own follow-up" -------------------
+#
+# Google's tool sends no such flag, and leaning on the work-count instead was measured and
+# found wrong: the tap fired five times in one reply and the answer repeated five times. So
+# the tap leaves itself a note. These three cases are that note's whole life - left, read
+# once, and gone - because a note that is never cleared silences a conversation for good,
+# which is the opposite failure and just as quiet.
+agy_payload() { printf '{"conversationId":"%s","transcriptPath":"%s","terminationReason":"model_stop"}' "$1" "$2"; }
+
+GROUP="one-google-session"
+case_run "agy:reads-its-own-field-names" fire "$(agy_payload g1 "$BIG")"
+case_run "agy:will-not-answer-its-own-tap" silent "$(agy_payload g1 "$BIG")"
+case_run "agy:speaks-again-once-more-work-arrives" fire "$(agy_payload g1 "$(transcript 600)")"
+GROUP=""
+
 case_run "quiet-when-little-happened" silent "$(payload c1 "$SMALL")"
 
 GROUP="one-session-doing-steady-work"

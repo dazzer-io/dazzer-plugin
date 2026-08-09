@@ -157,7 +157,7 @@
       "status": "supported",
       "reminders": {
         "recall": "works",
-        "capture": "not-delivered",
+        "capture": "works",
         "resume": "impossible"
       },
       "installReminders": {
@@ -178,11 +178,13 @@
             "command": "agy plugin install ./dazzer-plugin/plugins/dazzer-antigravity"
           }
         ],
-        "note": "This tool cannot read the main plugin's reminders file, because it and Devin both look for a file of that name and want different shapes inside it - and this tool discards a whole file over one entry it does not recognise, exactly as Claude Code does. Proven by putting both shapes in one file and watching every reminder vanish. So its reminders ship as a second small plugin of their own, which the third step installs. A broken neighbour sitting beside it does not take it down; that was proven too."
+        "note": "This tool cannot read the main plugin's reminders file, because it and Devin both look for a file of that name and want different shapes inside it - and this tool discards a whole file over one entry it does not recognise, exactly as Claude Code does. Proven by putting both shapes in one file and watching every reminder vanish. So its reminders ship as a second small plugin of their own, which the third step installs. A broken neighbour sitting beside it does not take it down; that was proven too. The second plugin carries no copy of the end-of-reply script - it runs the one the first plugin already ships, which is why both are installed."
       },
       "limits": [
-        "Saving what settled at the end of a reply does not arrive yet. The moment it needs does fire here - that is proven - but what a reminder must say back at that moment has not been established, so nothing is declared rather than declared and silently dead.",
         "Being put back on track after a long conversation forgets itself was never possible here - that moment does not exist in this tool."
+      ],
+      "gotchas": [
+        "This tool never says whether a reply is the one our own save prompt asked for, which every other tool does say. Leaning on the amount of new work instead was tried and measured wrong - the prompt fired five times in one reply and the answer repeated five times - so the prompt now leaves itself a note that the very next reply reads once and clears. The cost is that a genuine second reply straight after a save is skipped, which is the safe direction."
       ]
     },
     {

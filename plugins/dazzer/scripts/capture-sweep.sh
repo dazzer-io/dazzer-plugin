@@ -165,13 +165,32 @@ receipt() { # status, reason
 }
 
 # --- guard 1: never fire inside our own continuation --------------------------
+#
+# Most tools say outright that this reply is the one our own tap asked for. Google's does
+# not, and leaning on the work-count instead was measured and found wrong: with a low
+# threshold the tap fired five times in one reply and the answer repeated five times. The
+# count cannot do this job, because the reply a tap produces is itself new work.
+#
+# So where the host will not say it, we say it to ourselves: the tap leaves a note, and the
+# very next end-of-reply in that conversation reads the note, removes it, and stays quiet.
+# One note, consumed once, so a tap can never answer its own tap. The cost is that a
+# genuine second reply straight after a tap is skipped, which is the safe direction: the
+# backstop fires a little less often, never twice.
 
 [ "$(read_flag stop_hook_active)" = "true" ] && exit 0
 
+# THE SAME TWO FACTS, UNDER TWO SPELLINGS. Google's tool names the conversation and the
+# transcript in camelCase where the others use underscores. Reading only one spelling is
+# how a reminder that is wired, fires, and is watched running still reaches nobody: the
+# script exits at the first missing field and says nothing, which looks identical to a
+# quiet reply. Both spellings are read for every tool rather than switched on the tool,
+# because a tool renaming its own fields must not need this file to know it happened.
 SESSION="$(read_string session_id)"
+[ -z "$SESSION" ] && SESSION="$(read_string conversationId)"
 [ -z "$SESSION" ] && exit 0
 
 TRANSCRIPT="$(fence_path "$(read_string transcript_path)")"
+[ -z "$TRANSCRIPT" ] && TRANSCRIPT="$(fence_path "$(read_string transcriptPath)")"
 [ -z "$TRANSCRIPT" ] && exit 0
 
 CURRENT="$(whole_number "$(wc -l < "$TRANSCRIPT" 2>/dev/null | tr -d ' ')" '')"
@@ -179,6 +198,15 @@ CURRENT="$(whole_number "$(wc -l < "$TRANSCRIPT" 2>/dev/null | tr -d ' ')" '')"
 
 mkdir -p "$STATE_DIR" 2>/dev/null || exit 0
 MARK="$STATE_DIR/$(fence_name "$SESSION").last"
+
+# Our own continuation, where the host does not say so itself. Read once and removed, so a
+# note left behind by a run that died cannot silence the next reply as well.
+TAP_NOTE="$MARK.tap"
+if [ -f "$TAP_NOTE" ]; then
+  rm -f "$TAP_NOTE" 2>/dev/null
+  receipt quiet "own-continuation"
+  exit 0
+fi
 
 LAST=0
 if [ -f "$MARK" ]; then
@@ -225,6 +253,11 @@ fi
 
 # Old marks from sessions long finished. Ours only, never a recursive delete.
 find "$STATE_DIR" -maxdepth 1 -name '*.last' -mtime "+$STATE_TTL_DAYS" -exec rm -f {} + 2>/dev/null
+
+# Leave the note before speaking, for the hosts that will not tell us themselves. Written
+# after the mark and before the tap, so a failure to write it costs one quiet reply rather
+# than a repeat.
+: > "$TAP_NOTE" 2>/dev/null
 
 receipt fired "threshold-reached"
 

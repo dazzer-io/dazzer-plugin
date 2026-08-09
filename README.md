@@ -59,9 +59,9 @@ agy plugin install ./dazzer-plugin/plugins/dazzer-antigravity
 Two installs here rather than one, and it is not tidiness — Antigravity cannot read the first
 one's reminders file, so the second carries them. See below for why.
 
-**The check-your-Brain reminder arrives.** Saving what settled at the end of a reply does not yet,
-and being put back on track after a long conversation forgets itself never can: that moment does
-not exist in this tool at all.
+**Two of the three reminders arrive** — checking your Brain before answering, and saving what
+settled at the end of a reply. Being put back on track after a long conversation forgets itself
+never can: that moment does not exist in this tool at all.
 
 ### Cursor
 
@@ -241,9 +241,16 @@ which is the extra install line above. Two further things were proven rather tha
 own file it works, and **a broken neighbour sitting beside it does not drag it down** — the failing
 mixed file was left in place deliberately while the good one was tested.
 
-**Saving what settled is not declared here yet, and the reason is narrow.** The moment it needs does
-fire — that is proven — but what a reminder has to say back at that moment has not been established,
-and this repository does not declare a reminder it has not watched arrive.
+**Saving what settled arrives too, and it needed one thing built.** Antigravity never says whether a
+reply is the one our own save prompt asked for — every other tool says so outright. Leaning on the
+amount of new work instead was tried and measured wrong: with the prompt made deliberately eager it
+fired five times in a single reply and the answer repeated five times.
+
+So where the host will not say it, the prompt now says it to itself: it leaves a note, and the very
+next end-of-reply in that conversation reads the note, clears it, and stays quiet. One note,
+consumed once, so a prompt can never answer its own prompt. The cost is that a genuine second reply
+straight after a save is skipped — the safe direction, since the backstop fires a little less often
+rather than twice. Three tests hold that note's whole life: left, read once, and gone.
 
 ### What has actually been tried
 
