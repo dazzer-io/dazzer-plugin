@@ -7,7 +7,7 @@ losing it when the conversation ends.
 
 Two lines in most tools. The same plugin, the same files — only the command changes.
 
-### Claude Code — Anthropic's coding tool, and not the Claude you chat with
+### Claude Code — Anthropic’s coding tool, separate from the Claude desktop app
 
 ```
 /plugin marketplace add dazzer-io/dazzer-plugin
@@ -21,7 +21,7 @@ terminal share one set of settings, so it appears in the app on your next conver
 install command does not exist inside the app, so this genuinely needs a terminal once — even if
 you never otherwise open one.
 
-### Codex — OpenAI's coding tool
+### Codex — OpenAI’s coding tool
 
 ```
 codex plugin marketplace add dazzer-io/dazzer-plugin
@@ -31,7 +31,7 @@ codex plugin add dazzer@dazzer
 Codex asks you to approve a plugin's reminders before it will run them. If nothing appears in the
 run history described below, that approval is the first thing to check.
 
-### GitHub Copilot — GitHub's coding tool
+### GitHub Copilot — GitHub’s coding tool
 
 ```
 copilot plugin marketplace add dazzer-io/dazzer-plugin
@@ -46,7 +46,7 @@ Copilot ignores a link.
 
 **The other two reminders still do not arrive on Copilot** — see below for why.
 
-### Antigravity — Google's coding tool
+### Antigravity — Google’s coding tool
 
 It has no store to install from, so point it at a downloaded copy:
 
@@ -86,7 +86,7 @@ privately to the AI at the end of a reply. It only accepts a message and submits
 had typed it, so on Cursor the save prompt is visible in your conversation. Everything works; it
 just is not silent.
 
-### Devin — Cognition's coding agent
+### Devin — Cognition’s coding agent
 
 ```
 devin plugins install dazzer-io/dazzer-plugin#plugins/dazzer
