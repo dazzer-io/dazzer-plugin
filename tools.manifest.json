@@ -52,6 +52,7 @@
       "id": "claude-code",
       "name": "Claude Code",
       "vendor": "Anthropic",
+      "describedAs": "Anthropic's coding tool, and not the Claude you chat with",
       "status": "supported",
       "reminders": {
         "recall": "works",
@@ -118,6 +119,7 @@
       "id": "copilot",
       "name": "GitHub Copilot",
       "vendor": "GitHub",
+      "describedAs": "GitHub's coding tool",
       "status": "supported",
       "reminders": {
         "recall": "works",
@@ -191,6 +193,7 @@
     {
       "id": "cursor",
       "name": "Cursor",
+      "describedAs": "a code editor with an AI built into it",
       "status": "supported",
       "reminders": {
         "recall": "works",
@@ -225,6 +228,7 @@
       "id": "devin",
       "name": "Devin",
       "vendor": "Cognition",
+      "describedAs": "Cognition's coding agent",
       "status": "supported",
       "reminders": {
         "recall": "works",
@@ -248,6 +252,7 @@
       "id": "claude-chat",
       "name": "Claude (chat app and web)",
       "vendor": "Anthropic",
+      "describedAs": "the Claude you already chat with, in the app or a browser tab",
       "status": "no-reminders",
       "reminders": {
         "recall": "impossible",

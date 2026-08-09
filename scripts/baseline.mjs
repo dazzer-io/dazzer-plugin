@@ -44,6 +44,7 @@ const GATES = [
   // Documentation that would otherwise drift away from the code.
   { id: "docs-truth", name: "knobs and instructions match the code", cmd: CHECK("check-docs-truth") },
   { id: "install-parity", name: "printed and rendered install steps agree", cmd: CHECK("check-install-parity") },
+  { id: "tool-description", name: "every tool says what it actually is", cmd: CHECK("check-tool-description") },
   { id: "connection-coverage", name: "every tool has a way to reach the Brain", cmd: CHECK("check-connection-coverage") },
   { id: "reminder-parity", name: "every tool gets a reminder it can actually read", cmd: CHECK("check-reminder-parity") },
 
