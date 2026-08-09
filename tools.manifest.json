@@ -146,7 +146,8 @@
       },
       "limits": [
         "Two of the three reminders do not arrive. Saving what settled at the end of a reply, and being put back on track after a long conversation forgets itself, both need to speak at a particular moment, and this tool lets a reminder do only one of those. Checking your Brain before answering is the one that survives, and it is the one that matters most.",
-        "The standing instruction is a copy, not a link - this tool ignores a link. So re-run the third install step after updating the plugin, or the copy keeps whatever wording it first got."
+        "The standing instruction is a copy, not a link - this tool ignores a link. So re-run the third install step after updating the plugin, or the copy keeps whatever wording it first got.",
+        "The standing instruction has to TELL the model what to do, not remind it. The first version opened by explaining to a human why reminders cannot work here, and the model read that explanation as part of its instruction: asked six times whether it would check the Brain unprompted, it did so none of those times. Rewritten as a plain instruction naming what to call and when, it did so all six. Anything added to that file is read by the model, so commentary belongs in the README, never there."
       ]
     },
     {

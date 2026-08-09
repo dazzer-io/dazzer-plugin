@@ -224,6 +224,22 @@ a particular moment, and speaking is the half Copilot withholds.
 **It is a copy, not a link** — a link was tried and Copilot ignored it. So an update to the plugin
 does not reach the instruction until that line is run again.
 
+**The file has to instruct, not remind, and this was nearly missed.** The first version shipped
+opened by explaining to a human reader why reminders cannot work on this tool. The model reads that
+file as its own standing instruction, explanation and all — so it was being told, in effect, that
+Dazzer's prompting does not work here, and then asked to act on Dazzer's prompt.
+
+The difference is not subtle and is not a matter of taste. Asked the same question six times, with
+the connection attached and a Brain that could answer it, the explaining version made the model go
+and ask **none of those six times**. Rewritten as a plain instruction that names what to call and
+when, it asked **all six**.
+
+Two things follow, and the second is the general one. **Anything put in that file is read by the
+model**, so commentary belongs here in the README and never there. And **a wording change like this
+must be measured over several runs, never one** — the first version was called working on the
+strength of a single successful attempt, and a single attempt cannot tell a rule that is obeyed
+from one that is obeyed sometimes.
+
 ### Antigravity gets no reminders for now
 
 The reason recorded here before — that a separate file was tried and Antigravity's own importer
