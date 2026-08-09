@@ -52,7 +52,7 @@
       "id": "claude-code",
       "name": "Claude Code",
       "vendor": "Anthropic",
-      "describedAs": "Anthropic's coding tool, separate from the Claude desktop app",
+      "describedAs": "Anthropic’s coding tool, separate from the Claude desktop app",
       "status": "supported",
       "reminders": {
         "recall": "works",
@@ -92,7 +92,7 @@
       "id": "codex",
       "name": "Codex",
       "vendor": "OpenAI",
-      "describedAs": "OpenAI's coding tool",
+      "describedAs": "OpenAI’s coding tool",
       "status": "supported",
       "reminders": {
         "recall": "works",
@@ -119,7 +119,7 @@
       "id": "copilot",
       "name": "GitHub Copilot",
       "vendor": "GitHub",
-      "describedAs": "GitHub's coding tool",
+      "describedAs": "GitHub’s coding tool",
       "status": "supported",
       "reminders": {
         "recall": "works",
@@ -156,7 +156,7 @@
       "id": "antigravity",
       "name": "Antigravity",
       "vendor": "Google",
-      "describedAs": "Google's coding tool",
+      "describedAs": "Google’s coding tool",
       "status": "supported",
       "reminders": {
         "recall": "works",
@@ -228,7 +228,7 @@
       "id": "devin",
       "name": "Devin",
       "vendor": "Cognition",
-      "describedAs": "Cognition's coding agent",
+      "describedAs": "Cognition’s coding agent",
       "status": "supported",
       "reminders": {
         "recall": "works",
