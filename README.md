@@ -36,9 +36,15 @@ run history described below, that approval is the first thing to check.
 ```
 copilot plugin marketplace add dazzer-io/dazzer-plugin
 copilot plugin install dazzer@dazzer
+mkdir -p ~/.copilot/instructions && cp ~/.copilot/installed-plugins/dazzer/dazzer/instructions/copilot.md ~/.copilot/instructions/dazzer.instructions.md
 ```
 
-**The reminders do not reach Copilot at the moment** — see below for why, and what would undo it. Installing still gives you the skill and, if you add it, the connection.
+The third line is not patching a bad install. Copilot gives a reminder no way to speak, so the
+check-your-Brain sentence is delivered as a standing instruction instead — Copilot reads it before
+every conversation. **Re-run that third line after updating the plugin**, because it is a copy:
+Copilot ignores a link.
+
+**The other two reminders still do not arrive on Copilot** — see below for why.
 
 ### Antigravity — Google's coding tool
 
@@ -184,17 +190,46 @@ file holding its own moments and nothing else:
 That last row is load-bearing and was established by experiment: a name Claude Code rejects was
 put in the root file, and the plugin still loaded.
 
-### Antigravity and Copilot get no reminders for now
+### Copilot: a reminder there can watch and block, but never speak
 
-Their moments can only live in the file Claude Code also reads, and Claude Code refuses that
-whole file over any name it does not recognise. There is no third place to put them: a separate
-file for Antigravity was tried once and its own importer overwrote it, and Copilot follows the
-same layout Claude Code does.
+The reason recorded here before — that Copilot's moments had to share the file Claude Code reads —
+was wrong, and it was wrong in a way worth keeping on the record, because it stood unchallenged
+while it made a supported tool look unsupported. Copilot takes a file of its own without complaint.
+Its moments even have different names from Claude Code's, so sharing was never going to work.
 
-So rather than ship something that is either dead or takes every other tool down with it,
-**nothing is declared for those two**. Both installed and were watched working before; neither
-has been shown to receive a reminder under a test that would have caught this. Give either of
-them a run that proves it reads a file of its own and this is a few lines to undo.
+What is true was found by running it, not by reading about it. **A reminder runs on Copilot and has
+no way to say anything to the model.** Both moments fired and left their mark on disk; five
+different shapes of reply were tried in one go, including the exact shapes Cursor and Claude Code
+use, and the model reported receiving nothing every time.
+
+Two other routes were tried and one of them works:
+
+- **What the connection announces when it opens** does reach the model, and the model acts on it —
+  but only for three services GitHub owns, on a list baked into the program. Nothing we ship can
+  join it. It only worked under test because a command-line override was passed, which nobody
+  running Copilot normally would type.
+- **A standing instruction file works, with nothing special passed.** Copilot reads
+  `~/.copilot/instructions/*.instructions.md` before every conversation. With our one sentence
+  there, asking a question the Brain could answer made the model go and ask it, unprompted. That is
+  the third install line above.
+
+So Copilot gets the check-your-Brain reminder, delivered a different way. It does not get the other
+two, and cannot: saving what settled, and getting back on track after a reset, each need to speak at
+a particular moment, and speaking is the half Copilot withholds.
+
+**It is a copy, not a link** — a link was tried and Copilot ignored it. So an update to the plugin
+does not reach the instruction until that line is run again.
+
+### Antigravity gets no reminders for now
+
+Its moments can only live in the file Claude Code also reads, and Claude Code refuses that whole
+file over any name it does not recognise. A separate file was tried once and Antigravity's own
+importer overwrote it.
+
+So rather than ship something either dead or damaging to every other tool, **nothing is declared
+for it**. It installed and was watched working; it has never been shown to receive a reminder under
+a test that would have caught failure. The standing-instruction route that solved Copilot is the
+obvious thing to try here and has not been tried — it reads a similar file.
 
 ### What has actually been tried
 
