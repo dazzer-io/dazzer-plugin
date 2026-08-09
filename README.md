@@ -36,9 +36,15 @@ run history described below, that approval is the first thing to check.
 ```
 copilot plugin marketplace add dazzer-io/dazzer-plugin
 copilot plugin install dazzer@dazzer
+mkdir -p ~/.copilot/instructions && cp ~/.copilot/installed-plugins/dazzer/dazzer/instructions/copilot.md ~/.copilot/instructions/dazzer.instructions.md
 ```
 
-**The reminders do not reach Copilot at the moment** — see below for why, and what would undo it. Installing still gives you the skill and, if you add it, the connection.
+The third line is not patching a bad install. Copilot gives a reminder no way to speak, so the
+check-your-Brain sentence is delivered as a standing instruction instead — Copilot reads it before
+every conversation. **Re-run that third line after updating the plugin**, because it is a copy:
+Copilot ignores a link.
+
+**The other two reminders still do not arrive on Copilot** — see below for why.
 
 ### Antigravity — Google's coding tool
 
@@ -47,11 +53,15 @@ It has no store to install from, so point it at a downloaded copy:
 ```
 git clone https://github.com/dazzer-io/dazzer-plugin.git
 agy plugin install ./dazzer-plugin/plugins/dazzer
+agy plugin install ./dazzer-plugin/plugins/dazzer-antigravity
 ```
 
-**The reminders do not reach Antigravity at the moment** — see below for why, and what would
-undo it. Being put back on track after a long conversation forgets itself was never possible
-here anyway: that moment does not exist in this tool at all.
+Two installs here rather than one, and it is not tidiness — Antigravity cannot read the first
+one's reminders file, so the second carries them. See below for why.
+
+**Two of the three reminders arrive** — checking your Brain before answering, and saving what
+settled at the end of a reply. Being put back on track after a long conversation forgets itself
+never can: that moment does not exist in this tool at all.
 
 ### Cursor
 
@@ -184,17 +194,63 @@ file holding its own moments and nothing else:
 That last row is load-bearing and was established by experiment: a name Claude Code rejects was
 put in the root file, and the plugin still loaded.
 
-### Antigravity and Copilot get no reminders for now
+### Copilot: a reminder there can watch and block, but never speak
 
-Their moments can only live in the file Claude Code also reads, and Claude Code refuses that
-whole file over any name it does not recognise. There is no third place to put them: a separate
-file for Antigravity was tried once and its own importer overwrote it, and Copilot follows the
-same layout Claude Code does.
+The reason recorded here before — that Copilot's moments had to share the file Claude Code reads —
+was wrong, and it was wrong in a way worth keeping on the record, because it stood unchallenged
+while it made a supported tool look unsupported. Copilot takes a file of its own without complaint.
+Its moments even have different names from Claude Code's, so sharing was never going to work.
 
-So rather than ship something that is either dead or takes every other tool down with it,
-**nothing is declared for those two**. Both installed and were watched working before; neither
-has been shown to receive a reminder under a test that would have caught this. Give either of
-them a run that proves it reads a file of its own and this is a few lines to undo.
+What is true was found by running it, not by reading about it. **A reminder runs on Copilot and has
+no way to say anything to the model.** Both moments fired and left their mark on disk; five
+different shapes of reply were tried in one go, including the exact shapes Cursor and Claude Code
+use, and the model reported receiving nothing every time.
+
+Two other routes were tried and one of them works:
+
+- **What the connection announces when it opens** does reach the model, and the model acts on it —
+  but only for three services GitHub owns, on a list baked into the program. Nothing we ship can
+  join it. It only worked under test because a command-line override was passed, which nobody
+  running Copilot normally would type.
+- **A standing instruction file works, with nothing special passed.** Copilot reads
+  `~/.copilot/instructions/*.instructions.md` before every conversation. With our one sentence
+  there, asking a question the Brain could answer made the model go and ask it, unprompted. That is
+  the third install line above.
+
+So Copilot gets the check-your-Brain reminder, delivered a different way. It does not get the other
+two, and cannot: saving what settled, and getting back on track after a reset, each need to speak at
+a particular moment, and speaking is the half Copilot withholds.
+
+**It is a copy, not a link** — a link was tried and Copilot ignored it. So an update to the plugin
+does not reach the instruction until that line is run again.
+
+### Antigravity gets no reminders for now
+
+The reason recorded here before — that a separate file was tried and Antigravity's own importer
+overwrote it — was wrong, and it kept a working capability shut off. Antigravity has a documented
+way to carry reminders, its own moments fire, and **what a reminder says there does reach the
+model**: asked to quote the sentence back, it did, word for word.
+
+**What is actually in the way is a name collision with Devin.** Both look for a file called
+`hooks.json` at the plugin root, and they want different shapes inside it. Antigravity discards the
+whole file over one entry it does not recognise — the same behaviour as Claude Code. Proven by
+putting both shapes in one file and watching every reminder vanish.
+
+So Antigravity's reminders ship as **a second small plugin of their own**, `plugins/dazzer-antigravity`,
+which is the extra install line above. Two further things were proven rather than assumed: given its
+own file it works, and **a broken neighbour sitting beside it does not drag it down** — the failing
+mixed file was left in place deliberately while the good one was tested.
+
+**Saving what settled arrives too, and it needed one thing built.** Antigravity never says whether a
+reply is the one our own save prompt asked for — every other tool says so outright. Leaning on the
+amount of new work instead was tried and measured wrong: with the prompt made deliberately eager it
+fired five times in a single reply and the answer repeated five times.
+
+So where the host will not say it, the prompt now says it to itself: it leaves a note, and the very
+next end-of-reply in that conversation reads the note, clears it, and stays quiet. One note,
+consumed once, so a prompt can never answer its own prompt. The cost is that a genuine second reply
+straight after a save is skipped — the safe direction, since the backstop fires a little less often
+rather than twice. Three tests hold that note's whole life: left, read once, and gone.
 
 ### What has actually been tried
 
@@ -314,3 +370,17 @@ If you also installed the connection, and you want that gone too:
 
 Leave that second one in place if Dazzer is still how you reach your Brain — removing it
 takes the connection with it.
+
+On Antigravity there is a third piece, because its reminders could not travel in the same file as
+everyone else's:
+
+```
+/plugin uninstall dazzer-antigravity@dazzer
+```
+
+On Copilot, the check-your-Brain instruction is a file rather than a plugin, so removing the plugin
+leaves it behind. Delete it as well:
+
+```
+rm ~/.copilot/instructions/dazzer.instructions.md
+```

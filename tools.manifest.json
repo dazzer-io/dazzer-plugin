@@ -120,7 +120,7 @@
       "vendor": "GitHub",
       "status": "supported",
       "reminders": {
-        "recall": "not-delivered",
+        "recall": "works",
         "capture": "not-delivered",
         "resume": "not-delivered"
       },
@@ -135,10 +135,19 @@
             "kind": "run",
             "where": "terminal",
             "command": "copilot plugin install dazzer@dazzer"
+          },
+          {
+            "kind": "run",
+            "where": "terminal",
+            "command": "mkdir -p ~/.copilot/instructions && cp ~/.copilot/installed-plugins/dazzer/dazzer/instructions/copilot.md ~/.copilot/instructions/dazzer.instructions.md"
           }
         ],
-        "note": "Its moments can only live in the file Claude Code also reads, and Claude Code refuses that whole file over any name it does not recognise - which is how it came to load nothing at all. Until this tool can be run and shown to read a file of its own, nothing is declared for it rather than declared and silently dead."
-      }
+        "note": "This tool gives a reminder no way to speak to the model - it can watch and it can block, and nothing it says is passed on. Proven by running one: both moments fired and every shape of reply was discarded. So the check-first reminder is delivered as a standing instruction instead, which this tool reads before every conversation, and the third step above is what puts it there. The other two reminders need a moment AND a voice, so they stay undelivered here."
+      },
+      "limits": [
+        "Two of the three reminders do not arrive. Saving what settled at the end of a reply, and being put back on track after a long conversation forgets itself, both need to speak at a particular moment, and this tool lets a reminder do only one of those. Checking your Brain before answering is the one that survives, and it is the one that matters most.",
+        "The standing instruction is a copy, not a link - this tool ignores a link. So re-run the third install step after updating the plugin, or the copy keeps whatever wording it first got."
+      ]
     },
     {
       "id": "antigravity",
@@ -147,8 +156,8 @@
       "describedAs": "Google's coding tool",
       "status": "supported",
       "reminders": {
-        "recall": "not-delivered",
-        "capture": "not-delivered",
+        "recall": "works",
+        "capture": "works",
         "resume": "impossible"
       },
       "installReminders": {
@@ -162,12 +171,20 @@
             "kind": "run",
             "where": "terminal",
             "command": "agy plugin install ./dazzer-plugin/plugins/dazzer"
+          },
+          {
+            "kind": "run",
+            "where": "terminal",
+            "command": "agy plugin install ./dazzer-plugin/plugins/dazzer-antigravity"
           }
         ],
-        "note": "Its moments can only live in the file Claude Code also reads, and Claude Code refuses that whole file over any name it does not recognise - which is how it came to load nothing at all. Until this tool can be run and shown to read a file of its own, nothing is declared for it rather than declared and silently dead."
+        "note": "This tool cannot read the main plugin's reminders file, because it and Devin both look for a file of that name and want different shapes inside it - and this tool discards a whole file over one entry it does not recognise, exactly as Claude Code does. Proven by putting both shapes in one file and watching every reminder vanish. So its reminders ship as a second small plugin of their own, which the third step installs. A broken neighbour sitting beside it does not take it down; that was proven too. The second plugin carries no copy of the end-of-reply script - it runs the one the first plugin already ships, which is why both are installed."
       },
       "limits": [
-        "No reminders reach this tool at present. Its moments can only live in the file Claude Code also reads, and that file has to stay clean or Claude Code loads none of it. Being put back on track after a long conversation forgets itself was never possible here anyway - that moment does not exist in this tool."
+        "Being put back on track after a long conversation forgets itself was never possible here - that moment does not exist in this tool."
+      ],
+      "gotchas": [
+        "This tool never says whether a reply is the one our own save prompt asked for, which every other tool does say. Leaning on the amount of new work instead was tried and measured wrong - the prompt fired five times in one reply and the answer repeated five times - so the prompt now leaves itself a note that the very next reply reads once and clears. The cost is that a genuine second reply straight after a save is skipped, which is the safe direction."
       ]
     },
     {

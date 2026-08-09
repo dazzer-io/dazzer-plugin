@@ -14,6 +14,11 @@
       "name": "dazzer-connect",
       "source": "./plugins/dazzer-connect",
       "description": "The Dazzer Brain connection itself, for people who have not already connected one. Skip this if Dazzer already shows as connected."
+    },
+    {
+      "name": "dazzer-antigravity",
+      "source": "./plugins/dazzer-antigravity",
+      "description": "The Dazzer reminders in the one shape Antigravity accepts. Only for Antigravity, and only alongside the main plugin - every other tool reads its reminders from that one."
     }
   ]
 }

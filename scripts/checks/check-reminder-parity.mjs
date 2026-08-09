@@ -31,6 +31,21 @@ const SPOKEN_MARK = "[Dazzer]";
  * working prompt from one somebody silenced without removing. */
 const RUNS_THE_SWEEP = "capture-sweep.sh";
 
+/**
+ * Does this command actually run the script, rather than merely mention it?
+ *
+ * Still `sh <file>` and nothing cleverer - `: # disabled for now` is a command too, and it
+ * would satisfy a non-empty test while the end-of-reply prompt quietly stopped running.
+ * What is allowed in front of it is plain settings of the form NAME=value, because one tool
+ * hands over no way to tell which tool a script is running inside, and there the script has
+ * to be TOLD. Guessing it from the path works until somebody installs somewhere unexpected,
+ * and being wrong there is silent: the word for "act on this before you stop" is not the
+ * same everywhere, and the wrong one reads as permission to stop.
+ *
+ * A setting cannot switch the script off, which is what this rule is really guarding.
+ */
+const runsAScript = (command) => /^(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*sh\s/.test(command.trim());
+
 /** A reminder speaks by printing. The end-of-reply script runs a file and is not one. */
 const EMITTER = new Set(["printf", "echo"]);
 
@@ -232,7 +247,7 @@ const claudeShaped = (event) => ({
 });
 
 /**
- * The three files reminders live in, and everything that is true of each one.
+ * The files reminders live in, and everything that is true of each one.
  *
  * Three files, because no single file can serve every host. Claude Code checks every
  * moment-name in the shared file against a closed list and refuses the WHOLE file over one it
@@ -254,9 +269,14 @@ const claudeShaped = (event) => ({
  * what a file contains: keyed on content, deleting one wrapper line would switch every rule
  * here off at once and leave the run green - the exact edit these rules exist to refuse.
  *
- * Antigravity and Copilot have no row on purpose, and are NOT covered by somebody else's.
- * Neither can be handed a file of its own that has been run and watched working, so each is
- * given nothing rather than something silently dead.
+ * Antigravity earned a row once it was run and watched working, and its row names a DIFFERENT
+ * PLUGIN FOLDER - the only row that does. It cannot share Devin's file at the plugin root, and
+ * that was proven both ways rather than assumed.
+ *
+ * Copilot still has no row, and that is not an oversight. A reminder there runs and has no way
+ * to say anything back - five shapes of reply were tried and the model received none of them -
+ * so its check-first sentence travels as a standing instruction file instead, which is not a
+ * reminder and is not this gate's business.
  */
 const HOMES = [
   {
@@ -328,11 +348,46 @@ const HOMES = [
       ["SessionStart", { who: "Devin, after a reset", says: "resume" }],
     ]),
   },
+  {
+    // A SECOND PLUGIN, not a second file in the first one, and that is forced rather than
+    // chosen: Antigravity looks for `hooks.json` at the plugin root, which is Devin's, and the
+    // two want different shapes inside it. Proven by putting both in one file - Antigravity
+    // discarded the whole thing and delivered nothing, exactly as Claude Code does. Proven the
+    // other way too: given a folder of its own it works, and a broken neighbour left standing
+    // beside it did not drag it down.
+    plugin: "dazzer-antigravity",
+    at: ["hooks.json"],
+    hosts: "Antigravity",
+    // Its moments sit one level down, under a name for the whole set, so the only thing allowed
+    // at the top is that name.
+    under: "dazzer",
+    topLevel: new Set(["dazzer"]),
+    requires: [],
+    ifMissing:
+      "and it is the only file Antigravity reads, so losing it leaves Antigravity with no " +
+      "reminders at all - and nothing else objects, because every other tool ignores it.",
+    listing: { dir: "", host: "Antigravity", pointsHere: false },
+    moments: new Map([
+      [
+        "PreInvocation",
+        {
+          who: "Antigravity, before every answer",
+          says: "recall",
+          shape: {
+            read: (doc) => doc?.injectSteps?.[0]?.ephemeralMessage,
+            looks: '{"injectSteps":[{"ephemeralMessage":"..."}]}',
+          },
+        },
+      ],
+      ["Stop", { who: "Antigravity", runs: true }],
+    ]),
+  },
 ];
 
 /** Where a home sits, both as a path and as the tail `walk` finds it by. */
-const pathOf = (home) => join(REPO_ROOT, "plugins", "dazzer", ...home.at);
-const tailOf = (home) => join("dazzer", ...home.at);
+const folderOf = (home) => home.plugin ?? "dazzer";
+const pathOf = (home) => join(REPO_ROOT, "plugins", folderOf(home), ...home.at);
+const tailOf = (home) => join(folderOf(home), ...home.at);
 
 /**
  * Every sentence any hook speaks, with where it was found. Parsed, never pattern-matched
@@ -361,7 +416,7 @@ function spokenByHooks(findings, declaredById) {
       findings.push({
         file: where,
         message:
-          "declares reminders but is not one of the three files any host reads. It is held to " +
+          "declares reminders but is not one of the files any host reads. It is held to " +
           "no shape and owes no tool anything, so whatever it says reaches nobody while looking " +
           "like part of the plugin.",
       });
@@ -398,7 +453,7 @@ function spokenByHooks(findings, declaredById) {
 
     // Read whichever form the file is written in. Taken from the path instead, removing one
     // wrapper line left nothing to read and the whole file went unchecked.
-    const triggers = parsed.hooks ?? parsed;
+    const triggers = home.under === undefined ? (parsed.hooks ?? parsed) : parsed[home.under];
     if (triggers === null || typeof triggers !== "object") continue;
 
     const spoke = new Map();
@@ -486,8 +541,7 @@ function spokenByHooks(findings, declaredById) {
           Array.isArray(groups) &&
           groups.some((group) =>
             (Array.isArray(group?.hooks) ? group.hooks : [group]).some(
-              (hook) => typeof hook?.command === "string" && typeof hook?.command === "string" &&
-                hook.command.trim().startsWith("sh ") &&
+              (hook) => typeof hook?.command === "string" && runsAScript(hook.command) &&
                 hook.command.includes(RUNS_THE_SWEEP),
             ),
           );
@@ -566,7 +620,7 @@ function homesAreWired(findings) {
     }
 
     const { dir, host, pointsHere } = home.listing;
-    const listing = join(REPO_ROOT, "plugins", "dazzer", dir, "plugin.json");
+    const listing = join(REPO_ROOT, "plugins", folderOf(home), ...(dir === "" ? [] : [dir]), "plugin.json");
     const declared = readJson(listing, findings)?.hooks;
     const wanted = pointsHere ? `./${home.at.join("/")}` : undefined;
     if (declared === wanted) continue;
