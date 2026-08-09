@@ -7,7 +7,7 @@ losing it when the conversation ends.
 
 Two lines in most tools. The same plugin, the same files — only the command changes.
 
-### Claude Code
+### Claude Code — Anthropic's coding tool, and not the Claude you chat with
 
 ```
 /plugin marketplace add dazzer-io/dazzer-plugin
@@ -31,7 +31,7 @@ codex plugin add dazzer@dazzer
 Codex asks you to approve a plugin's reminders before it will run them. If nothing appears in the
 run history described below, that approval is the first thing to check.
 
-### GitHub Copilot
+### GitHub Copilot — GitHub's coding tool
 
 ```
 copilot plugin marketplace add dazzer-io/dazzer-plugin
@@ -63,7 +63,7 @@ one's reminders file, so the second carries them. See below for why.
 settled at the end of a reply. Being put back on track after a long conversation forgets itself
 never can: that moment does not exist in this tool at all.
 
-### Cursor
+### Cursor — a code editor with an AI built into it
 
 Two steps, and the second one happens inside Cursor rather than in a terminal.
 
@@ -86,7 +86,7 @@ privately to the AI at the end of a reply. It only accepts a message and submits
 had typed it, so on Cursor the save prompt is visible in your conversation. Everything works; it
 just is not silent.
 
-### Devin
+### Devin — Cognition's coding agent
 
 ```
 devin plugins install dazzer-io/dazzer-plugin#plugins/dazzer
