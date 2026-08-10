@@ -79,6 +79,14 @@ function commandsDeclared(manifest, findings) {
     if (step?.when !== "own-step") continue;
     collect([step], `signIn.${id}`);
   }
+  // And so is getting a current version. It is a thing a person RUNS, so it is a thing a screen
+  // has to be able to hand them — printing it only in prose would put it back out of reach of
+  // anything but this README, which is how it came to be printed nowhere at all for so long that
+  // every single person was sitting on whatever version they first installed.
+  for (const [id, step] of Object.entries(manifest.keepCurrent?.byTool ?? {})) {
+    if (step === null || step?.kind === "none") continue;
+    collect([step], `keepCurrent.${id}`);
+  }
 
   return out;
 }
