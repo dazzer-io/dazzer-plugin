@@ -32,7 +32,7 @@
       "id": "recall",
       "seenOn": "every message",
       "provesInstalled": true,
-      "text": "[Dazzer] Before answering anything your Brain may already know, recall it - answer from what is recorded, not from assumption. As real decisions accumulate in this session, checkpoint your progress so a context reset cannot lose your place."
+      "text": "[Dazzer] Before answering anything your Brain may already know, recall it - answer from what is recorded, not from assumption. If you cannot reach the Brain, say so plainly - never present files, transcripts or guesses as what it holds. As real decisions accumulate in this session, checkpoint your progress so a context reset cannot lose your place."
     },
     {
       "id": "resume",
