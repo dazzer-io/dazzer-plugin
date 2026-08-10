@@ -210,7 +210,7 @@
           {
             "kind": "choose",
             "where": "cursor",
-            "from": "/plugins",
+            "from": "/add-plugin",
             "label": "dazzer"
           }
         ],
@@ -267,9 +267,9 @@
   ],
   "installConnection": {
     "conditional": true,
-    "askFirst": "Does Dazzer already show as connected?",
-    "skipWhen": "Dazzer already shows as connected.",
-    "warning": "Installing it again would replace a working connection with one that needs signing in.",
+    "askFirst": "Nothing — run it whether or not you already have Dazzer.",
+    "skipWhen": "Never. Running it again is how you get the current version.",
+    "warning": "You will be asked to sign in again afterwards. That is the point: installing does not sign you in, and the sign-in is what was missing.",
     "note": "Everything above adds the reminders. They do not reach your Brain by themselves, so a tool with the reminders and no connection has an AI being told to check something it cannot open. One line per tool below, in that tool's own wording.",
     "byTool": {
       "claude-code": {
@@ -299,7 +299,7 @@
       "cursor": {
         "kind": "choose",
         "where": "cursor",
-        "from": "/plugins",
+        "from": "/add-plugin",
         "label": "dazzer-connect",
         "proven": null
       },
@@ -312,9 +312,10 @@
     },
     "signInByTool": {
       "claude-code": {
-        "when": "during-install",
-        "note": "The connection line opens the sign-in itself. One click, and there is no way to miss it.",
-        "proven": "watched on a clean Claude Code"
+        "when": "on-restart",
+        "where": "claude",
+        "note": "Only a machine that has never had Dazzer gets a sign-in during the install. On every other machine nothing happens at all — watched, 2026-08-10. Close the tool and start it again, then sign in when it asks. If it does not ask, open the sign-in list yourself.",
+        "proven": "watched: already installed, so the install was silent and no sign-in ever appeared"
       },
       "codex": {
         "when": "own-step",
@@ -322,26 +323,30 @@
         "where": "terminal",
         "command": "codex mcp login dazzer",
         "note": "Nothing appears when the connection installs. Without this the first thing that reaches your Brain fails, quietly.",
-        "proven": null
+        "proven": "watched on a clean Codex"
       },
       "copilot": {
-        "when": "unknown",
-        "note": "Not established. Follow the tool's own way of signing a connection in.",
-        "proven": null
+        "when": "on-restart",
+        "where": "terminal",
+        "note": "Close the tool and start it again, then sign in when it asks. Watched, 2026-08-10: the sign-in appeared on the next start, not during the install.",
+        "proven": "watched: sign-in appeared the next time the tool was started"
+      },
+      "devin": {
+        "when": "on-restart",
+        "where": "terminal",
+        "note": "Close the tool and start it again, then sign in when it asks. Watched, 2026-08-10: it signed in without asking and worked. If yours does ask, this is when.",
+        "proven": "watched: signed in silently on first use and reached the Brain"
       },
       "antigravity": {
-        "when": "unknown",
-        "note": "Not established. Follow the tool's own way of signing a connection in.",
+        "when": "on-restart",
+        "where": "terminal",
+        "note": "Close the tool and start it again, then sign in when it asks. Watched, 2026-08-10: it never reached the Brain at all. If asking it what your Brain knows comes back with anything other than real records, it is not signed in.",
         "proven": null
       },
       "cursor": {
-        "when": "unknown",
-        "note": "Not established. Follow the tool's own way of signing a connection in.",
-        "proven": null
-      },
-      "devin": {
-        "when": "unknown",
-        "note": "Not established. Follow the tool's own way of signing a connection in.",
+        "when": "on-restart",
+        "where": "cursor",
+        "note": "Close the tool and start it again, then sign in when it asks. Not established on this tool.",
         "proven": null
       }
     }
@@ -356,5 +361,44 @@
       "cursor",
       "devin"
     ]
+  },
+  "keepCurrent": {
+    "why": "Nothing updates on its own. Sources like ours have automatic updating switched off by default, so a person stays on whatever version they first installed until they do something about it.",
+    "byTool": {
+      "claude-code": {
+        "kind": "choose",
+        "where": "claude",
+        "from": "/plugin",
+        "label": "Enable auto-update",
+        "note": "Open the plugin panel, go to Marketplaces, choose dazzer, and turn on auto-update. One time, and it keeps itself current afterwards.",
+        "proven": null
+      },
+      "antigravity": {
+        "kind": "run",
+        "where": "terminal",
+        "command": "git -C dazzer-plugin pull",
+        "note": "Then run the same three install lines again against the refreshed copy.",
+        "proven": null
+      },
+      "cursor": {
+        "kind": "run",
+        "where": "terminal",
+        "command": "cursor-agent plugin marketplace remove dazzer",
+        "note": "Then add it again and install. Cursors update command reports success without re-fetching, so removing and re-adding is the only thing that genuinely gets a newer version.",
+        "proven": "watched: a machine sat on an old version while reporting itself up to date"
+      },
+      "codex": {
+        "kind": "none",
+        "note": "Not established. Nothing here has been run, so we do not publish a step."
+      },
+      "copilot": {
+        "kind": "none",
+        "note": "Not established. Nothing here has been run, so we do not publish a step."
+      },
+      "devin": {
+        "kind": "none",
+        "note": "Not established. Nothing here has been run, so we do not publish a step."
+      }
+    }
   }
 }

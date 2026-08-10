@@ -71,7 +71,7 @@ Two steps, and the second one happens inside Cursor rather than in a terminal.
 cursor-agent plugin marketplace add https://github.com/dazzer-io/dazzer-plugin.git
 ```
 
-Then, in Cursor, type `/plugins` and choose **dazzer** from the list.
+Then, in Cursor, type `/add-plugin` and choose **dazzer** from the list.
 
 Two things that cost real time when this was first tried, so they are written down here:
 
@@ -102,8 +102,13 @@ Everything above adds the **reminders**. They do not reach your Brain by themsel
 the reminders and no connection has an AI being told to check something it cannot open, which is
 worse than having neither: it goes looking, and it finds whatever else it has.
 
-**Skip this if Dazzer already shows as connected.** Installing it again would replace a working
-connection with one that needs signing in.
+**Run this whether or not you already have Dazzer.** It used to say the opposite — skip it if
+Dazzer already shows as connected — and that one line stranded people. Somebody already installed
+skips it, nothing ever asks them to sign in, and they end up with an AI told to check a Brain it
+cannot open. Running it again is also how you get the current version.
+
+You will be asked to sign in afterwards. That is the point rather than a cost: installing does not
+sign you in on any tool, and the sign-in is the part that was missing.
 
 One line per tool, in that tool's own wording.
 
@@ -131,7 +136,7 @@ copilot plugin install dazzer-connect@dazzer
 agy plugin install ./dazzer-plugin/plugins/dazzer-connect
 ```
 
-**Cursor** — type `/plugins` in Cursor and choose **dazzer-connect**.
+**Cursor** — type `/add-plugin` in Cursor and choose **dazzer-connect**.
 
 **Devin** — in a terminal:
 
@@ -141,24 +146,43 @@ devin plugins install dazzer-io/dazzer-plugin#plugins/dazzer-connect
 
 ### Signing in
 
-**When the sign-in happens is not the same on every tool**, and assuming otherwise cost us a day.
+**Installing does not sign you in. On any tool.** All six were walked on one afternoon and not one
+of them reliably signs you in as part of the install. It happens the next time the tool starts up
+and reaches out.
 
-**Claude Code** opens it for you. The connection line above brings up the sign-in itself, one click, and there is no way to miss it.
+**So close your tool, start it again, and sign in when it asks.** That is the step, and it is the
+same step everywhere. Where a tool needs a command as well, it is under its name below.
 
-**Codex** does not. Nothing appears when the connection installs. The sign-in surfaces only when something first tries to reach your Brain, and if it fails there it fails quietly, leaving an AI told to check something it cannot open. Do it up front instead:
+**Claude Code** — the sign-in appears during the install only on a machine that has never had
+Dazzer. On every other machine the install is silent and nothing ever asks. If starting it again
+does not prompt you, open the sign-in list yourself with `/mcp` and choose **dazzer**.
+
+**Codex** — nothing appears on its own. Do it up front rather than waiting for the first thing that
+reaches your Brain to fail quietly:
 
 ```
 codex mcp login dazzer
 ```
 
-For **GitHub Copilot, Antigravity, Cursor and Devin** this is not established. Follow that tool's own way of signing a connection in.
+**GitHub Copilot** — the sign-in appeared the next time the tool was started. Nothing during the
+install.
+
+**Devin** — it signed itself in without asking and worked. If yours does ask, this is when.
+
+**Antigravity** — not established. It has been watched failing to reach the Brain at all, which is
+the case to check for: ask it what your Brain knows about you, and if the answer is anything other
+than real records, it is not signed in.
+
+**Cursor** — not established.
 
 **Whoever you are already signed in as is who it signs in as.** Nothing asks and nothing warns. If you are testing with a different account, sign out of Dazzer in your browser first, or the memories land under the wrong person and the dashboard you are watching never shows them.
 
-Two of these have been run and watched working: Claude Code, where it registers the connection and
-asks to sign in, and Codex, where the connection then appears with a sign-in waiting. The other
-four follow each tool's own established shape and have not yet been run. Where that matters is
-written down rather than smoothed over — see what has actually been tried, below.
+**How to tell it worked, on any tool:** ask your AI what your Brain already knows about you. Real
+records back means it is signed in. Anything else — a shrug, a file it found, a summary of your own
+conversation — means it is not, whatever the install said.
+
+Four of the six above are now watched rather than read about: Claude Code, Codex, Copilot and
+Devin. Antigravity and Cursor are not, and say so where a person can see it.
 
 **This section existed in one wording only, Claude's, and every other tool's setup simply ended
 after the reminders.** Someone followed the Codex instructions to the letter on a clean machine,
@@ -167,6 +191,40 @@ through an unrelated archive for the memory it had just been told to check. The 
 existed and worked the whole time. Nobody had written it down, and no rule asked whether anything
 was missing — every rule here compared what we say against what we ship, and both said the same
 thing. A rule that asks the missing question now exists.
+
+### Staying current
+
+**Nothing updates on its own.** Sources like this one have automatic updating switched off by
+default — that is the tool makers' own default, not a choice of ours — so whatever version you
+first installed is the version you keep, indefinitely. A machine was found sitting several versions
+behind while reporting itself perfectly healthy.
+
+**Claude Code** — turn it on once and forget it. Open the plugin panel with `/plugin`, go to
+**Marketplaces**, choose **dazzer**, and select **Enable auto-update**. It keeps itself current
+after that.
+
+**Antigravity** — it runs from a copy you downloaded, so refresh the copy and install again:
+
+```
+git -C dazzer-plugin pull
+```
+
+Then re-run the three install lines above against it.
+
+**Cursor** — its update command reports success without actually re-fetching, so removing and
+adding again is the only thing that gets you a newer version:
+
+```
+cursor-agent plugin marketplace remove dazzer
+```
+
+Then add it again and install, as above.
+
+**Codex, GitHub Copilot and Devin** — not established. Nothing here has been run on those three, so
+there is no step to give you rather than a guess dressed up as one.
+
+**Whatever the tool, removing the source and adding it back is the fallback that always re-fetches**
+— at the cost of signing you out, so it is the last resort rather than the first.
 
 ### Where reminders cannot run at all
 

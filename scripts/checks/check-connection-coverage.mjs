@@ -33,6 +33,29 @@ import { REPO_ROOT, readJson, rel, runGate } from "./lib/gate.mjs";
 
 const MANIFEST = join(REPO_ROOT, "tools.manifest.json");
 
+/**
+ * Every shape a sign-in can take, and the list is closed on purpose.
+ *
+ * `on-restart` was added after all six tools were walked in one afternoon: **installing does not
+ * sign anybody in, anywhere.** It happens the next time the tool starts up and reaches out, which
+ * is a real answer that needs no command — and the vocabulary had no word for it, so those tools
+ * were written down as needing a step of their own and then given none.
+ *
+ * The vocabulary itself was built around one tool's behaviour, which is the same mistake this file
+ * exists to catch, arriving from underneath. A word nothing here recognises is refused rather than
+ * quietly accepted: an unrecognised value reads to a person as though somebody had answered.
+ */
+const WHEN_SIGN_IN_HAPPENS = new Set([
+  /** The connection line brings it up itself. True of one tool, and only on a clean machine. */
+  "during-install",
+  /** Close the tool, start it again, sign in when it asks. No command, and true of most. */
+  "on-restart",
+  /** Nothing appears on its own and there is a command to run up front. */
+  "own-step",
+  /** Not established. Honest, and allowed. */
+  "unknown",
+]);
+
 /** A step has to actually tell somebody to do something. */
 function isUsable(step) {
   if (step === null || typeof step !== "object") return false;
@@ -115,6 +138,14 @@ runGate({
             `"${tool.id}" never says when its sign-in happens. On one tool the connection opens ` +
             "it; on another nothing appears until something first reaches the Brain, and a person " +
             "given no step there is left with an AI that fails quietly.",
+        });
+      } else if (!WHEN_SIGN_IN_HAPPENS.has(signIn.when)) {
+        findings.push({
+          file: rel(MANIFEST),
+          message:
+            `"${tool.id}" says its sign-in happens "${signIn.when}", which is none of ` +
+            `${[...WHEN_SIGN_IN_HAPPENS].join(", ")}. A word nothing recognises reads to a person ` +
+            "as though somebody had answered.",
         });
       } else if (signIn.when === "own-step" && !isUsable(signIn)) {
         findings.push({
