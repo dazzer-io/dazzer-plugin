@@ -1,2 +1,6 @@
 .DS_Store
-.claude/
+# The shared agent guards are tracked; everything else here is per-machine. A trailing
+# slash would stop git descending, so the exceptions below would never be seen.
+.claude/*
+!.claude/hooks/
+!.claude/settings.json

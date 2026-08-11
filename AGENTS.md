@@ -53,6 +53,9 @@ Brain, not here.**
   direction that matters is the quiet one: words declared that nothing says would report
   every correctly installed person as not set up.
 
+## Where work happens
+The main checkout is **read-only**: file-tool writes into it are refused (`.claude/hooks/reference-copy-guard.sh`) — shell redirection is not intercepted, so the guard is a floor, not a seal. All work happens in a linked worktree under `../dazzer-plugin-worktrees/<what-it-does>`, created by `node scripts/git-health.mjs new <kind>/<what-it-does>` so its folder name matches its branch. `status` reports every worktree, what is unsaved, what is unpushed, what has gone cold, and where two branches touch the same files; open work is snapshotted each turn and untouched branches retire to `archive/<name>` after 14 days (`scripts/git-health.mjs`). Some tools place their own worktrees inside this checkout — those are judged by what they hold, never by where they sit. Proven by gate `git-health`.
+
 ## Testing
 
 `node scripts/baseline.mjs` runs everything. It stays green while listed defects fail, and

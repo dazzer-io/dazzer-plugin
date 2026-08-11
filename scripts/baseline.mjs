@@ -53,6 +53,7 @@ const GATES = [
 
   // The product's own behaviour.
   { id: "capture-sweep", name: "capture sweep behaves", cmd: "sh plugins/dazzer/scripts/capture-sweep.test.sh" },
+  { id: "git-health", name: "the repository keeps itself clean", cmd: "sh scripts/checks/git-health.test.sh" },
 ];
 
 function loadLedger() {

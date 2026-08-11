@@ -25,7 +25,12 @@ runGate({
   purpose: "The suite can observe every way the script can fail.",
   rule: "assert the error channel, take the shell from outside, and cover the cases that hid defects before",
   assert(findings) {
-    const suites = walk(join(REPO_ROOT, "plugins")).filter((f) => f.endsWith(".test.sh"));
+    // Every shell suite in the repository, not just the shipped plugins'. A suite that names
+    // its own interpreter passes on a Mac and dies on the Linux runner; this rule exists to
+    // stop that, and a suite outside the walked folder escapes it on nothing but its location.
+    const suites = [...walk(join(REPO_ROOT, "plugins")), ...walk(join(REPO_ROOT, "scripts"))].filter(
+      (f) => f.endsWith(".test.sh"),
+    );
 
     if (suites.length === 0) {
       findings.push({ file: "plugins/", message: "there is no test suite" });
@@ -39,7 +44,7 @@ runGate({
 
       // Only the SUBJECT's error channel matters. The suite's own housekeeping may quiet
       // itself; throwing away what the thing under test said is the habit that hid defects.
-      const invokesSubject = /\$\{?(SUBJECT|SWEEP|DAZZER_SWEEP_BIN)\b/;
+      const invokesSubject = /\$\{?(SUBJECT|SWEEP|DAZZER_SWEEP_BIN|SCRIPT|GUARD|SANDBOX_GUARD)\b/;
 
       for (const { n, text } of code) {
         if (invokesSubject.test(text) && /2>\s*(\/dev\/null|&1)/.test(text)) {
@@ -85,7 +90,10 @@ runGate({
         });
       }
 
-      for (const { tag, why } of REQUIRED_COVERAGE) {
+      // These name the sweep script's own past defects, so they are asked of that suite only.
+      // Every rule above this line is about harness hygiene and applies to every suite.
+      const isSweepSuite = where.includes("capture-sweep");
+      for (const { tag, why } of isSweepSuite ? REQUIRED_COVERAGE : []) {
         if (!body.includes(tag)) {
           findings.push({
             file: where,
