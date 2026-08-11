@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 # Reference-copy guard (PreToolUse / Write|Edit|NotebookEdit matcher).
 #
 # Refuses any file write whose target sits in the repository's MAIN checkout — the
@@ -38,8 +38,10 @@
 input=$(cat)
 
 # The repository this guard belongs to, resolved from the guard's own location rather than
-# from the caller's cwd, which may be anywhere.
-self_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd) || exit 0
+# from the caller's cwd, which may be anywhere. `$0` rather than a bash-only name, so this
+# behaves the same under every shell — a guard that silently does nothing under one of them
+# is worse than no guard, and the difference only shows up on another machine.
+self_dir=$(cd "$(dirname "$0")" && pwd) || exit 0
 own_repo=$(git -C "$self_dir" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || exit 0
 [ -n "$own_repo" ] || exit 0
 

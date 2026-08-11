@@ -321,12 +321,11 @@ const cmdNew = (main, name) => {
   }
   git(["fetch", "origin", "--prune", "--quiet"], main);
   const base = mainLine(main);
-  try {
-    execFileSync("git", ["worktree", "add", folder, "-b", name, base], {
-      cwd: main,
-      stdio: "inherit",
-    });
-  } catch {
+  // Quiet, and its output kept rather than passed through: git's progress chatter is not this
+  // command's voice, and it arrives on the error channel where it reads as a fault.
+  const made = run(["worktree", "add", "-q", folder, "-b", name, base], { cwd: main });
+  if (!made.ok) {
+    console.error(`Could not create a working copy at ${folder}`);
     process.exit(1);
   }
   console.log(`\nWorking copy ready. Move into it and do the work there:\n  cd ${folder}`);

@@ -19,10 +19,12 @@ set -u
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 SCRIPT="$ROOT/scripts/git-health.mjs"
 GUARD="$ROOT/.claude/hooks/reference-copy-guard.sh"
+SHELL_UNDER_TEST="${SHELL_UNDER_TEST:-sh}"
 PASS=0
 FAIL=0
 FAILED=""
 
+trap 'rm -rf "${SANDBOX:-}"' EXIT INT TERM
 ok() { PASS=$((PASS + 1)); printf '  ok   %s\n' "$1"; }
 no() { FAIL=$((FAIL + 1)); FAILED="$FAILED\n  - $1"; printf '  FAIL %s  (%s)\n' "$1" "$2"; }
 
@@ -31,6 +33,20 @@ assert_has() { # name haystack needle
 }
 assert_lacks() {
   case "$2" in *"$3"*) no "$1" "should not contain: $3" ;; *) ok "$1" ;; esac
+}
+
+# Runs the thing under test and keeps BOTH channels. Throwing away the error channel is the
+# habit this repository's harness rule exists to stop — it hid three real defects once, and a
+# guard that prints a shell error on every turn would otherwise pass every case here.
+subject() { # <cwd> <args...>
+  sub_cwd=$1
+  shift
+  (cd "$sub_cwd" && node "$SCRIPT" "$@" >"$SANDBOX/.out" 2>"$SANDBOX/.err")
+  if [ -s "$SANDBOX/.err" ]; then
+    no "nothing on the error channel from: $*" "$(head -1 "$SANDBOX/.err")"
+  else
+    PASS=$((PASS + 1))
+  fi
 }
 
 # A repository shaped like this one: a reference copy with one commit on the main line.
@@ -53,9 +69,14 @@ new_repo() {
   SANDBOX_GUARD="$MAIN/.claude/hooks/reference-copy-guard.sh"
 }
 
-decision() { # path -> deny | allow
+# -> deny | allow | broken. "broken" matters: a guard that crashed prints nothing, which is
+# indistinguishable from a deliberate allow unless the error channel is read. Three cases here
+# went green against a dead guard before this told them apart.
+decision() {
+  : > "$SANDBOX/.guard-err"
   out=$(printf '{"hook_event_name":"PreToolUse","tool_name":"Write","tool_input":{"file_path":"%s"}}' "$1" \
-    | sh "$SANDBOX_GUARD" 2>/dev/null)
+    | "$SHELL_UNDER_TEST" "$SANDBOX_GUARD" 2>"$SANDBOX/.guard-err")
+  [ -s "$SANDBOX/.guard-err" ] && { echo broken; return; }
   [ -z "$out" ] && { echo allow; return; }
   case "$out" in *'"deny"'*) echo deny ;; *) echo allow ;; esac
 }
@@ -88,10 +109,13 @@ echo x > "$SANDBOX/someone-else/theirs.ts"
 # The refusal has to name a remedy the creator accepts, or the agent concludes it is broken
 # and goes looking for a way around the guard.
 REASON=$(printf '{"hook_event_name":"PreToolUse","tool_name":"Write","tool_input":{"file_path":"%s"}}' \
-  "$MAIN/kept.txt" | sh "$SANDBOX_GUARD" 2>/dev/null)
+  "$MAIN/kept.txt" | "$SHELL_UNDER_TEST" "$SANDBOX_GUARD" 2>"$SANDBOX/.err")
+[ -s "$SANDBOX/.err" ] && no "the guard refuses without complaining" "$(head -1 "$SANDBOX/.err")" \
+  || ok "the guard refuses without complaining"
 assert_has "the refusal says how to get a working copy" "$REASON" "git-health.mjs new "
 SUGGESTED=$(printf '%s' "$REASON" | sed -n 's/.*git-health\.mjs new \([^ \\"]*\).*/\1/p' | head -1)
-if [ -n "$SUGGESTED" ] && (cd "$MAIN" && node "$MAIN/scripts/git-health.mjs" new "$SUGGESTED" >/dev/null 2>&1); then
+if [ -n "$SUGGESTED" ] && (cd "$MAIN" && node "$MAIN/scripts/git-health.mjs" new "$SUGGESTED" \
+  >"$SANDBOX/.out" 2>"$SANDBOX/.err") && [ ! -s "$SANDBOX/.err" ]; then
   ok "the name it suggests is one the creator accepts"
 else
   no "the name it suggests is one the creator accepts" "creator rejected: $SUGGESTED"
@@ -102,7 +126,7 @@ echo ""
 echo "open work is never written off"
 
 new_repo
-(cd "$MAIN" && node "$SCRIPT" new fix/work-in-progress >/dev/null 2>&1)
+subject "$MAIN" new fix/work-in-progress
 COPY="$SANDBOX/repo-worktrees/work-in-progress"
 # A setting can hide files that have never been committed — the only content that exists in
 # exactly one place.
@@ -110,7 +134,7 @@ git -C "$COPY" config status.showUntrackedFiles no
 echo "the only copy of this" > "$COPY/exists-nowhere-else.txt"
 [ -z "$(git -C "$COPY" status --porcelain)" ] && ok "the hazard is real: the ordinary check sees nothing" \
   || no "the hazard is real: the ordinary check sees nothing" "it was visible, so the case proves nothing"
-(cd "$COPY" && node "$SCRIPT" save >/dev/null 2>&1)
+subject "$COPY" save
 SAVED=$(git -C "$MAIN" for-each-ref --format='%(refname)' refs/saved | head -1)
 if [ -n "$SAVED" ]; then
   assert_has "saves work a setting would hide" \
@@ -121,13 +145,13 @@ fi
 rm -rf "$SANDBOX"
 
 new_repo
-(cd "$MAIN" && node "$SCRIPT" new fix/after-a-crash >/dev/null 2>&1)
+subject "$MAIN" new fix/after-a-crash
 COPY="$SANDBOX/repo-worktrees/after-a-crash"
 echo "the only copy of this" > "$COPY/survives-a-crash.txt"
 # A crash mid-write can leave the copy's own record of staged files unreadable. That is when
 # open work matters most, and the snapshot does not need that record — it builds its own.
 echo "not a real index" > "$(git -C "$COPY" rev-parse --path-format=absolute --git-dir)/index"
-(cd "$COPY" && node "$SCRIPT" save >/dev/null 2>&1)
+subject "$COPY" save
 SAVED=$(git -C "$MAIN" for-each-ref --format='%(refname)' refs/saved | head -1)
 if [ -n "$SAVED" ]; then
   assert_has "saves work when the copy cannot be read" \
@@ -141,12 +165,13 @@ echo ""
 echo "the report tells the truth"
 
 new_repo
-(cd "$MAIN" && node "$SCRIPT" new feat/being-built >/dev/null 2>&1)
+subject "$MAIN" new feat/being-built
 git -C "$MAIN" worktree add -q -b work/nested-real "$MAIN/.claude/worktrees/agent-2" >/dev/null 2>&1
 echo "real work" > "$MAIN/.claude/worktrees/agent-2/real.txt"
 git -C "$MAIN/.claude/worktrees/agent-2" add -A
 git -C "$MAIN/.claude/worktrees/agent-2" commit -q -m "work in a nested copy"
-OUT=$(cd "$MAIN" && node "$SCRIPT" status 2>&1)
+subject "$MAIN" status
+OUT=$(cat "$SANDBOX/.out")
 # Judged by what it holds, not where the folder sits: calling live work disposable is the
 # failure that makes the whole report untrustworthy.
 # Asserted against the part of the report BEFORE the disposable section, so it cannot pass
@@ -162,11 +187,33 @@ echo old > "$MAIN/old.txt"
 git -C "$MAIN" add -A
 GIT_COMMITTER_DATE="$WHEN" GIT_AUTHOR_DATE="$WHEN" git -C "$MAIN" commit -q -m "old work"
 git -C "$MAIN" checkout -q main
-(cd "$MAIN" && node "$SCRIPT" sweep --apply >/dev/null 2>&1)
+# Work from a minute ago, and work someone is sitting in. Neither may be touched.
+git -C "$MAIN" checkout -q -b feat/still-being-worked-on
+echo new > "$MAIN/new.txt"
+git -C "$MAIN" add -A
+git -C "$MAIN" commit -q -m "work from a minute ago"
+git -C "$MAIN" checkout -q main
+git -C "$MAIN" checkout -q -b feat/someone-is-in-this
+git -C "$MAIN" checkout -q main
+GIT_COMMITTER_DATE="$WHEN" GIT_AUTHOR_DATE="$WHEN" git -C "$MAIN" branch -f feat/someone-is-in-this feat/nobody-remembers
+git -C "$MAIN" worktree add -q "$SANDBOX/occupied" feat/someone-is-in-this >/dev/null 2>&1
+
+# Reporting must destroy nothing: the one destructive step is separate and explicit.
+subject "$MAIN" sweep
+[ -n "$(git -C "$MAIN" branch --list feat/nobody-remembers)" ] && ok "reporting alone deletes nothing" \
+  || no "reporting alone deletes nothing" "it was deleted without being asked"
+
+subject "$MAIN" sweep --apply
 [ -z "$(git -C "$MAIN" branch --list feat/nobody-remembers)" ] && ok "retires work nobody has touched" \
   || no "retires work nobody has touched" "still there"
 [ -n "$(git -C "$MAIN" tag --list 'archive/*')" ] && ok "and keeps it, so it comes back" \
   || no "and keeps it, so it comes back" "nothing archived"
+[ -n "$(git -C "$MAIN" branch --list feat/still-being-worked-on)" ] && ok "leaves recent work alone" \
+  || no "leaves recent work alone" "it retired work from a minute ago"
+[ -n "$(git -C "$MAIN" branch --list feat/someone-is-in-this)" ] && ok "leaves work someone is sitting in" \
+  || no "leaves work someone is sitting in" "it retired an occupied line of work"
+[ -n "$(git -C "$MAIN" branch --list main)" ] && ok "never retires the main line" \
+  || no "never retires the main line" "the main line was retired"
 rm -rf "$SANDBOX"
 
 echo ""
