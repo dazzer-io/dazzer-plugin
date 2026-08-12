@@ -391,9 +391,10 @@ const cmdSave = (main) => {
   if (head && git(["rev-parse", "--verify", "--quiet", `${head}^{tree}`], here) === tree) return;
 
   // Nothing was open after all: with no commits yet there is no previous tree to compare
-  // against, so an empty one is checked directly rather than reported as work saved.
-  const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
-  if (!head && tree === EMPTY_TREE) return;
+  // against, so an empty one is recognised directly rather than reported as work saved. The
+  // repository is asked what an empty tree looks like — writing the answer down here would be
+  // right for one way of naming objects and silently wrong for the other.
+  if (!head && tree === git(["hash-object", "-t", "tree", "/dev/null"], here)) return;
 
   const message = `open work in ${basename(here)}, saved automatically`;
   const snapshot = head

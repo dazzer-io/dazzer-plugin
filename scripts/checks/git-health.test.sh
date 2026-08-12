@@ -25,15 +25,29 @@ FAIL=0
 FAILED=""
 
 trap 'rm -rf "${SANDBOX:-}"' EXIT INT TERM
-# Its own record, or a loud failure — an empty answer here would send a redirect to the
-# filesystem root, from a suite whose whole contract is that it touches nothing real.
-gitdir_of() {
+# Makes a copy's own record unreadable, which several cases need as their starting state.
+#
+# Resolved into a variable and checked HERE, not inside a redirect: a check written as
+# `> "$(resolve x)/index"` runs in a subshell, so a failure it records is thrown away with
+# that subshell and the suite still reports every check passed — while the redirect goes
+# ahead against an empty path, which is the filesystem root. Three cases then pass for
+# reasons unrelated to what they claim to prove.
+break_the_record_of() {
   d=$(git -C "$1" rev-parse --path-format=absolute --git-dir 2>/dev/null)
-  [ -n "$d" ] || { no "could resolve the copy's own record" "empty path for $1"; return 1; }
-  printf '%s' "$d"
+  if [ -z "$d" ]; then
+    no "could resolve the copy's own record" "empty path for $1"
+    return 1
+  fi
+  echo "not a real index" > "$d/index"
+  # And confirm it really is unreadable now. Cases whose whole subject is "an unreadable copy"
+  # otherwise pass on whatever else happens to be true of the fixture.
+  if git -C "$1" status --porcelain >/dev/null 2>&1; then
+    no "the copy really is unreadable" "$1 still reads cleanly"
+    return 1
+  fi
 }
 ok() { PASS=$((PASS + 1)); printf '  ok   %s\n' "$1"; }
-no() { FAIL=$((FAIL + 1)); FAILED="$FAILED\n  - $1"; printf '  FAIL %s  (%s)\n' "$1" "$2"; }
+no() { FAIL=$((FAIL + 1)); FAILED="$FAILED\n  - $1"; printf '  FAIL %s  (%s)\n' "$1" "$2" >&2; }
 
 assert_has() { # name haystack needle
   case "$2" in *"$3"*) ok "$1" ;; *) no "$1" "missing: $3" ;; esac
@@ -157,7 +171,7 @@ COPY="$SANDBOX/repo-worktrees/after-a-crash"
 echo "the only copy of this" > "$COPY/survives-a-crash.txt"
 # A crash mid-write can leave the copy's own record of staged files unreadable. That is when
 # open work matters most, and the snapshot does not need that record — it builds its own.
-echo "not a real index" > "$(gitdir_of "$COPY")/index"
+break_the_record_of "$COPY" || true
 subject "$COPY" save
 SAVED=$(git -C "$MAIN" for-each-ref --format='%(refname)' refs/saved | head -1)
 if [ -n "$SAVED" ]; then
@@ -192,7 +206,7 @@ new_repo
 subject "$MAIN" new feat/looks-empty-but-is-not
 git -C "$MAIN" worktree add -q -b work/unreadable "$MAIN/.claude/worktrees/agent-3" >/dev/null 2>&1
 echo "the only copy of this" > "$MAIN/.claude/worktrees/agent-3/precious.txt"
-echo "not a real index" > "$(gitdir_of "$MAIN/.claude/worktrees/agent-3")/index"
+break_the_record_of "$MAIN/.claude/worktrees/agent-3" || true
 subject "$MAIN" status
 OUT=$(cat "$SANDBOX/.out")
 assert_has "counts a copy it could not read as work" "${OUT%%ASSISTANT*}" "COULD NOT BE READ"
@@ -205,7 +219,7 @@ new_repo
 git -C "$MAIN" worktree add -q --detach "$SANDBOX/blank" >/dev/null 2>&1
 git -C "$SANDBOX/blank" checkout -q --orphan chore/nothing-committed
 git -C "$SANDBOX/blank" rm -q -rf . >/dev/null 2>&1
-echo "not a real index" > "$(gitdir_of "$SANDBOX/blank")/index"
+break_the_record_of "$SANDBOX/blank" || true
 subject "$SANDBOX/blank" save
 assert_lacks "says nothing when there was nothing open" "$(cat "$SANDBOX/.out")" "open work saved"
 [ -z "$(git -C "$MAIN" for-each-ref --format='%(refname)' refs/saved)" ] \
@@ -215,7 +229,7 @@ rm -rf "$SANDBOX"
 new_repo
 # The main copy is judged by the same answer as every other. Reporting it "clean" when it
 # could not be read is the same reassuring wrong answer, one line above the fix for it.
-echo "not a real index" > "$(gitdir_of "$MAIN")/index"
+break_the_record_of "$MAIN" || true
 subject "$MAIN" status
 assert_has "says so when the main copy itself cannot be read" "$(cat "$SANDBOX/.out")" "COULD NOT BE READ"
 rm -rf "$SANDBOX"
@@ -226,7 +240,12 @@ new_repo
 subject "$MAIN" new feat/something-real
 git -C "$MAIN" worktree add -q -b work/genuinely-empty "$MAIN/.claude/worktrees/agent-4" >/dev/null 2>&1
 subject "$MAIN" status
-assert_has "lists a copy that really does hold nothing as the tool's own" "$(cat "$SANDBOX/.out")" "agent-4"
+OUT=$(cat "$SANDBOX/.out")
+assert_has "the disposable section exists at all" "$OUT" "TEMPORARY COPIES"
+# After the header, not merely somewhere: a folder's name is printed in the work section too,
+# so searching the whole report would stay green if the classifier stopped working.
+assert_has "lists a copy that really does hold nothing as the tool's own" \
+  "${OUT#*TEMPORARY COPIES}" "agent-4"
 rm -rf "$SANDBOX"
 
 new_repo
