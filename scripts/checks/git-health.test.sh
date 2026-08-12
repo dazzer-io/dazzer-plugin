@@ -180,6 +180,32 @@ assert_has "counts work in a nested copy as work" "${OUT%%ASSISTANT*}" "work/nes
 rm -rf "$SANDBOX"
 
 new_repo
+# A copy in the tool's own folder whose contents cannot be read. Counting that as "holds
+# nothing" files real work under "not yours to manage" — the one label acted on by deleting.
+subject "$MAIN" new feat/looks-empty-but-is-not
+git -C "$MAIN" worktree add -q -b work/unreadable "$MAIN/.claude/worktrees/agent-3" >/dev/null 2>&1
+echo "the only copy of this" > "$MAIN/.claude/worktrees/agent-3/precious.txt"
+echo "not a real index" > "$(git -C "$MAIN/.claude/worktrees/agent-3" rev-parse --path-format=absolute --git-dir)/index"
+subject "$MAIN" status
+OUT=$(cat "$SANDBOX/.out")
+assert_has "counts a copy it could not read as work" "${OUT%%ASSISTANT*}" "COULD NOT BE READ"
+assert_lacks "and never as the tool's own" "$OUT" "TEMPORARY COPIES"
+rm -rf "$SANDBOX"
+
+new_repo
+# With no commits yet there is no earlier state to compare against, so an empty capture looked
+# like a successful one: it wrote a snapshot and announced work saved.
+git -C "$MAIN" worktree add -q --detach "$SANDBOX/blank" >/dev/null 2>&1
+git -C "$SANDBOX/blank" checkout -q --orphan chore/nothing-committed
+git -C "$SANDBOX/blank" rm -q -rf . >/dev/null 2>&1
+echo "not a real index" > "$(git -C "$SANDBOX/blank" rev-parse --path-format=absolute --git-dir)/index"
+(cd "$SANDBOX/blank" && node "$SCRIPT" save >"$SANDBOX/.out" 2>"$SANDBOX/.err")
+assert_lacks "says nothing when there was nothing open" "$(cat "$SANDBOX/.out")" "open work saved"
+[ -z "$(git -C "$MAIN" for-each-ref --format='%(refname)' refs/saved)" ] \
+  && ok "and writes no snapshot of nothing" || no "and writes no snapshot of nothing" "one was written"
+rm -rf "$SANDBOX"
+
+new_repo
 # Retiring is the one destructive step, and it runs unattended. It must refuse on any doubt.
 WHEN=$(date -u -v-30d '+%Y-%m-%dT%H:%M:%S' 2>/dev/null || date -u -d '30 days ago' '+%Y-%m-%dT%H:%M:%S')
 git -C "$MAIN" checkout -q -b feat/nobody-remembers
