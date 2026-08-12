@@ -121,8 +121,9 @@ const isToolScratch = (copy, main, base) => {
   const inToolFolder =
     copy.path.includes("/.claude/worktrees/") || /^worktree-agent-/.test(copy.branch);
   if (!inToolFolder) return false;
-  // Unsaved files exist in exactly one place, so any of them makes a copy real work.
-  if (copy.unsaved) return false;
+  // Unsaved files exist in exactly one place, so any of them makes a copy real work — and a
+  // copy we could not read might hold some, which is not the same as holding none.
+  if (copy.unsaved || copy.unreadable) return false;
   return isAncestor(main, copy.branch || copy.head, base);
 };
 
@@ -157,7 +158,9 @@ const describe = (copy, main) => {
   // Untracked files are asked for explicitly: a repository or user setting can turn them off
   // by default, and a file never committed anywhere is exactly the content that exists in one
   // place — the whole reason this count is consulted.
-  const unsaved = missing ? 0 : unsavedIn(copy.path).files.length;
+  const read = missing ? { ok: true, files: [] } : unsavedIn(copy.path);
+  const unsaved = read.files.length;
+  const unreadable = !read.ok;
   // A copy with no branch is described by its own position, so the one class of work that
   // exists nowhere else is not printed as blank and "nothing yet".
   const ref = copy.branch || copy.head;
@@ -166,7 +169,7 @@ const describe = (copy, main) => {
   const backedUp = copy.branch
     ? git(["rev-parse", "--verify", "--quiet", `origin/${copy.branch}`], main) !== ""
     : false;
-  return { ...copy, unsaved, lastIso, backedUp, subject, missing };
+  return { ...copy, unsaved, unreadable, lastIso, backedUp, subject, missing };
 };
 
 // Which files are machine-written is a question the repository can answer, so it is asked
@@ -198,7 +201,7 @@ const overlaps = (main, copies, base) => {
   const changed = new Map();
   for (const c of copies) {
     if (!c.branch || base.endsWith(`/${c.branch}`) || base === c.branch) continue;
-    const files = git(["diff", "--name-only", `${base}...${c.branch}`], main)
+    const files = git(["-c", "core.quotePath=false", "diff", "--name-only", `${base}...${c.branch}`], main)
       .split("\n")
       .filter(Boolean);
     if (files.length) changed.set(c.branch, new Set(files));
@@ -249,7 +252,13 @@ const cmdStatus = (main) => {
   console.log("REFERENCE COPY");
   console.log(`  ${main}`);
   console.log(
-    `  on ${reference?.branch || "(no branch)"} · ${reference?.unsaved ? `${plural(reference.unsaved, "file", "files")} UNSAVED — should be none` : "clean"}` +
+    `  on ${reference?.branch || "(no branch)"} · ${
+      reference?.unreadable
+        ? "COULD NOT BE READ"
+        : reference?.unsaved
+          ? `${plural(reference.unsaved, "file", "files")} UNSAVED — should be none`
+          : "clean"
+    }` +
       `${behind ? ` · ${plural(behind, "change", "changes")} behind the main line` : ""}`,
   );
 
@@ -258,7 +267,8 @@ const cmdStatus = (main) => {
   for (const c of work) {
     const flags = [];
     if (c.missing) flags.push("FOLDER MISSING");
-    if (c.unsaved) flags.push(`${plural(c.unsaved, "file", "files")} unsaved`);
+    if (c.unreadable) flags.push("COULD NOT BE READ — treat as holding work");
+    else if (c.unsaved) flags.push(`${plural(c.unsaved, "file", "files")} unsaved`);
     if (!c.backedUp) flags.push("only on this machine");
     if (c.lastIso && daysSince(c.lastIso) >= RETIRE_DAYS)
       flags.push(`cold ${age(c.lastIso)} — will be retired`);
@@ -321,11 +331,14 @@ const cmdNew = (main, name) => {
   }
   git(["fetch", "origin", "--prune", "--quiet"], main);
   const base = mainLine(main);
-  // Quiet, and its output kept rather than passed through: git's progress chatter is not this
-  // command's voice, and it arrives on the error channel where it reads as a fault.
+  // Quiet rather than passed through: git's progress chatter is not this command's voice, and
+  // it arrives on the error channel where it reads as a fault. Its reason for failing goes with
+  // it, so the message below names what to look at instead.
   const made = run(["worktree", "add", "-q", folder, "-b", name, base], { cwd: main });
   if (!made.ok) {
-    console.error(`Could not create a working copy at ${folder}`);
+    console.error(
+      `Could not create a working copy at ${folder} — check that ${base} exists, that ${name} is not already a line of work, and that the folder is free`,
+    );
     process.exit(1);
   }
   console.log(`\nWorking copy ready. Move into it and do the work there:\n  cd ${folder}`);
@@ -376,6 +389,12 @@ const cmdSave = (main) => {
   // Nothing new to keep: the working tree matches what was already recorded, so writing
   // another snapshot would only add a duplicate that pins the same files forever.
   if (head && git(["rev-parse", "--verify", "--quiet", `${head}^{tree}`], here) === tree) return;
+
+  // Nothing was open after all: with no commits yet there is no previous tree to compare
+  // against, so an empty one is recognised directly rather than reported as work saved. The
+  // repository is asked what an empty tree looks like — writing the answer down here would be
+  // right for one way of naming objects and silently wrong for the other.
+  if (!head && tree === git(["hash-object", "-t", "tree", "/dev/null"], here)) return;
 
   const message = `open work in ${basename(here)}, saved automatically`;
   const snapshot = head
