@@ -4,3 +4,6 @@
 .claude/*
 !.claude/hooks/
 !.claude/settings.json
+# Records that a review ran against one exact commit on ONE machine. Sharing it would let
+# the gate read someone else's approval as if it were this machine's.
+.claude/pr-gate/

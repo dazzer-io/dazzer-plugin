@@ -252,7 +252,13 @@ const cmdStatus = (main) => {
   console.log("REFERENCE COPY");
   console.log(`  ${main}`);
   console.log(
-    `  on ${reference?.branch || "(no branch)"} · ${reference?.unsaved ? `${plural(reference.unsaved, "file", "files")} UNSAVED — should be none` : "clean"}` +
+    `  on ${reference?.branch || "(no branch)"} · ${
+      reference?.unreadable
+        ? "COULD NOT BE READ"
+        : reference?.unsaved
+          ? `${plural(reference.unsaved, "file", "files")} UNSAVED — should be none`
+          : "clean"
+    }` +
       `${behind ? ` · ${plural(behind, "change", "changes")} behind the main line` : ""}`,
   );
 
@@ -325,11 +331,14 @@ const cmdNew = (main, name) => {
   }
   git(["fetch", "origin", "--prune", "--quiet"], main);
   const base = mainLine(main);
-  // Quiet, and its output kept rather than passed through: git's progress chatter is not this
-  // command's voice, and it arrives on the error channel where it reads as a fault.
+  // Quiet rather than passed through: git's progress chatter is not this command's voice, and
+  // it arrives on the error channel where it reads as a fault. Its reason for failing goes with
+  // it, so the message below names what to look at instead.
   const made = run(["worktree", "add", "-q", folder, "-b", name, base], { cwd: main });
   if (!made.ok) {
-    console.error(`Could not create a working copy at ${folder}`);
+    console.error(
+      `Could not create a working copy at ${folder} — check that ${base} exists, that ${name} is not already a line of work, and that the folder is free`,
+    );
     process.exit(1);
   }
   console.log(`\nWorking copy ready. Move into it and do the work there:\n  cd ${folder}`);
