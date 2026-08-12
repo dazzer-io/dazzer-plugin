@@ -33,11 +33,16 @@ import { basename, dirname, join } from "node:path";
 const COLD_DAYS = 7;
 const RETIRE_DAYS = 14;
 
-// Two ways to call git. `run` reports whether it worked, and is what every step that could
+// Three ways to call git. `run` reports whether it worked, and is what every step that could
 // lose something must use — a helper that returns "" on failure makes "the command failed"
 // and "the answer is empty" the same value, which is how a failed archive turns into a
 // deleted branch. `git` is the reading shorthand, for answers where empty is a real answer.
-const run = (args, { cwd = process.cwd(), env } = {}) => {
+// `gitPaths` reads a list of names and collapses those same two cases, so every caller owns
+// the consequence: an unanswered diff drops that branch and under-reports a clash, while an
+// unanswered attribute lookup filters nothing and can report a clash that is not real. Both
+// are wrong reports rather than lost work, which is why it is allowed here at all — it must
+// never be the answer anything acts on by deleting.
+const run = (args, { cwd = process.cwd(), env, raw = false } = {}) => {
   try {
     const out = execFileSync("git", args, {
       cwd,
@@ -45,13 +50,50 @@ const run = (args, { cwd = process.cwd(), env } = {}) => {
       stdio: ["ignore", "pipe", "pipe"],
       env: env ? { ...process.env, ...env } : process.env,
     });
-    return { ok: true, out: out.trim() };
+    return { ok: true, out: raw ? out : out.trim() };
   } catch {
     return { ok: false, out: "" };
   }
 };
 
 const git = (args, cwd = process.cwd()) => run(args, { cwd }).out;
+
+// Paths, read exactly as git wrote them. Git only leaves a name intact when asked with -z: in
+// every other form it wraps anything containing a quote, a backslash or a control character in
+// quotes and escapes it, which is a different string from the real name and matches nothing.
+// Read raw for the same reason — trimming would eat a leading space that is part of a filename.
+const gitPaths = (args, cwd) => {
+  const r = run(args, { cwd, raw: true });
+  if (!r.ok) return [];
+  const fields = r.out.split("\0");
+  // -z terminates rather than separates, so the last field is always the empty tail.
+  if (fields[fields.length - 1] === "") fields.pop();
+  return fields;
+};
+
+// Compared whole, never printed whole. Everything git hands back is matched exactly as git
+// wrote it, and drawn rather than obeyed: a line break inside a filename or a message would
+// otherwise forge a whole section, naming lines of work that do not exist, in the one place an
+// arriving agent looks to decide what is safe to touch. Anything that moves a cursor, clears a
+// screen, or ends a line goes — including the separators only some readers treat as breaks, and
+// the escape character itself, so two different names can never draw the same.
+const forDisplay = (text) =>
+  text.replace(/[\\\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, (ch) => {
+    if (ch === "\\") return "\\\\";
+    const code = ch.charCodeAt(0);
+    return code > 0xff
+      ? `\\u${code.toString(16).padStart(4, "0")}`
+      : `\\x${code.toString(16).padStart(2, "0")}`;
+  });
+
+// The only way a line is built. Escaping at each place that prints is a rule every future one
+// has to remember, and review kept finding one more that had not. Here the report's own words
+// stay literal and everything dropped into them is drawn rather than obeyed.
+const line = (parts, ...values) =>
+  parts.reduce(
+    (out, part, i) => out + part + (i < values.length ? forDisplay(String(values[i])) : ""),
+    "",
+  );
 
 // What is unsaved in a working copy. Both flags are explicit because a repository or user
 // setting can hide either by default, and a file never committed anywhere is the content that
@@ -131,19 +173,19 @@ const listWorkingCopies = (main) => {
   const out = git(["worktree", "list", "--porcelain"], main);
   const copies = [];
   let current = null;
-  for (const line of out.split("\n")) {
-    if (line.startsWith("worktree ")) {
-      current = { path: line.slice(9), branch: "", head: "", detached: false };
+  for (const row of out.split("\n")) {
+    if (row.startsWith("worktree ")) {
+      current = { path: row.slice(9), branch: "", head: "", detached: false };
       copies.push(current);
-    } else if (line.startsWith("HEAD ") && current) {
+    } else if (row.startsWith("HEAD ") && current) {
       // Reported for every copy, branch or not, and still reported once the folder is gone.
       // It is what keeps a branchless copy's commits reachable, so it is what they are
       // judged and described by. All-zeros means a branch with nothing committed yet.
-      const sha = line.slice(5);
+      const sha = row.slice(5);
       current.head = /^0+$/.test(sha) ? "" : sha;
-    } else if (line.startsWith("branch ") && current) {
-      current.branch = line.slice(7).replace("refs/heads/", "");
-    } else if (line === "detached" && current) {
+    } else if (row.startsWith("branch ") && current) {
+      current.branch = row.slice(7).replace("refs/heads/", "");
+    } else if (row === "detached" && current) {
       current.detached = true;
     }
   }
@@ -179,10 +221,8 @@ const describe = (copy, main) => {
 // needs no install and works in a checkout where nothing has been run.
 const generatedAmong = (main, files) => {
   if (!files.length) return new Set();
-  const out = run(["check-attr", "-z", "generated", "--", ...files], { cwd: main });
-  if (!out.ok) return new Set();
   // Records arrive as path, attribute, value, each NUL-terminated.
-  const parts = out.out.split("\0");
+  const parts = gitPaths(["check-attr", "-z", "generated", "--", ...files], main);
   const marked = new Set();
   for (let i = 0; i + 2 < parts.length; i += 3) {
     if (parts[i + 2] === "set" || parts[i + 2] === "true") marked.add(parts[i]);
@@ -201,9 +241,7 @@ const overlaps = (main, copies, base) => {
   const changed = new Map();
   for (const c of copies) {
     if (!c.branch || base.endsWith(`/${c.branch}`) || base === c.branch) continue;
-    const files = git(["-c", "core.quotePath=false", "diff", "--name-only", `${base}...${c.branch}`], main)
-      .split("\n")
-      .filter(Boolean);
+    const files = gitPaths(["diff", "-z", "--name-only", `${base}...${c.branch}`], main);
     if (files.length) changed.set(c.branch, new Set(files));
   }
   const found = [];
@@ -250,19 +288,18 @@ const cmdStatus = (main) => {
   const behindCount = run(["rev-list", "--count", `HEAD..${base}`], { cwd: main });
   const behind = behindCount.ok ? Number(behindCount.out) : 0;
   console.log("REFERENCE COPY");
-  console.log(`  ${main}`);
+  console.log(line`  ${main}`);
   console.log(
-    `  on ${reference?.branch || "(no branch)"} · ${
+    line`  on ${reference?.branch || "(no branch)"} · ${
       reference?.unreadable
         ? "COULD NOT BE READ"
         : reference?.unsaved
           ? `${plural(reference.unsaved, "file", "files")} UNSAVED — should be none`
           : "clean"
-    }` +
-      `${behind ? ` · ${plural(behind, "change", "changes")} behind the main line` : ""}`,
+    }${behind ? ` · ${plural(behind, "change", "changes")} behind the main line` : ""}`,
   );
 
-  console.log(`\nWORK IN PROGRESS (${work.length})`);
+  console.log(line`\nWORK IN PROGRESS (${work.length})`);
   if (!work.length) console.log("  none");
   for (const c of work) {
     const flags = [];
@@ -273,36 +310,36 @@ const cmdStatus = (main) => {
     if (c.lastIso && daysSince(c.lastIso) >= RETIRE_DAYS)
       flags.push(`cold ${age(c.lastIso)} — will be retired`);
     else if (c.lastIso && daysSince(c.lastIso) >= COLD_DAYS) flags.push(`cold ${age(c.lastIso)}`);
-    console.log(`  ${c.branch || `(no branch) ${c.head.slice(0, 8)}`}`);
-    console.log(`    ${c.subject || "(nothing yet)"}`);
+    console.log(line`  ${c.branch || `(no branch) ${c.head.slice(0, 8)}`}`);
+    console.log(line`    ${c.subject || "(nothing yet)"}`);
     console.log(
-      `    ${basename(c.path)} · last touched ${age(c.lastIso)}${flags.length ? ` · ${flags.join(" · ")}` : ""}`,
+      line`    ${basename(c.path)} · last touched ${age(c.lastIso)}${flags.length ? ` · ${flags.join(" · ")}` : ""}`,
     );
   }
 
   const clashes = overlaps(main, work, base);
   if (clashes.length) {
-    console.log(`\nTWO AGENTS IN THE SAME CODE (${clashes.length})`);
+    console.log(line`\nTWO AGENTS IN THE SAME CODE (${clashes.length})`);
     for (const c of clashes) {
-      console.log(`  ${c.a}  and  ${c.b}`);
+      console.log(line`  ${c.a}  and  ${c.b}`);
       console.log(
-        `    both changing: ${c.files.slice(0, 4).join(", ")}${c.files.length > 4 ? ` +${c.files.length - 4} more` : ""}`,
+        line`    both changing: ${c.files.slice(0, 4).join(", ")}${c.files.length > 4 ? ` +${c.files.length - 4} more` : ""}`,
       );
     }
   }
 
   if (scratch.length) {
     console.log(
-      `\nASSISTANT'S OWN TEMPORARY COPIES (${scratch.length}) — created and removed by the tool, not yours to manage`,
+      line`\nASSISTANT'S OWN TEMPORARY COPIES (${scratch.length}) — created and removed by the tool, not yours to manage`,
     );
-    for (const c of scratch) console.log(`  ${basename(c.path)} · ${age(c.lastIso)}`);
+    for (const c of scratch) console.log(line`  ${basename(c.path)} · ${age(c.lastIso)}`);
   }
 
   const retirable = retirableBranches(main);
-  console.log(`\nFORGOTTEN WORK`);
+  console.log(line`\nFORGOTTEN WORK`);
   console.log(
     retirable.length
-      ? `  ${retirable.length} line(s) untouched ${RETIRE_DAYS}+ days — run: node scripts/git-health.mjs sweep --apply`
+      ? line`  ${retirable.length} line(s) untouched ${RETIRE_DAYS}+ days — run: node scripts/git-health.mjs sweep --apply`
       : "  none",
   );
 };
@@ -315,7 +352,7 @@ const cmdNew = (main, name) => {
   // The folder is named after the work, so what is where is readable at a glance — the
   // single change that makes a directory of working copies self-describing.
   if (!/^(feat|fix|docs|chore|refactor|test|perf|ci|build)\/[a-z0-9]+(-[a-z0-9]+)*$/.test(name)) {
-    console.error(`Not a usable name: ${name}`);
+    console.error(line`Not a usable name: ${name}`);
     console.error(
       "Use  <kind>/<what-it-does>  — kind is one of feat fix docs chore refactor test perf ci build,",
     );
@@ -326,7 +363,7 @@ const cmdNew = (main, name) => {
   }
   const folder = join(worktreeHome(main), name.split("/").pop());
   if (existsSync(folder)) {
-    console.error(`Already taken: ${folder}`);
+    console.error(line`Already taken: ${folder}`);
     process.exit(2);
   }
   git(["fetch", "origin", "--prune", "--quiet"], main);
@@ -337,11 +374,11 @@ const cmdNew = (main, name) => {
   const made = run(["worktree", "add", "-q", folder, "-b", name, base], { cwd: main });
   if (!made.ok) {
     console.error(
-      `Could not create a working copy at ${folder} — check that ${base} exists, that ${name} is not already a line of work, and that the folder is free`,
+      line`Could not create a working copy at ${folder} — check that ${base} exists, that ${name} is not already a line of work, and that the folder is free`,
     );
     process.exit(1);
   }
-  console.log(`\nWorking copy ready. Move into it and do the work there:\n  cd ${folder}`);
+  console.log(line`\nWorking copy ready. Move into it and do the work there:\n  cd ${folder}`);
 };
 
 // Snapshots open work as an object that hangs off no line of work, so a crash, a reset or an
@@ -393,8 +430,13 @@ const cmdSave = (main) => {
   // Nothing was open after all: with no commits yet there is no previous tree to compare
   // against, so an empty one is recognised directly rather than reported as work saved. The
   // repository is asked what an empty tree looks like — writing the answer down here would be
-  // right for one way of naming objects and silently wrong for the other.
-  if (!head && tree === git(["hash-object", "-t", "tree", "/dev/null"], here)) return;
+  // right for one way of naming objects and silently wrong for the other. Read through `run` so
+  // a failure to ask cannot pass for "not empty" and write a snapshot of nothing.
+  if (!head) {
+    const empty = run(["hash-object", "-t", "tree", "--stdin"], { cwd: here });
+    if (!empty.ok) return failedToSave();
+    if (tree === empty.out) return;
+  }
 
   const message = `open work in ${basename(here)}, saved automatically`;
   const snapshot = head
@@ -408,7 +450,7 @@ const cmdSave = (main) => {
     return failedToSave();
   }
   console.log(
-    `open work saved (recover the files with: git restore --source ${snapshot.slice(0, 8)} -- .)`,
+    line`open work saved (recover the files with: git restore --source ${snapshot.slice(0, 8)} -- .)`,
   );
 };
 
@@ -433,8 +475,8 @@ const retirableBranches = (main) => {
     ["for-each-ref", "--format=%(refname:short)%00%(committerdate:iso-strict)", "refs/heads"],
     main,
   );
-  for (const line of refs.split("\n").filter(Boolean)) {
-    const [name, iso] = line.split("\0");
+  for (const row of refs.split("\n").filter(Boolean)) {
+    const [name, iso] = row.split("\0");
     if (!name || protectedNames.has(name) || occupied.has(name)) continue;
     // Written so an unreadable date KEEPS the branch. The natural phrasing — skip when
     // younger than the limit — is false for an unparseable date, so a branch made minutes
@@ -460,7 +502,7 @@ const freeArchiveName = (main, branch, sha) => {
   ];
   for (const name of candidates) {
     if (git(["rev-parse", "--verify", "--quiet", `refs/tags/${name}`], main)) continue; // taken
-    if (run(["tag", name, sha], main).ok) return name;
+    if (run(["tag", name, sha], { cwd: main }).ok) return name;
   }
   return "";
 };
@@ -474,12 +516,12 @@ const cmdSweep = (main, apply) => {
   const candidates = retirableBranches(main);
 
   if (!candidates.length) {
-    console.log(`Nothing untouched for ${RETIRE_DAYS}+ days.`);
+    console.log(line`Nothing untouched for ${RETIRE_DAYS}+ days.`);
     return candidates;
   }
   const skipped = [];
   for (const c of candidates) {
-    console.log(`${apply ? "retiring" : "would retire"}  ${c.name}  (last touched ${age(c.iso)})`);
+    console.log(line`${apply ? "retiring" : "would retire"}  ${c.name}  (last touched ${age(c.iso)})`);
     if (!apply) continue;
 
     const sha = git(["rev-parse", "--verify", "--quiet", `refs/heads/${c.name}`], main);
@@ -497,19 +539,19 @@ const cmdSweep = (main, apply) => {
       skipped.push(`${c.name} — could not be archived, so it was left alone`);
       continue;
     }
-    if (!run(["branch", "-D", c.name], main).ok)
+    if (!run(["branch", "-D", c.name], { cwd: main }).ok)
       skipped.push(`${c.name} — archived but not removed`);
   }
 
   if (apply) {
     pruneOldSnapshots(main);
-    console.log(`\nKept as a tag — restore any with: git branch <name> <its archive tag>`);
+    console.log(line`\nKept as a tag — restore any with: git branch <name> <its archive tag>`);
     if (skipped.length) {
-      console.log(`\nLeft alone, nothing lost:`);
-      for (const s of skipped) console.log(`  ${s}`);
+      console.log(line`\nLeft alone, nothing lost:`);
+      for (const s of skipped) console.log(line`  ${s}`);
     }
   } else {
-    console.log(`\nAdd --apply to retire them (each is kept as a tag and stays restorable).`);
+    console.log(line`\nAdd --apply to retire them (each is kept as a tag and stays restorable).`);
   }
   return candidates;
 };
@@ -522,8 +564,8 @@ const pruneOldSnapshots = (main) => {
     ["for-each-ref", "--format=%(refname)%00%(committerdate:iso-strict)", "refs/saved"],
     main,
   );
-  for (const line of refs.split("\n").filter(Boolean)) {
-    const [ref, iso] = line.split("\0");
+  for (const row of refs.split("\n").filter(Boolean)) {
+    const [ref, iso] = row.split("\0");
     if (ref && daysSince(iso) >= RETIRE_DAYS) git(["update-ref", "-d", ref], main);
   }
 };
