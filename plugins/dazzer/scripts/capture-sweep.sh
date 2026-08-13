@@ -264,7 +264,14 @@ receipt fired "threshold-reached"
 # The tap. The message is one file shared by every tool; only the envelope around it
 # differs, and each tool's envelope is genuinely its own:
 #
-#   Anthropic's and OpenAI's  say "block"    to mean "act on this before you stop"
+#   Anthropic's               takes the message as plain feedback and keeps the reply
+#                             going. It also accepts "block", but paints that word red as
+#                             "Stop hook error" on the person's own screen - which is how
+#                             a checkpoint doing exactly its job looked broken to every
+#                             person who saw it. (Feedback shipped in their tool in early
+#                             2026; an older copy ignores it and just stops, so the cost
+#                             of someone unupdated is a skipped checkpoint, never a scare.)
+#   OpenAI's                  says "block"    to mean "act on this before you stop"
 #   Google's                  says "continue" for the same thing, and reads any other
 #                             word as permission to stop - so the wrong one is silence
 #   Cursor                    has no such word at all. It takes a message and submits it
@@ -276,6 +283,7 @@ MESSAGE="$(tr -d '\n' < "$HERE/prompts/capture-tap.txt" 2>/dev/null)"
 case "$TOOL" in
   cursor) printf '{"followup_message":"%s"}' "$MESSAGE" ;;
   antigravity) printf '{"decision":"continue","reason":"%s"}' "$MESSAGE" ;;
+  claude-code) printf '{"hookSpecificOutput":{"hookEventName":"Stop","additionalContext":"%s"}}' "$MESSAGE" ;;
   *) printf '{"decision":"block","reason":"%s"}' "$MESSAGE" ;;
 esac
 exit 0
