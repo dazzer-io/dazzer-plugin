@@ -45,8 +45,10 @@ transcript() {
   printf '%s' "$f"
 }
 
-# Well-formed and shaped like a prompt? Prefers a real parser; falls back to a shape
-# check so the suite still runs somewhere without one.
+# Well-formed and shaped like a prompt? One of the four envelopes the script speaks,
+# carrying a non-empty message. Prefers a real parser; falls back to a shape check so the
+# suite still runs somewhere without one. WHICH envelope a given tool gets is not this
+# function's question - the envelope cases pin that by name.
 is_valid_tap() {
   if command -v node >/dev/null 2>&1; then
     printf '%s' "$1" | node -e '
@@ -55,12 +57,20 @@ is_valid_tap() {
       process.stdin.on("end", () => {
         try {
           const o = JSON.parse(s);
-          process.exit(o && o.decision === "block" && typeof o.reason === "string" && o.reason.length > 0 ? 0 : 1);
+          const msg =
+            (o.hookSpecificOutput && o.hookSpecificOutput.hookEventName === "Stop"
+              ? o.hookSpecificOutput.additionalContext : undefined) ??
+            ((o.decision === "block" || o.decision === "continue") ? o.reason : undefined) ??
+            o.followup_message;
+          process.exit(typeof msg === "string" && msg.length > 0 ? 0 : 1);
         } catch { process.exit(1); }
       });'
     return $?
   fi
-  case "$1" in *'"decision"'*'"block"'*'"reason"'*) return 0 ;; *) return 1 ;; esac
+  case "$1" in
+    *'"additionalContext"'* | *'"decision"'*'"reason"'* | *'"followup_message"'*) return 0 ;;
+    *) return 1 ;;
+  esac
 }
 
 # case_run <id> <fire|silent> <stdin-json> [VAR=value ...]
@@ -71,9 +81,13 @@ is_valid_tap() {
 #
 # Set GROUP to run several cases against ONE shared sandbox - needed where the point of
 # the test is what carries over between replies. Set EXPECT_STATE to name the file the
-# script should have written, for cases where firing is not the thing in question.
+# script should have written, for cases where firing is not the thing in question. Set
+# EXPECT_ENVELOPE / FORBID_ENVELOPE to pin which words a fired prompt carries, for the
+# cases whose whole point is which envelope a tool receives.
 GROUP=""
 EXPECT_STATE=""
+EXPECT_ENVELOPE=""
+FORBID_ENVELOPE=""
 case_run() {
   id="$1"
   want="$2"
@@ -104,6 +118,12 @@ case_run() {
       problems="$problems; expected a prompt, got silence"
     elif ! is_valid_tap "$out"; then
       problems="$problems; printed something that is not a well-formed prompt"
+    fi
+    if [ -n "$EXPECT_ENVELOPE" ]; then
+      case "$out" in *"$EXPECT_ENVELOPE"*) : ;; *) problems="$problems; envelope does not carry $EXPECT_ENVELOPE" ;; esac
+    fi
+    if [ -n "$FORBID_ENVELOPE" ]; then
+      case "$out" in *"$FORBID_ENVELOPE"*) problems="$problems; envelope must not carry $FORBID_ENVELOPE" ;; esac
     fi
   else
     [ -z "$out" ] || problems="$problems; expected silence, got $(printf '%s' "$out" | cut -c1-60)"
@@ -221,6 +241,22 @@ EXPECT_STATE="outer.last"
 case_run "reads-the-outer-session-not-a-nested-one" fire \
   "$(printf '{"session_id":"outer","transcript_path":"%s","tool_input":{"session_id":"inner"},"stop_hook_active":false}' "$BIG")"
 EXPECT_STATE=""
+
+# --- the envelope: each tool must receive its own words ----------------------
+# Anthropic's tool paints "block" red as "Stop hook error" on the person's own screen, so
+# a checkpoint doing exactly its job looked broken to everyone who saw it fire. Its
+# envelope carries plain feedback instead, and must never say "block" again. The other
+# three envelopes are pinned alongside it, so a regression in any of them fails by name.
+
+EXPECT_ENVELOPE='"additionalContext"' FORBID_ENVELOPE='"decision"'
+case_run "envelope:claude-code-feedback-never-block" fire "$(payload e1 "$BIG")" DAZZER_TOOL=claude-code
+EXPECT_ENVELOPE='"decision":"block"' FORBID_ENVELOPE=""
+case_run "envelope:codex-still-blocks" fire "$(payload e2 "$BIG")" DAZZER_TOOL=codex
+EXPECT_ENVELOPE='"decision":"continue"'
+case_run "envelope:antigravity-still-continues" fire "$(agy_payload e3 "$BIG")" DAZZER_TOOL=antigravity
+EXPECT_ENVELOPE='"followup_message"'
+case_run "envelope:cursor-still-follows-up" fire "$(payload e4 "$BIG")" DAZZER_TOOL=cursor
+EXPECT_ENVELOPE="" FORBID_ENVELOPE=""
 
 # --- fail-open: none of these may print, fail, or trap anything --------------
 
