@@ -85,7 +85,10 @@ function commandsDeclared(manifest, findings) {
   // every single person was sitting on whatever version they first installed.
   for (const [id, step] of Object.entries(manifest.keepCurrent?.byTool ?? {})) {
     if (step === null || step?.kind === "none") continue;
-    collect([step], `keepCurrent.${id}`);
+    // More than one line, where a tool has more than one thing installed. Read as a single
+    // step only, the second line was shown to people and declared to nobody - and the piece
+    // it updates is the one that reaches the Brain at all.
+    collect(step.steps ?? [step], `keepCurrent.${id}`);
   }
 
   return out;

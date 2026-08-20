@@ -199,9 +199,28 @@ default — that is the tool makers' own default, not a choice of ours — so wh
 first installed is the version you keep, indefinitely. A machine was found sitting several versions
 behind while reporting itself perfectly healthy.
 
-**Claude Code** — turn it on once and forget it. Open the plugin panel with `/plugin`, go to
-**Marketplaces**, choose **dazzer**, and select **Enable auto-update**. It keeps itself current
-after that.
+**Claude Code** — both lines, in this order, then restart Claude Code:
+
+```
+claude plugin marketplace update dazzer
+claude plugin update dazzer@dazzer
+claude plugin update dazzer-connect@dazzer
+```
+
+The first refreshes the list of what exists. The second and third are what actually move the
+version you are running, and the second and third are what people were missing.
+
+**The first line on its own does nothing to the plugin you are using, and says otherwise.** It
+prints `✔ Successfully updated marketplace: dazzer` and leaves you on exactly the version you were
+already on. That was watched happening here: marketplace refreshed to the newest commit, plugin
+still reporting the previous version, old behaviour intact after a restart. A success message that
+means "the catalogue is current", read as "you are current", is the whole trap. Only
+`claude plugin update` changes the answer, and only a restart applies it.
+
+Drop the third line if you never installed the connection separately.
+
+To stop doing this by hand: open the plugin panel with `/plugin`, go to **Marketplaces**, choose
+**dazzer**, and select **Enable auto-update**. It keeps itself current after that.
 
 **Antigravity** — it runs from a copy you downloaded, so refresh the copy and install again:
 
