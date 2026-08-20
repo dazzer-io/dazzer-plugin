@@ -366,12 +366,24 @@
     "why": "Nothing updates on its own. Sources like ours have automatic updating switched off by default, so a person stays on whatever version they first installed until they do something about it.",
     "byTool": {
       "claude-code": {
-        "kind": "choose",
-        "where": "claude",
-        "from": "/plugin",
-        "label": "Enable auto-update",
-        "note": "Open the plugin panel, go to Marketplaces, choose dazzer, and turn on auto-update. One time, and it keeps itself current afterwards.",
-        "proven": null
+        "kind": "run",
+        "where": "terminal",
+        "steps": [
+          {
+            "kind": "run",
+            "command": "claude plugin marketplace update dazzer"
+          },
+          {
+            "kind": "run",
+            "command": "claude plugin update dazzer@dazzer"
+          },
+          {
+            "kind": "run",
+            "command": "claude plugin update dazzer-connect@dazzer"
+          }
+        ],
+        "note": "All three, in that order, then restart. The first refreshes the list of what exists and does NOTHING to the plugin being used - it prints a success message either way, which is how a person ran it, restarted, and got the old behaviour back. Only the update lines move the version actually in use. Drop the third where the connection was never installed separately. To stop doing it by hand, open the plugin panel with /plugin, go to Marketplaces, choose dazzer, turn on auto-update.",
+        "proven": "watched: 0.8.3 to 0.9.0 on a real machine, after the marketplace command had reported success and changed nothing"
       },
       "antigravity": {
         "kind": "run",
