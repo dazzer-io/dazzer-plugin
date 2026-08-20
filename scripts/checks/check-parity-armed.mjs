@@ -491,10 +491,16 @@ const CASES = [
   },
   {
     gate: "reminder-parity",
-    what: "the end-of-reply prompt deleted, which says none of our sentences so no wording rule can miss it",
+    what: "the checkpoint deleted, which says none of our sentences so no wording rule can miss it",
     seed(root) {
+      // Only the checkpoint, leaving the reminder that shares its moment untouched. Deleting
+      // the whole moment would fail this gate on the missing SENTENCE and prove nothing about
+      // the script - and the script is the half no wording rule can see go.
       edit(root, WRAPPED_HOOKS, (hooks) => {
-        delete hooks.hooks.Stop;
+        for (const group of Object.values(hooks.hooks).flat()) {
+          if (!Array.isArray(group.hooks)) continue;
+          group.hooks = group.hooks.filter((hook) => !hook.command.includes("capture-sweep.sh"));
+        }
       });
     },
   },
@@ -519,10 +525,18 @@ const CASES = [
   },
   {
     gate: "reminder-parity",
-    what: "the end-of-reply prompt silenced rather than deleted, which any presence test would accept",
+    what: "the checkpoint silenced rather than deleted, which any presence test would accept",
     seed(root) {
+      // It sits beside the recall reminder now, at the person's next message rather than at
+      // the end of a reply - the whole point of moving it being that a host prints anything
+      // said at the end of a reply onto the person's own screen. Found by what it runs, not
+      // by where it sits, so moving it again cannot quietly disarm this.
       edit(root, WRAPPED_HOOKS, (hooks) => {
-        hooks.hooks.Stop[0].hooks[0].command = ": # disabled for now";
+        for (const group of Object.values(hooks.hooks).flat()) {
+          for (const hook of group.hooks ?? []) {
+            if (hook.command.includes("capture-sweep.sh")) hook.command = ": # disabled for now";
+          }
+        }
       });
     },
   },
@@ -531,7 +545,7 @@ const CASES = [
     what: "a trigger written one level too shallow, which used to throw and hide every other finding",
     seed(root) {
       edit(root, WRAPPED_HOOKS, (hooks) => {
-        hooks.hooks.Stop = { hooks: [{ command: "x" }] };
+        hooks.hooks.UserPromptSubmit = { hooks: [{ command: "x" }] };
       });
     },
   },

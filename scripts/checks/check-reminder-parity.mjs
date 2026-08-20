@@ -27,8 +27,8 @@ const MANIFEST = join(REPO_ROOT, "tools.manifest.json");
 /** Every reminder we speak opens with this, which is what makes one findable in a reply. */
 const SPOKEN_MARK = "[Dazzer]";
 
-/** The script the end-of-reply prompt exists to run. Naming it is the only way to tell a
- * working prompt from one somebody silenced without removing. */
+/** The script the checkpoint exists to run, wherever a given host is tapped. Naming it is
+ * the only way to tell a working checkpoint from one somebody silenced without removing. */
 const RUNS_THE_SWEEP = "capture-sweep.sh";
 
 /**
@@ -294,9 +294,16 @@ const HOMES = [
       [
         "UserPromptSubmit",
         {
+          // The one moment that carries both: a sentence AND the script. These hosts print
+          // whatever a script says at the END of a reply straight onto the person's screen,
+          // in full, under a word of their own choosing - so the checkpoint was moved here,
+          // where nothing is drawn and nothing is forced to speak. Both are owed, and both
+          // are checked: the sentence by wording, the script by name.
           who: "Claude Code and Codex, on every message",
           says: "recall",
           shape: claudeShaped("UserPromptSubmit"),
+          runs: true,
+          runsWhere: "with every message a person sends",
         },
       ],
       [
@@ -307,7 +314,6 @@ const HOMES = [
           shape: claudeShaped("SessionStart"),
         },
       ],
-      ["Stop", { who: "Claude Code and Codex", runs: true }],
     ]),
   },
   {
@@ -331,7 +337,7 @@ const HOMES = [
           shape: { read: (doc) => doc?.additional_context, looks: '{"additional_context":"..."}' },
         },
       ],
-      ["stop", { who: "Cursor", runs: true }],
+      ["stop", { who: "Cursor", runs: true, runsWhere: "at the end of a reply" }],
     ]),
   },
   {
@@ -379,7 +385,7 @@ const HOMES = [
           },
         },
       ],
-      ["Stop", { who: "Antigravity", runs: true }],
+      ["Stop", { who: "Antigravity", runs: true, runsWhere: "at the end of a reply" }],
     ]),
   },
 ];
@@ -482,7 +488,14 @@ function spokenByHooks(findings, declaredById) {
           // Devin's file is the plain-words one and wants exactly that, so a shape is named
           // only on the moments a host is known to read structure at.
           const shape = moment?.shape;
-          const said = saidBy(hook.command, trigger, where, findings, shape !== undefined);
+          // One moment carries a sentence AND the script, side by side. The script is not a
+          // reminder and never will be, so it must not be marked down for saying nothing -
+          // its own rule below checks it by name. Without this the moment cannot hold both,
+          // which is what forced the checkpoint to live at the end of a reply in the first
+          // place, where every person could see it.
+          const isTheSweep = runsAScript(hook.command) && hook.command.includes(RUNS_THE_SWEEP);
+          const said = saidBy(hook.command, trigger, where, findings, shape !== undefined && !isTheSweep);
+          if (isTheSweep) continue;
 
           if (shape === undefined) {
             // No host here reads structure, so the words themselves are the reminder. A
@@ -526,7 +539,7 @@ function spokenByHooks(findings, declaredById) {
     // so one tool's reminder can be deleted outright and the run stays green as long as
     // another tool still says the same words. Not a hypothetical: a reminder was removed from
     // one of these files on the strength of a tool's documentation, and nothing objected.
-    for (const [trigger, { who, says, runs }] of home.moments) {
+    for (const [trigger, { who, says, runs, runsWhere }] of home.moments) {
       // The end-of-reply prompt runs a file rather than saying one of our sentences, so
       // "did anyone speak here" cannot see it go. Every wording rule was blind to it, and
       // it could be deleted from every file at once with nothing objecting.
@@ -549,12 +562,14 @@ function spokenByHooks(findings, declaredById) {
           findings.push({
             file: where,
             message:
-              `nothing runs ${RUNS_THE_SWEEP} at the end of a reply for ${who}. That is where ` +
-              "settled work gets saved, and it says none of our sentences - so no rule about " +
+              `nothing runs ${RUNS_THE_SWEEP} ${runsWhere} for ${who}. That is what gets ` +
+              "settled work saved, and it says none of our sentences - so no rule about " +
               "wording can notice it has gone, whether deleted or quietly replaced.",
           });
         }
-        continue;
+        // No `continue`: a moment may owe a sentence as well, and stopping here is how the
+        // one that owes both would have had its wording checked by nothing at all.
+        if (says === undefined) continue;
       }
 
       const said = spoke.get(trigger);

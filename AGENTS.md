@@ -12,7 +12,7 @@ tags: [conventions, plugin, constraints]
 ## Purpose
 
 What people install so their AI actually uses their Dazzer memory. It adds three nudges:
-check the memory before answering, save what settled when a reply ends, and get
+check the memory before answering, save what settled once enough has accumulated, and get
 re-oriented after a context reset.
 
 **It never talks to Dazzer.** It has no credentials and no reliable moment at which a
@@ -25,7 +25,7 @@ Brain, not here.**
 
 | Path | What it is |
 | --- | --- |
-| `plugins/dazzer/` | The behaviour: triggers, the end-of-reply script, the skill. **Carries no connection.** |
+| `plugins/dazzer/` | The behaviour: triggers, the checkpoint script, the skill. **Carries no connection.** |
 | `plugins/dazzer-connect/` | The connection, and nothing else, for people who have not already got one. |
 | `.claude-plugin/marketplace.json` | The list people install from. |
 | `README.md` | How to install it, written for a person. **The authority for the install steps.** |
@@ -93,7 +93,7 @@ broke for real people, and both are machine-enforced, so arguing around them fai
 - The rules the model follows live in the Brain and are served live. This repository holds
   triggers, not teaching. If you find yourself writing the rulebook in here, stop — a
   second copy will silently diverge from the real one.
-- The end-of-reply script is the only thing with real reach: it runs on every reply on
+- The checkpoint script is the only thing with real reach: it runs on every reply on
   someone else's machine and can hold their session open. It fails open **by
   construction** — the decision defaults to staying quiet, and only a comparison that
   actually succeeded can turn it on. Never restructure it so that "do nothing" is the

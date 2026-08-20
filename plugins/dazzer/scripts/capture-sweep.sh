@@ -3,12 +3,20 @@
 #
 # WHAT IT DOES NOT DO. It never decides what is worth saving and it never calls Dazzer.
 # It cannot: a hook has no credentials and no reliable moment at which the connection is up.
-# Its only job is to TAP the model at the end of a reply. The model then acts through the
-# connection it already owns, reading the current rules from the Brain at the moment it acts.
-# That is why this file is near-static: change the rules in the Brain, not here.
+# Its only job is to TAP the model. The model then acts through the connection it already
+# owns, reading the current rules from the Brain at the moment it acts. That is why this
+# file is near-static: change the rules in the Brain, not here.
+#
+# WHERE IT TAPS DECIDES WHETHER ANYONE SEES IT. Asked at the end of a reply, the message is
+# printed on the person's own screen, in full, under a word the tool chooses - and it also
+# forces another reply, which the model tends to fill with a line about the checkpoint. Sent
+# with the person's NEXT MESSAGE instead, the same words reach the model and nothing is
+# drawn at all. Every tool that offers the quieter moment is tapped there; the two that do
+# not are still tapped at the end of a reply, which is why both paths are here.
 #
 # TWO GUARDS, both mechanical, neither a judgment about knowledge:
-#   1. Never fire inside its own continuation, or it loops forever.
+#   1. Never fire inside its own continuation, or it loops forever. Only the end-of-reply
+#      moment can loop, and only that moment carries this guard.
 #   2. Never fire twice for the same work (a per-session mark on transcript growth).
 # Without both, every user gets duplicate writes and doubled cost on their own machine.
 #
@@ -49,7 +57,7 @@ setting() { # supplied, packaged, last-resort
   whole_number "$1" "$(whole_number "$2" "$3")"
 }
 
-THRESHOLD="$(setting "${DAZZER_CAPTURE_THRESHOLD:-}" "$(default_for DAZZER_CAPTURE_THRESHOLD)" 80)"
+THRESHOLD="$(setting "${DAZZER_CAPTURE_THRESHOLD:-}" "$(default_for DAZZER_CAPTURE_THRESHOLD)" 250)"
 MAX_INPUT_BYTES="$(setting "${DAZZER_CAPTURE_MAX_INPUT_BYTES:-}" "$(default_for DAZZER_CAPTURE_MAX_INPUT_BYTES)" 100000)"
 STATE_TTL_DAYS="$(setting "${DAZZER_CAPTURE_STATE_TTL_DAYS:-}" "$(default_for DAZZER_CAPTURE_STATE_TTL_DAYS)" 30)"
 RECEIPTS_MAX_BYTES="$(setting "${DAZZER_CAPTURE_RECEIPTS_MAX_BYTES:-}" "$(default_for DAZZER_CAPTURE_RECEIPTS_MAX_BYTES)" 262144)"
@@ -164,7 +172,60 @@ receipt() { # status, reason
   return 0
 }
 
+# WHICH MOMENT ARE WE STANDING IN? Two are possible, and they are not interchangeable.
+#
+# Asking at the END OF A REPLY is what this used to do everywhere, and it is why every
+# person running Anthropic's tool watched this checkpoint happen. That moment has no
+# private channel: whatever a script says there is PRINTED ON THE PERSON'S SCREEN, in
+# full, and the tool stamps its own word on it - "error" in older copies, "feedback" in
+# newer ones. Measured over three hundred real conversations, that put this instruction
+# on screen 1,644 times. Worse, saying anything there also tells the model not to finish,
+# so it owed the person another reply and usually filled it with a line about the
+# checkpoint - the one thing the message expressly asks it not to do.
+#
+# Asking WITH THE PERSON'S NEXT MESSAGE has neither problem. The words ride along with
+# what they typed, the model reads them, and nothing is drawn on screen - the same
+# channel the recall reminder has always used, which has never once been seen. Nothing
+# is forced to speak, so there is no extra reply to fill.
+#
+# Read by name from the host's own field. A tool that does not send one keeps exactly the
+# behaviour it has today, which is why the two hosts that cannot offer this moment need
+# no special case here. The person's typed message is in this payload too and could carry
+# these words itself - it is read by name and the host's real field comes first, and the
+# worst a crafted one could do is address the wrong moment, which that host ignores. A
+# skipped checkpoint, never a scare.
+# The trigger DECLARES which moment it is, the same way one tool is already told its own
+# name. Declared rather than guessed because not every host sends a field naming the
+# moment, and guessing wrong is silent in the worst direction. Where a host does send one
+# it is believed over the declaration - it is the host's own statement about where we are
+# standing, which beats anything written in a file months earlier. Unset and unspoken
+# means end-of-reply, so a tool nobody has moved keeps exactly the behaviour it has today.
+MOMENT="${DAZZER_MOMENT:-end-of-reply}"
+case "$(read_string hook_event_name)" in
+  UserPromptSubmit) MOMENT="with-next-message" ;;
+  Stop) MOMENT="end-of-reply" ;;
+esac
+
+# A host tapped with the person's next message is NEVER also tapped at the end of a reply.
+# Both triggers can be live at once - an older settings file, a host that answers a moment
+# we did not wire - and without this the person gets the checkpoint twice, once of them
+# printed on their screen, which is the entire fault this change exists to remove. Bailing
+# out HERE rather than at the tap keeps the count of new work intact, so the checkpoint
+# still lands at the quiet moment instead of being spent on the loud one.
+if [ "$MOMENT" = "end-of-reply" ]; then
+  case "$TOOL" in
+    claude-code | codex)
+      receipt quiet "tapped-with-next-message"
+      exit 0
+      ;;
+  esac
+fi
+
 # --- guard 1: never fire inside our own continuation --------------------------
+#
+# ONLY THE END-OF-REPLY MOMENT NEEDS THIS, and that is the whole reason it exists. Asking
+# there tells the model not to finish, so it owes another reply - and that reply reaches
+# this script as new work, which without a guard is answered with another tap, forever.
 #
 # Most tools say outright that this reply is the one our own tap asked for. Google's does
 # not, and leaning on the work-count instead was measured and found wrong: with a low
@@ -176,8 +237,13 @@ receipt() { # status, reason
 # One note, consumed once, so a tap can never answer its own tap. The cost is that a
 # genuine second reply straight after a tap is skipped, which is the safe direction: the
 # backstop fires a little less often, never twice.
+#
+# NONE OF IT APPLIES WITH THE PERSON'S NEXT MESSAGE. Nothing is forced to speak there, so
+# there is no continuation to mistake for new work - only a person typing again, which is
+# exactly the thing we are waiting for. Leaving a note there would be an active fault: the
+# next real message would read it and be skipped for no reason at all.
 
-[ "$(read_flag stop_hook_active)" = "true" ] && exit 0
+[ "$MOMENT" = "end-of-reply" ] && [ "$(read_flag stop_hook_active)" = "true" ] && exit 0
 
 # THE SAME TWO FACTS, UNDER TWO SPELLINGS. Google's tool names the conversation and the
 # transcript in camelCase where the others use underscores. Reading only one spelling is
@@ -200,12 +266,16 @@ mkdir -p "$STATE_DIR" 2>/dev/null || exit 0
 MARK="$STATE_DIR/$(fence_name "$SESSION").last"
 
 # Our own continuation, where the host does not say so itself. Read once and removed, so a
-# note left behind by a run that died cannot silence the next reply as well.
+# note left behind by a run that died cannot silence the next reply as well. A note left
+# by an earlier end-of-reply run is cleared rather than obeyed when we are standing at the
+# person's next message, so upgrading mid-conversation cannot cost anybody a message.
 TAP_NOTE="$MARK.tap"
 if [ -f "$TAP_NOTE" ]; then
   rm -f "$TAP_NOTE" 2>/dev/null
-  receipt quiet "own-continuation"
-  exit 0
+  if [ "$MOMENT" = "end-of-reply" ]; then
+    receipt quiet "own-continuation"
+    exit 0
+  fi
 fi
 
 LAST=0
@@ -256,34 +326,52 @@ find "$STATE_DIR" -maxdepth 1 -name '*.last' -mtime "+$STATE_TTL_DAYS" -exec rm 
 
 # Leave the note before speaking, for the hosts that will not tell us themselves. Written
 # after the mark and before the tap, so a failure to write it costs one quiet reply rather
-# than a repeat.
-: > "$TAP_NOTE" 2>/dev/null
+# than a repeat. Never written at the person's next message: there is no loop to break
+# there, and a note would cost them their following message for nothing.
+[ "$MOMENT" = "end-of-reply" ] && : > "$TAP_NOTE" 2>/dev/null
 
 receipt fired "threshold-reached"
 
-# The tap. The message is one file shared by every tool; only the envelope around it
-# differs, and each tool's envelope is genuinely its own:
+# The tap. One message for every tool and every moment, held in one file; what differs is
+# the envelope around it and the single sentence that closes it.
 #
-#   Anthropic's               takes the message as plain feedback and keeps the reply
-#                             going. It also accepts "block", but paints that word red as
-#                             "Stop hook error" on the person's own screen - which is how
-#                             a checkpoint doing exactly its job looked broken to every
-#                             person who saw it. (Feedback shipped in their tool in early
-#                             2026; an older copy ignores it and just stops, so the cost
-#                             of someone unupdated is a skipped checkpoint, never a scare.)
-#   OpenAI's                  says "block"    to mean "act on this before you stop"
-#   Google's                  says "continue" for the same thing, and reads any other
-#                             word as permission to stop - so the wrong one is silence
+# WITH THE PERSON'S NEXT MESSAGE the words ride along with what they typed and nothing is
+# drawn on their screen. It closes by handing the turn back, because the person is waiting
+# on an answer and the checkpoint is a chore taken on the way there, never the point of the
+# turn. Anthropic's tool and OpenAI's both read this shape - it is the same one the recall
+# reminder has used at this moment since the beginning, which is what proves it arrives.
+#
+# AT THE END OF A REPLY there is no private channel, so the message is printed on the
+# person's screen whatever we do. Only the two tools that offer no earlier moment are still
+# tapped here, and each needs its own word:
+#
+#   Google's                  says "continue" to mean "act on this before you stop", and
+#                             reads any other word as permission to stop - so the wrong
+#                             one is silence
 #   Cursor                    has no such word at all. It takes a message and submits it
 #                             as the next thing the person said, which is why theirs is a
 #                             different field rather than a different value.
+#   anything else             says "block" for the same thing. Anthropic's tool also
+#                             paints that word red as "Stop hook error" on the person's own
+#                             screen, which is what this whole change is about - it is no
+#                             longer tapped here, and this branch is what any tool we have
+#                             not met yet falls into.
+# THE SILENCE CLAUSE IN THAT FILE IS LOAD-BEARING AND WAS ARRIVED AT BY MEASUREMENT. Told
+# only to "say nothing" when nothing settled, the model reported the absence anyway - "144.
+# Nothing new settled here, so nothing to save." - in every trial. Told instead that the
+# checkpoint is INVISIBLE when it saves nothing, and named the exact sentence not to write,
+# it stayed silent in every trial. Softening those words brings the chatter straight back.
 MESSAGE="$(tr -d '\n' < "$HERE/prompts/capture-tap.txt" 2>/dev/null)"
 [ -z "$MESSAGE" ] && exit 0
 
+if [ "$MOMENT" = "with-next-message" ]; then
+  printf '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"%s Then answer what was asked, and nothing else."}}' "$MESSAGE"
+  exit 0
+fi
+
 case "$TOOL" in
-  cursor) printf '{"followup_message":"%s"}' "$MESSAGE" ;;
-  antigravity) printf '{"decision":"continue","reason":"%s"}' "$MESSAGE" ;;
-  claude-code) printf '{"hookSpecificOutput":{"hookEventName":"Stop","additionalContext":"%s"}}' "$MESSAGE" ;;
-  *) printf '{"decision":"block","reason":"%s"}' "$MESSAGE" ;;
+  cursor) printf '{"followup_message":"%s Then stop."}' "$MESSAGE" ;;
+  antigravity) printf '{"decision":"continue","reason":"%s Then stop."}' "$MESSAGE" ;;
+  *) printf '{"decision":"block","reason":"%s Then stop."}' "$MESSAGE" ;;
 esac
 exit 0

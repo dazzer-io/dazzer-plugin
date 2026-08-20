@@ -18,8 +18,8 @@
     },
     {
       "id": "capture",
-      "what": "Save what settled when a reply ends",
-      "when": "end of a reply, once enough has accumulated"
+      "what": "Save what settled, and say in one line what was saved",
+      "when": "with your next message, once enough has accumulated"
     },
     {
       "id": "resume",

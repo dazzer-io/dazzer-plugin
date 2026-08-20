@@ -7,8 +7,14 @@
 # identical - a setting that gets added without being documented fails the build.
 
 # How much new conversation has to accumulate before a save is prompted, counted in
-# entries. Raise it for fewer interruptions, lower it to capture more eagerly.
-DAZZER_CAPTURE_THRESHOLD=80
+# entries. Raise it for fewer checkpoints, lower it to capture more eagerly.
+#
+# 80 was far too eager. Measured over three hundred real conversations it worked out at a
+# checkpoint every three or four messages a person typed, and about one per message in the
+# busiest sessions - where a single reply that reads files and runs commands adds eighty
+# entries on its own. At 250 the same sessions get one roughly every six messages, and a
+# quiet conversation one every twenty.
+DAZZER_CAPTURE_THRESHOLD=250
 
 # The most of the incoming message we will read at once. A guard against a pathological
 # payload, not a tuning dial - there is no reason to change it.
@@ -25,3 +31,8 @@ DAZZER_CAPTURE_RECEIPTS_MAX_BYTES=262144
 # apart. Left empty on purpose: it works itself out, and is only set by hand somewhere the
 # guess is wrong.
 DAZZER_TOOL=
+
+# Which moment this is running in, set by the trigger that runs it rather than by a person.
+# Left empty on purpose: a tool wired only at the end of a reply says nothing here and gets
+# the behaviour it has always had. There is no reason to set this by hand.
+DAZZER_MOMENT=
