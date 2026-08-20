@@ -81,10 +81,10 @@ Two things that cost real time when this was first tried, so they are written do
 - **If you already have some other Dazzer setup wired into Cursor, take it out first**, or both
   fire on every reply and you get the save prompt twice.
 
-One difference you will see rather than read about: Cursor has no way for a plugin to speak
-privately to the AI at the end of a reply. It only accepts a message and submits it as though you
-had typed it, so on Cursor the save prompt is visible in your conversation. Everything works; it
-just is not silent.
+One difference you will see rather than read about: Cursor offers no moment for a plugin to speak
+privately to the AI, so the save prompt cannot be moved off your screen the way it has been
+everywhere else. It only accepts a message and submits it as though you had typed it, so on Cursor
+the save prompt is visible in your conversation. Everything works; it just is not silent.
 
 ### Devin — Cognition’s coding agent
 
@@ -228,9 +228,8 @@ there is no step to give you rather than a guess dressed up as one.
 
 ### Where reminders cannot run at all
 
-Claude's chat apps and the web app have no moment at the end of a reply for anything to run. There
-the bundled skill carries the same intent as plain text, and reaching your Brain works exactly the
-same.
+Claude's chat apps and the web app have no moment at which anything can run. There the bundled
+skill carries the same intent as plain text, and reaching your Brain works exactly the same.
 
 ### Why the reminders live in three files
 
@@ -378,9 +377,18 @@ apart from a hand-configured connection. A plugin that disconnects someone is th
 **Tells the AI to check before answering.** Every prompt carries a short reminder to look in your
 Brain first rather than answering from assumption.
 
-**Tells it to save what settled.** At the end of a reply, when enough real work has accumulated,
-it prompts a capture sweep. What actually gets saved is the model's judgment against your Brain's
-own rules — this plugin never decides that and never writes anything itself.
+**Tells it to save what settled.** Once enough real work has accumulated, your next message
+quietly carries a prompt to save it, and the AI tells you in one line what it saved. What
+actually gets saved is the model's judgment against your Brain's own rules — this plugin never
+decides that and never writes anything itself.
+
+That prompt used to go out at the end of a reply instead, and that was a mistake worth naming:
+tools print anything said at that moment straight into your conversation, in full, under a word
+of their own choosing — Claude Code painted it red as `Stop hook error`, which is what a
+checkpoint doing exactly its job looked like to everyone who saw one. It also told the AI not to
+finish, so it owed you another reply and usually filled it with a line about the checkpoint.
+Carried with your next message, the same words reach the AI and nothing is drawn on your screen.
+The one thing you will still see is the save itself, which is the part you should see.
 
 **Restores your place after a context reset.** When a long session compacts, nothing reconnects
 and the AI is never re-oriented. This is the one moment your Brain cannot reach on its own, so
@@ -407,11 +415,12 @@ in `plugins/dazzer/config/capture.defaults`, which is read as plain data and nev
 
 | Variable | Default | Effect |
 | --- | --- | --- |
-| `DAZZER_CAPTURE_THRESHOLD` | `80` | How much new conversation accumulates before a save is prompted. Raise it for fewer interruptions, lower it to capture more eagerly. |
+| `DAZZER_CAPTURE_THRESHOLD` | `250` | How much new conversation accumulates before a save is prompted. Raise it for fewer checkpoints, lower it to capture more eagerly. |
 | `DAZZER_CAPTURE_STATE_TTL_DAYS` | `30` | How long a finished session's marker is kept before being tidied away. |
 | `DAZZER_CAPTURE_RECEIPTS_MAX_BYTES` | `262144` | How large the record of what this did may grow before the old one is rolled aside. |
 | `DAZZER_CAPTURE_MAX_INPUT_BYTES` | `100000` | A guard against an unreasonably large message, not a tuning dial. There is no reason to change it. |
 | `DAZZER_TOOL` | works itself out | Which tool this is running inside, recorded in the run history. Only set it somewhere the automatic answer is wrong. |
+| `DAZZER_MOMENT` | set by the trigger | Which moment the save prompt is running in. Set by the plugin's own trigger, not by hand. |
 
 A bad value never takes effect and never causes an error: anything that is not a whole
 number falls back to the shipped default, silently and on purpose.

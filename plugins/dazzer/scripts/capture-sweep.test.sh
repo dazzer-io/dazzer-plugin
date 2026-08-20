@@ -58,7 +58,9 @@ is_valid_tap() {
         try {
           const o = JSON.parse(s);
           const msg =
-            (o.hookSpecificOutput && o.hookSpecificOutput.hookEventName === "Stop"
+            (o.hookSpecificOutput &&
+             (o.hookSpecificOutput.hookEventName === "Stop" ||
+              o.hookSpecificOutput.hookEventName === "UserPromptSubmit")
               ? o.hookSpecificOutput.additionalContext : undefined) ??
             ((o.decision === "block" || o.decision === "continue") ? o.reason : undefined) ??
             o.followup_message;
@@ -149,19 +151,39 @@ case_run() {
   fi
 }
 
-payload() { printf '{"session_id":"%s","transcript_path":"%s","hook_event_name":"Stop","stop_hook_active":false}' "$1" "$2"; }
+# The two moments a host can tap us at, each in the host's own words. The mainstream one is
+# the person's next message: that is where every tool offering it is now tapped, because a
+# host prints whatever a script says at the END of a reply straight onto the person's screen.
+# A real message is carried along too - it arrives in this payload, and it is untrusted.
+payload() { printf '{"session_id":"%s","transcript_path":"%s","hook_event_name":"UserPromptSubmit","prompt":"carry on where we left off"}' "$1" "$2"; }
+stop_payload() { printf '{"session_id":"%s","transcript_path":"%s","hook_event_name":"Stop","stop_hook_active":false}' "$1" "$2"; }
 
-BIG="$(transcript 300)"
-SMALL="$(transcript 20)"
-MID="$(transcript 150)"
+# A tool still tapped at the end of a reply. Named rather than borrowed from a real one, so
+# these cases keep testing the fall-through branch even after every tool we know by name has
+# been moved off it.
+UNMOVED="a-tool-we-have-not-met"
+
+# SIZES ARE TAKEN FROM THE SHIPPED DEFAULT, never written out here. Written out, they silently
+# stop testing what they were chosen to test the moment somebody retunes the default - which
+# is exactly what happened: three cases sized against the old value went quiet, and the suite
+# would have called that a pass had two others not failed loudly beside them.
+DEFAULT_THRESHOLD="$(sed -n 's/^DAZZER_CAPTURE_THRESHOLD=//p' "$HERE/../config/capture.defaults" | head -1)"
+case "$DEFAULT_THRESHOLD" in '' | *[!0-9]*) printf 'cannot read the shipped threshold\n' >&2; exit 1 ;; esac
+
+BIG="$(transcript $((DEFAULT_THRESHOLD * 4)))"
+SMALL="$(transcript $((DEFAULT_THRESHOLD / 4)))"
+MID="$(transcript $((DEFAULT_THRESHOLD * 2)))"
 
 printf 'shell under test: %s\n' "$SHELL_UNDER_TEST"
 printf 'subject: %s\n\n' "$SUBJECT"
 
 # --- the anti-loop guard -----------------------------------------------------
 
+# Only the end-of-reply moment can loop, so every case here is one, run as a tool still
+# tapped there. At the person's next message there is no continuation to mistake for new
+# work, and the cases further down prove the guard is correctly absent.
 case_run "reentry-blocked" silent \
-  "$(printf '{"session_id":"r1","transcript_path":"%s","stop_hook_active":true}' "$BIG")"
+  "$(printf '{"session_id":"r1","transcript_path":"%s","stop_hook_active":true}' "$BIG")" DAZZER_TOOL="$UNMOVED"
 
 # The guard must read the flag's own value, not scan the message for a word. A folder or
 # a prompt that merely contains "true" disabled saving entirely for anyone unlucky enough
@@ -171,17 +193,17 @@ case_run "reentry-blocked" silent \
 # lands on one side of the flag, so a single ordering can pass while the defect is fully
 # present - and nothing promises which order the fields arrive in.
 case_run "reentry-word-before-flag" fire \
-  "$(printf '{"session_id":"r2","transcript_path":"%s","cwd":"/Users/x/truelayer","stop_hook_active":false}' "$BIG")"
+  "$(printf '{"session_id":"r2","transcript_path":"%s","cwd":"/Users/x/truelayer","stop_hook_active":false}' "$BIG")" DAZZER_TOOL="$UNMOVED"
 
 case_run "reentry-word-after-flag" fire \
-  "$(printf '{"session_id":"r3","transcript_path":"%s","stop_hook_active":false,"cwd":"/Users/x/truelayer"}' "$BIG")"
+  "$(printf '{"session_id":"r3","transcript_path":"%s","stop_hook_active":false,"cwd":"/Users/x/truelayer"}' "$BIG")" DAZZER_TOOL="$UNMOVED"
 
 case_run "reentry-word-in-prompt-after-flag" fire \
-  "$(printf '{"session_id":"r4","transcript_path":"%s","stop_hook_active":false,"prompt":"is that true?"}' "$BIG")"
+  "$(printf '{"session_id":"r4","transcript_path":"%s","stop_hook_active":false,"prompt":"is that true?"}' "$BIG")" DAZZER_TOOL="$UNMOVED"
 
 # The flag genuinely set must still stop the loop, whatever follows it.
 case_run "reentry-blocked-with-trailing-fields" silent \
-  "$(printf '{"session_id":"r5","transcript_path":"%s","stop_hook_active":true,"cwd":"/Users/x/plain"}' "$BIG")"
+  "$(printf '{"session_id":"r5","transcript_path":"%s","stop_hook_active":true,"cwd":"/Users/x/plain"}' "$BIG")" DAZZER_TOOL="$UNMOVED"
 
 # --- cadence -----------------------------------------------------------------
 
@@ -195,9 +217,10 @@ case_run "reentry-blocked-with-trailing-fields" silent \
 agy_payload() { printf '{"conversationId":"%s","transcriptPath":"%s","terminationReason":"model_stop"}' "$1" "$2"; }
 
 GROUP="one-google-session"
-case_run "agy:reads-its-own-field-names" fire "$(agy_payload g1 "$BIG")"
-case_run "agy:will-not-answer-its-own-tap" silent "$(agy_payload g1 "$BIG")"
-case_run "agy:speaks-again-once-more-work-arrives" fire "$(agy_payload g1 "$(transcript 600)")"
+case_run "agy:reads-its-own-field-names" fire "$(agy_payload g1 "$BIG")" DAZZER_TOOL=antigravity
+case_run "agy:will-not-answer-its-own-tap" silent "$(agy_payload g1 "$BIG")" DAZZER_TOOL=antigravity
+case_run "agy:speaks-again-once-more-work-arrives" fire \
+  "$(agy_payload g1 "$(transcript $((DEFAULT_THRESHOLD * 8)))")" DAZZER_TOOL=antigravity
 GROUP=""
 
 case_run "quiet-when-little-happened" silent "$(payload c1 "$SMALL")"
@@ -227,10 +250,10 @@ case_run "setting:a-real-value-is-honoured" fire "$(payload t3 "$SMALL")" DAZZER
 # --- escape: a session name must never steer the write out of our folder -----
 
 case_run "escape:parent-directory" fire \
-  "$(printf '{"session_id":"../../escaped","transcript_path":"%s","stop_hook_active":false}' "$BIG")"
+  "$(printf '{"session_id":"../../escaped","transcript_path":"%s","stop_hook_active":false}' "$BIG")" DAZZER_TOOL="$UNMOVED"
 
 case_run "escape:absolute-path" fire \
-  "$(printf '{"session_id":"/dazzer-escape-probe","transcript_path":"%s","stop_hook_active":false}' "$BIG")"
+  "$(printf '{"session_id":"/dazzer-escape-probe","transcript_path":"%s","stop_hook_active":false}' "$BIG")" DAZZER_TOOL="$UNMOVED"
 
 # --- reading the message correctly -------------------------------------------
 # Firing is not the question here - which session it recorded against is. Reading the last
@@ -239,23 +262,47 @@ case_run "escape:absolute-path" fire \
 
 EXPECT_STATE="outer.last"
 case_run "reads-the-outer-session-not-a-nested-one" fire \
-  "$(printf '{"session_id":"outer","transcript_path":"%s","tool_input":{"session_id":"inner"},"stop_hook_active":false}' "$BIG")"
+  "$(printf '{"session_id":"outer","transcript_path":"%s","tool_input":{"session_id":"inner"},"stop_hook_active":false}' "$BIG")" DAZZER_TOOL="$UNMOVED"
 EXPECT_STATE=""
 
-# --- the envelope: each tool must receive its own words ----------------------
-# Anthropic's tool paints "block" red as "Stop hook error" on the person's own screen, so
-# a checkpoint doing exactly its job looked broken to everyone who saw it fire. Its
-# envelope carries plain feedback instead, and must never say "block" again. The other
-# three envelopes are pinned alongside it, so a regression in any of them fails by name.
+# --- the envelope: the moment decides, then the tool -------------------------
+# A host prints whatever a script says at the END of a reply straight onto the person's
+# screen, in full, under a word of its own choosing - measured at 1,644 times over three
+# hundred real conversations, and it forces an extra reply on top. So every tool that offers
+# an earlier, private moment is tapped there instead, and these cases pin BOTH halves: what
+# each moment sends, and that a tool moved to the quiet moment is never tapped at the loud
+# one as well. Without that second half both triggers can be live at once and the person
+# gets the checkpoint twice - once of them on screen, which is the whole fault being removed.
 
-EXPECT_ENVELOPE='"additionalContext"' FORBID_ENVELOPE='"decision"'
-case_run "envelope:claude-code-feedback-never-block" fire "$(payload e1 "$BIG")" DAZZER_TOOL=claude-code
-EXPECT_ENVELOPE='"decision":"block"' FORBID_ENVELOPE=""
-case_run "envelope:codex-still-blocks" fire "$(payload e2 "$BIG")" DAZZER_TOOL=codex
-EXPECT_ENVELOPE='"decision":"continue"'
-case_run "envelope:antigravity-still-continues" fire "$(agy_payload e3 "$BIG")" DAZZER_TOOL=antigravity
+EXPECT_ENVELOPE='"hookEventName":"UserPromptSubmit"' FORBID_ENVELOPE='"decision"'
+case_run "envelope:with-next-message-is-never-a-decision" fire "$(payload e1 "$BIG")" DAZZER_TOOL=claude-code
+case_run "envelope:with-next-message-reaches-codex-too" fire "$(payload e2 "$BIG")" DAZZER_TOOL=codex
+
+# The closing sentence is the moment's, not the tool's: one hands the turn back to a person
+# who is waiting on an answer, the other ends it. Swapped, the quiet moment tells the model
+# to stop mid-conversation and the person's actual question goes unanswered.
+EXPECT_ENVELOPE='Then answer what was asked' FORBID_ENVELOPE='Then stop.'
+case_run "envelope:with-next-message-hands-the-turn-back" fire "$(payload e3 "$BIG")" DAZZER_TOOL=claude-code
+
+# The clause that keeps a checkpoint which saved nothing from announcing itself. Measured:
+# without these words the model reported the absence in every trial, with them in none. It
+# is pinned here because it reads like ordinary wording and is not.
+EXPECT_ENVELOPE='THIS CHECKPOINT IS INVISIBLE' FORBID_ENVELOPE=""
+case_run "the-checkpoint-that-saved-nothing-stays-quiet" fire "$(payload e3b "$BIG")" DAZZER_TOOL=claude-code
+
+EXPECT_ENVELOPE="" FORBID_ENVELOPE=""
+case_run "envelope:claude-code-is-not-tapped-at-the-end-of-a-reply" silent "$(stop_payload e4 "$BIG")" DAZZER_TOOL=claude-code
+case_run "envelope:codex-is-not-tapped-at-the-end-of-a-reply" silent "$(stop_payload e5 "$BIG")" DAZZER_TOOL=codex
+
+# The two hosts that offer no earlier moment keep exactly the words they have always had.
+EXPECT_ENVELOPE='"decision":"continue"' FORBID_ENVELOPE=""
+case_run "envelope:antigravity-still-continues" fire "$(agy_payload e6 "$BIG")" DAZZER_TOOL=antigravity
 EXPECT_ENVELOPE='"followup_message"'
-case_run "envelope:cursor-still-follows-up" fire "$(payload e4 "$BIG")" DAZZER_TOOL=cursor
+case_run "envelope:cursor-still-follows-up" fire "$(stop_payload e7 "$BIG")" DAZZER_TOOL=cursor
+EXPECT_ENVELOPE='"decision":"block"'
+case_run "envelope:an-unmet-tool-still-blocks" fire "$(stop_payload e8 "$BIG")" DAZZER_TOOL="$UNMOVED"
+EXPECT_ENVELOPE='Then stop.'
+case_run "envelope:the-end-of-a-reply-still-ends-it" fire "$(stop_payload e9 "$BIG")" DAZZER_TOOL="$UNMOVED"
 EXPECT_ENVELOPE="" FORBID_ENVELOPE=""
 
 # --- fail-open: none of these may print, fail, or trap anything --------------
@@ -266,7 +313,7 @@ case_run "no-session-name" silent "$(printf '{"transcript_path":"%s"}' "$BIG")"
 case_run "transcript-missing" silent '{"session_id":"f1","transcript_path":"/no/such/file.jsonl"}'
 case_run "transcript-path-empty" silent '{"session_id":"f2","transcript_path":""}'
 case_run "pretty-printed-message" fire \
-  "$(printf '{\n  "session_id": "f3",\n  "transcript_path": "%s",\n  "stop_hook_active": false\n}' "$BIG")"
+  "$(printf '{\n  "session_id": "f3",\n  "transcript_path": "%s",\n  "stop_hook_active": false\n}' "$BIG")" DAZZER_TOOL="$UNMOVED"
 
 # --- a state folder it cannot write to must stay silent, not shout -----------
 # The redirection is the shell's, so a suppressed command still lets the error through;

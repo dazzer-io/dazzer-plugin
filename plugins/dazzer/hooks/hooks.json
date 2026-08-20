@@ -6,6 +6,10 @@
           {
             "type": "command",
             "command": "printf %s '{\"hookSpecificOutput\":{\"hookEventName\":\"UserPromptSubmit\",\"additionalContext\":\"[Dazzer] Before answering anything your Brain may already know, recall it - answer from what is recorded, not from assumption. If you cannot reach the Brain, say so plainly - never present files, transcripts or guesses as what it holds. As real decisions accumulate in this session, checkpoint your progress so a context reset cannot lose your place.\"}}'"
+          },
+          {
+            "type": "command",
+            "command": "DAZZER_MOMENT=with-next-message sh \"${CLAUDE_PLUGIN_ROOT:-$HOME/.gemini/config/plugins/dazzer}/scripts/capture-sweep.sh\""
           }
         ]
       }
@@ -17,16 +21,6 @@
           {
             "type": "command",
             "command": "printf %s '{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":\"[Dazzer] This session restarted from a context reset, so nothing reconnected and you were never re-oriented. Call resume to restore your saved working session before continuing, and before asking the user to repeat anything.\"}}'"
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "sh \"${CLAUDE_PLUGIN_ROOT:-$HOME/.gemini/config/plugins/dazzer}/scripts/capture-sweep.sh\""
           }
         ]
       }
