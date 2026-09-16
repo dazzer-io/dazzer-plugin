@@ -14,7 +14,7 @@
     {
       "id": "recall",
       "what": "Check what you already know before answering",
-      "when": "every message"
+      "when": "before you answer - how often it arrives depends on your tool"
     },
     {
       "id": "capture",
@@ -30,7 +30,7 @@
   "spokenSentences": [
     {
       "id": "recall",
-      "seenOn": "every message",
+      "seenOn": "before you answer - how often it arrives depends on your tool",
       "provesInstalled": true,
       "text": "[Dazzer] Before answering anything your Brain may already know, recall it - answer from what is recorded, not from assumption. If you cannot reach the Brain, say so plainly - never present files, transcripts or guesses as what it holds. As real decisions accumulate in this session, checkpoint your progress so a context reset cannot lose your place."
     },
@@ -86,7 +86,8 @@
           "installableHere": false,
           "note": "Install it from a terminal with the same two lines. The app and the terminal share one set of settings, so it appears in the app on your next conversation. The install command does not exist inside the app, so this genuinely needs a terminal once — even if you never otherwise open one."
         }
-      ]
+      ],
+      "recallArrives": "every message"
     },
     {
       "id": "codex",
@@ -113,7 +114,8 @@
           }
         ],
         "note": "Codex asks you to approve a plugin's reminders before it will run them. If nothing appears in the run history, that approval is the first thing to check."
-      }
+      },
+      "recallArrives": "every message"
     },
     {
       "id": "copilot",
@@ -150,7 +152,8 @@
         "Two of the three reminders do not arrive. Saving what settled at the end of a reply, and being put back on track after a long conversation forgets itself, both need to speak at a particular moment, and this tool lets a reminder do only one of those. Checking your Brain before answering is the one that survives, and it is the one that matters most.",
         "The standing instruction is a copy, not a link - this tool ignores a link. So re-run the third install step after updating the plugin, or the copy keeps whatever wording it first got.",
         "The standing instruction has to TELL the model what to do, not remind it. The first version opened by explaining to a human why reminders cannot work here, and the model read that explanation as part of its instruction: asked six times whether it would check the Brain unprompted, it did so none of those times. Rewritten as a plain instruction naming what to call and when, it did so all six. Anything added to that file is read by the model, so commentary belongs in the README, never there."
-      ]
+      ],
+      "recallArrives": "once a conversation"
     },
     {
       "id": "antigravity",
@@ -188,7 +191,8 @@
       ],
       "gotchas": [
         "This tool never says whether a reply is the one our own save prompt asked for, which every other tool does say. Leaning on the amount of new work instead was tried and measured wrong - the prompt fired five times in one reply and the answer repeated five times - so the prompt now leaves itself a note that the very next reply reads once and clears. The cost is that a genuine second reply straight after a save is skipped, which is the safe direction."
-      ]
+      ],
+      "recallArrives": "every message"
     },
     {
       "id": "cursor",
@@ -222,7 +226,8 @@
       "gotchas": [
         "If you have installed it before, remove and re-add rather than update. Cursor's update command reports success without actually re-fetching, so you keep whatever version you first got. Run `cursor-agent plugin marketplace remove dazzer` then add it again.",
         "If you already have some other Dazzer setup wired into Cursor, take it out first, or both fire on every reply and you get the save prompt twice."
-      ]
+      ],
+      "recallArrives": "once a session"
     },
     {
       "id": "devin",
@@ -246,7 +251,8 @@
       },
       "limits": [
         "Two of the three reminders work. The save prompt does not, and cannot: Devin tells a reminder only which session and which prompt it is, with no way to tell how much conversation has built up since last time. The prompt has nothing to measure, so it stays quiet rather than firing blindly."
-      ]
+      ],
+      "recallArrives": "every message"
     },
     {
       "id": "claude-chat",

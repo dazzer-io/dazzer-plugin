@@ -48,6 +48,7 @@ const GATES = [
   { id: "tool-description", name: "every tool says what it actually is", cmd: CHECK("check-tool-description") },
   { id: "connection-coverage", name: "every tool has a way to reach the Brain", cmd: CHECK("check-connection-coverage") },
   { id: "reminder-parity", name: "every tool gets a reminder it can actually read", cmd: CHECK("check-reminder-parity") },
+  { id: "reminder-cadence", name: "what a person is told they will see is what fires", cmd: CHECK("check-reminder-cadence") },
 
   // CI guarding itself.
   { id: "workflow-sha-pin", name: "every action is pinned to a commit", cmd: CHECK("check-workflow-sha-pin") },
