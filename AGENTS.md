@@ -31,6 +31,8 @@ Brain, not here.**
 | `README.md` | How to install it, written for a person. **The authority for the install steps.** |
 | `tools.manifest.json` | The same install steps in a shape a screen can render. **Mirrors the README; never leads it.** |
 | `scripts/baseline.mjs` | Runs every check. One command: `node scripts/baseline.mjs`. |
+
+**Everything shipped here is a TRIGGER, never a rule.** A file in `plugins/` may say WHEN to reach for the memory and WHERE the rules are served, and nothing about what they say. A rule written here survives a deploy — correcting it means editing the file, publishing a version, and waiting for every person to update — which is the second copy this repository's own Boundaries already warn about. Gate `rules-not-restated` refuses the shape of teaching: a list defining a verb, a numbered habit list, a boundaries section, or a prompt long enough to be a rule rather than a moment. It sees structure, not prose, so a rule written as one flowing paragraph with no heading walks past it — the shipped files are small enough to read whole in review, and the gate is what stops the shape growing back while nobody is looking.
 | `scripts/checks/` | The checks themselves. Plain Node, no dependencies. |
 | `scripts/known-defects.txt` | Things broken right now, each with a test proving it. Shrink-only. |
 
