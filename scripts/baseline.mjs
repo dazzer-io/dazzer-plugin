@@ -42,6 +42,7 @@ const GATES = [
   { id: "parity-armed", name: "the parity gates can actually see failures", cmd: CHECK("check-parity-armed") },
 
   // Documentation that would otherwise drift away from the code.
+  { id: "rules-not-restated", name: "everything shipped is a trigger, never a rule", cmd: CHECK("check-rules-not-restated") },
   { id: "docs-truth", name: "knobs and instructions match the code", cmd: CHECK("check-docs-truth") },
   { id: "install-parity", name: "printed and rendered install steps agree", cmd: CHECK("check-install-parity") },
   { id: "tool-description", name: "every tool says what it actually is", cmd: CHECK("check-tool-description") },
