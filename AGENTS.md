@@ -15,11 +15,19 @@ What people install so their AI actually uses their Dazzer memory. It adds three
 check the memory before answering, save what settled once enough has accumulated, and get
 re-oriented after a context reset.
 
-**It never talks to Dazzer.** It has no credentials and no reliable moment at which a
-connection is up. All it does is tap the model at the right instant; the model then acts
-through the connection it already owns and reads the current rules from the Brain at the
+**The behaviour plugin never talks to Dazzer.** It has no credentials and no reliable moment
+at which a connection is up. All it does is tap the model at the right instant; the model then
+acts through the connection it already owns and reads the current rules from the Brain at the
 moment it acts. That is why the shipped script is near-static: **change the rules in the
 Brain, not here.**
+
+**The plate pane is the one piece that reads from Dazzer**, and it is its own plugin
+(`plugins/dazzer-plate`, Claude Code only, optional). Only once the person asks (`/plate`, or the
+pane's Refresh), it calls the board's `recall` for the plate view through the connection the
+person's Claude Code already has (`$.mcp.call`, the engine's own connection and credentials). It
+holds no credentials and no connection of its own, finds the board among the tools already
+connected rather than by a name written into it, and never writes: a row's done is a sentence to
+the person's AI, which does the writing.
 
 ## Layout
 
@@ -27,6 +35,8 @@ Brain, not here.**
 | --- | --- |
 | `plugins/dazzer/` | The behaviour: triggers, the checkpoint script, the skill. **Carries no connection.** |
 | `plugins/dazzer-connect/` | The connection, and nothing else, for people who have not already got one. |
+| `plugins/dazzer-plate/` | The plate pane: a Claude Code mod (`hooks/plate.tsx`) that draws the person's plate when they ask. Reads through the connection the person already has; **carries none.** Its `hooks/hooks.json` holds only `modules`, which is why it is a plugin of its own: Codex refuses the shared file over that key. |
+| `scripts/kept-states.mjs` | Writes the pages a plugin test prints, since `claude plugin test` gives a test no file system; the words check reads them. |
 | `.claude-plugin/marketplace.json` | The list people install from. |
 | `README.md` | How to install it, written for a person. **The authority for the install steps.** |
 | `tools.manifest.json` | The same install steps in a shape a screen can render. **Mirrors the README; never leads it.** |

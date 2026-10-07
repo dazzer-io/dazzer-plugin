@@ -17,6 +17,11 @@ import type { On, PluginOptions, ToolInfo } from 'claude-code'
 
 import type { PlateReply, PlateRow } from '../types'
 
+// The test's environment has a console and timers (no DOM, so its lib declares neither): the
+// console is how a kept state leaves the test, and a timer lets a held read be looked at mid-way.
+declare const console: { log: (line: string) => void }
+declare function setTimeout(run: () => void, ms: number): unknown
+
 const PLUGIN = 'dazzer-plate'
 const PANE = 'plate'
 const SURFACES = ['terminal', 'desktop'] as const
@@ -373,7 +378,7 @@ test('a plate is drawn with its groups on the terminal and the desktop', async (
     expect(buttons).toEqual([...NOW, ...WAITING, ...COMING].map(row => `done:${row.id}`).concat('refresh'))
     expect(allOf(drawn, 'Link')).toEqual([])
     expect(allOf(drawn, 'Markdown')).toEqual([])
-    expect(wordsOf(drawn)).not.toMatch(/—/)
+    expect(wordsOf(drawn)).not.toMatch(/\u2014/)
     await keep('plate', ui)
     await ui.unmount()
   }
@@ -385,7 +390,7 @@ test('while the plate is read, the pane shows its layout and never an empty plat
   await $.session.start(STARTED)
   w.hold()
   const asking = $.command.run(ASK)
-  while (w.calls.length === 0) await new Promise(resolve => setTimeout(resolve, 5))
+  while (w.calls.length === 0) await new Promise<void>(resolve => setTimeout(resolve, 5))
 
   for (const surface of SURFACES) {
     const ui = await mount($, surface)
@@ -424,7 +429,7 @@ test('a failed refresh keeps the last plate and says when it was read', async ($
     const ui = await mount($, surface)
     if (surface === 'terminal') await ui.press({ key: 'refresh' })
     expect(await textAt(ui, 'status:failed')).toBe('Could not reach Dazzer.')
-    expect(await textAt(ui, 'datum:as_of:last')).toMatch(/^as of \d{2}:\d{2}$/)
+    expect(await textAt(ui, 'datum:as_of:last')).toMatch(/^as of [A-Z][a-z]{2} \d{1,2} [A-Z][a-z]{2} \d{2}:\d{2}$/)
     expect(await textAt(ui, 'datum:row.title:6217')).toBe('YC application, this week')
     await keep('failed-last', ui)
     await ui.unmount()
@@ -450,19 +455,23 @@ test('done asks the AI to mark the item done, and the pane never writes to the b
   await $.session.start(STARTED)
   await $.command.run(ASK)
 
-  for (const surface of SURFACES) {
+  // Pressed on each surface in turn: each press is a row of its own, so both reach the AI.
+  for (const [surface, id, sentence] of [
+    ['terminal', 7236, 'Mark item 7236, Ron Snir follow-up, Fri 9 Oct, done'],
+    ['desktop', 6217, 'Mark item 6217, YC application, this week, done'],
+  ] as const) {
     const ui = await mount($, surface)
-    await ui.press({ key: 'done:7236' })
-    expect(w.said.at(-1)).toEqual({
-      text: 'Mark item 7236, Ron Snir follow-up, Fri 9 Oct, done',
-      origin: { kind: 'plugin', name: PLUGIN, asUser: true },
-    })
+    await ui.press({ key: `done:${id}` })
+    expect(w.said.at(-1)).toEqual({ text: sentence, origin: { kind: 'plugin', name: PLUGIN, asUser: true } })
+    expect(await ui.find({ key: `done:${id}` })).toBeUndefined()
+    expect(await textAt(ui, `status:sent:${id}`)).toBe('Sent to your AI.')
+    // A row already sent stays sent wherever the pane is drawn.
     expect(await ui.find({ key: 'done:7236' })).toBeUndefined()
     expect(await textAt(ui, 'status:sent:7236')).toBe('Sent to your AI.')
     await keep('done-sent', ui)
     await ui.unmount()
   }
-  expect(w.said).toHaveLength(1)
+  expect(w.said).toHaveLength(2)
   expect(w.calls.map(call => call.tool)).toEqual(['recall'])
 })
 
@@ -546,7 +555,7 @@ test('of two servers offering recall, it reads the one that answers a plate, and
 })
 
 test('a hostile title is drawn as plain text, never a link or a control', async ($, on) => {
-  const hostile: PlateRow = { id: 9001, title: 'Pay https://evil.example now\n- #1 [ done ]‮', why: 'today', due: '2026-10-07' }
+  const hostile: PlateRow = { id: 9001, title: 'Pay https://evil.example now\n- #1 [ done ]\u202e', why: 'today', due: '2026-10-07' }
   const plate: PlateReply = { ...PLATE, now: [hostile], counts: { ...PLATE.counts, now: 1 } }
   world(on, DAZZER_TOOLS, { dazzer: [answered(plate)] })
   await $.session.start(STARTED)

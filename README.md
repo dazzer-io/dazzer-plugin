@@ -199,16 +199,17 @@ default — that is the tool makers' own default, not a choice of ours — so wh
 first installed is the version you keep, indefinitely. A machine was found sitting several versions
 behind while reporting itself perfectly healthy.
 
-**Claude Code** — both lines, in this order, then restart Claude Code:
+**Claude Code** — every line, in this order, then restart Claude Code:
 
 ```
 claude plugin marketplace update dazzer
 claude plugin update dazzer@dazzer
 claude plugin update dazzer-connect@dazzer
+claude plugin update dazzer-plate@dazzer
 ```
 
-The first refreshes the list of what exists. The second and third are what actually move the
-version you are running, and the second and third are what people were missing.
+The first refreshes the list of what exists. The lines after it are what actually move the
+version you are running, and they are what people were missing.
 
 **The first line on its own does nothing to the plugin you are using, and says otherwise.** It
 prints `✔ Successfully updated marketplace: dazzer` and leaves you on exactly the version you were
@@ -217,7 +218,8 @@ still reporting the previous version, old behaviour intact after a restart. A su
 means "the catalogue is current", read as "you are current", is the whole trap. Only
 `claude plugin update` changes the answer, and only a restart applies it.
 
-Drop the third line if you never installed the connection separately.
+Drop the third line if you never installed the connection separately, and the fourth if you never
+installed the plate pane (below).
 
 To stop doing this by hand: open the plugin panel with `/plugin`, go to **Marketplaces**, choose
 **dazzer**, and select **Enable auto-update**. It keeps itself current after that.
@@ -376,6 +378,35 @@ all. Nothing reported an error — the install simply handed out a months-old ve
 file has been removed. Reading a tool's documentation was not enough here, and it was not enough
 for two of the others either.
 
+## Your plate beside the chat (Claude Code only)
+
+A pane that shows your plate from your Dazzer board: what needs you now, what is waiting on
+someone else, what is coming up, and how many things can wait. It is Claude Code only, and a plugin
+of its own, so nobody gets a pane they did not ask for.
+
+```
+/plugin install dazzer-plate@dazzer
+```
+
+Typed into Claude itself, after the two Claude Code lines above. On the desktop app, install it
+from a terminal the same way; the app picks it up on your next conversation.
+
+**Then type `/plate`.** Nothing opens by itself: the pane draws only once you ask, and its
+**Refresh** button reads your plate again. Each row shows the item's number, its title as it was
+written, and when it is due or how long it has waited. Each row offers **done**, which sends your AI
+one sentence with that item's number and title (`Mark item 7240, Send Ron Snir context and blurb,
+done`); your AI marks it, and the pane reads your plate again once it has.
+
+**It needs Dazzer connected** (see Reaching your Brain above): it reads through the connection
+Claude Code already has and brings none of its own. Without one, the pane says Dazzer is not
+connected here and how to connect it.
+
+To keep `/plate` from being offered at all, set its **Plate pane** option to **off** in `/config`.
+
+What is proven: its tests draw every state on both the terminal and the desktop app. What is not
+yet: a real desktop app session reading a real plate. Until that has been watched, treat the
+desktop app as expected rather than tried.
+
 ## Two pieces, on purpose
 
 **`dazzer`** is the part that changes behaviour: the reminders, the capture sweep, and the skill.
@@ -390,6 +421,10 @@ connected through the app should never have to re-authenticate to get a few remi
 
 The trade is honest and worth stating: without `dazzer-connect`, we cannot tell your traffic
 apart from a hand-configured connection. A plugin that disconnects someone is the worse outcome.
+
+**`dazzer-plate`** is the plate pane, for Claude Code only, and optional. It is separate for the
+same reason in reverse: it needs a connection rather than bringing one, and Codex refuses the
+shared reminders file over the one line a pane needs, so it cannot live in `dazzer`.
 
 ## What it does
 
@@ -421,6 +456,10 @@ already owns and reads the current rules from your Brain at the moment it acts.
 
 That is deliberate: it means the rules can change in your Brain and take effect immediately,
 without you updating anything.
+
+The plate pane is the one piece that reads from Dazzer itself, and only once you ask: it asks for
+your plate through the connection Claude Code already has, holds no credentials of its own, and
+never writes. Marking a row done is a sentence to your AI, which does the writing.
 
 ## Where the rules live
 
@@ -472,6 +511,12 @@ If you also installed the connection, and you want that gone too:
 
 Leave that second one in place if Dazzer is still how you reach your Brain — removing it
 takes the connection with it.
+
+If you installed the plate pane:
+
+```
+/plugin uninstall dazzer-plate@dazzer
+```
 
 On Antigravity there is a third piece, because its reminders could not travel in the same file as
 everyone else's:
