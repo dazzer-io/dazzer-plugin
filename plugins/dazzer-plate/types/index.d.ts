@@ -39,6 +39,9 @@ export type PlateReply = {
   plain?: string
 }
 
+/** Where one row's done stands: on its way to the AI, taken by the session, or not taken. */
+export type PlateAsk = 'sending' | 'sent' | 'unsent'
+
 /** What the pane shows. Unasked until the person asks, and nothing is drawn while it is. */
 export type PlateView =
   | { kind: 'unasked' }
@@ -51,10 +54,14 @@ export type PlateView =
 declare module 'claude-code' {
   interface PluginState {
     'dazzer-plate': {
+      /**
+       * What the pane shows. The last plate this session read lives here and nowhere else: held by
+       * the host for this session, never written to disk, never shared with another session.
+       */
       view: PlateView
-      /** The rows whose done went to the AI since the plate was last read. */
-      sent: number[]
-      /** The connected server the plate was last read from. */
+      /** Each row's done, by item number, kept until that item leaves the plate. */
+      asked: Record<string, PlateAsk>
+      /** The connected server the plate was last read from, in this session. */
       board: string | null
     }
   }

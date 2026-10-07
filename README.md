@@ -396,11 +396,20 @@ from a terminal the same way; the app picks it up on your next conversation.
 written, and when it is due or how long it has waited. Each row offers **done**, which sends your AI
 one sentence with that item's number and nothing else (`Mark item 7240 done.`); your AI marks it,
 and the pane reads your plate again once it has. The title never goes with it: anyone in your
-workspace can write a title, and that sentence goes as your own words.
+workspace can write a title, and that sentence goes as your own words. The row says it was sent
+only once your session took the sentence; if it was not taken, the row says so and offers done
+again.
 
 **It needs Dazzer connected** (see Reaching your Brain above): it reads through the connection
-Claude Code already has and brings none of its own. Without one, the pane says Dazzer is not
-connected here and how to connect it.
+Claude Code already has and brings none of its own. It looks only among the tools your session has
+right now, and only at a server offering both of Dazzer's recall and track, so your words, your
+time zone and the pane's name never go to any other server. When it finds none, the pane says
+Dazzer was not found here and how to connect it. A read that has not answered in 20 seconds says
+it could not reach Dazzer, rather than waiting forever.
+
+**What it keeps:** the last plate it read, in this session's memory only, so a read that fails can
+still show it with the time it was read. Nothing is saved to disk, and nothing is shared with another
+session or another account.
 
 To keep `/plate` from being offered at all, set its **Plate pane** option to **off** in `/config`.
 
