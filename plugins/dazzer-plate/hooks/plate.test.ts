@@ -12,7 +12,7 @@
 // "datum:<field>:..." holds a datum from that reply field (data-source).
 
 import { expect, mock, test } from 'claude-code/testing'
-import type { Engine } from 'claude-code/testing'
+import type { Engine, MockClock } from 'claude-code/testing'
 import type { On, PluginOptions, ToolInfo } from 'claude-code'
 
 import type { PlateReply, PlateRow } from '../types'
@@ -131,6 +131,13 @@ const PLATE_AFTER: PlateReply = {
   ),
 }
 
+/** The plate as the AI's own read returned it a little later: one more thing can wait. */
+const PLATE_RELAYED: PlateReply = {
+  ...PLATE_AFTER,
+  counts: { ...PLATE_AFTER.counts, later: 34 },
+  plain: (PLATE_AFTER.plain ?? '').replace('35 more things', '34 more things'),
+}
+
 const EMPTY: PlateReply = {
   view: 'plate',
   as_of: '2026-10-07T06:12:03Z',
@@ -151,15 +158,32 @@ type McpAnswer = { content: { type: string; text?: string }[]; isError: boolean 
 /** What one server's recall answers: a result, or a refusal of the call itself. */
 type ServerAnswer = McpAnswer | { refuse: string }
 
+/** What the board appends after a reply's own block: where the call landed, and a next move. */
+const LANDED = { landed_in: { workspace_id: 738, name: 'Dazzer Org Brain' }, decided_by: 'your home' }
+const NEXT_MOVE = { next_move: 'answer the person from this reply' }
+
+/**
+ * A reply in the shape the board really sends: its own block, then the block saying where it
+ * landed and the block carrying the next move, each its own JSON. A refusal is its block alone.
+ */
 const answered = (body: unknown, isError = false): McpAnswer => ({
-  content: [{ type: 'text', text: JSON.stringify(body, null, 2) }],
+  content: [body, ...(isError ? [] : [LANDED, NEXT_MOVE])].map((part, at) => ({
+    type: 'text',
+    text: at === 0 ? JSON.stringify(part, null, 2) : JSON.stringify(part),
+  })),
   isError,
 })
+
+/** The same reply as the model reads it at `tool.call`: its text blocks joined. */
+const asRead = (reply: McpAnswer) => reply.content.map(block => block.text ?? '').join('\n')
 
 const tool = (name: string, mcp = true): ToolInfo => ({ name, description: name, mcp })
 const DAZZER_TOOLS = [tool('Read', false), tool('mcp__dazzer__recall'), tool('mcp__dazzer__track')]
 
 type Call = { server: string; tool: string; args: Record<string, unknown> }
+
+/** What becomes of a prompt the pane submits: it enters, a hook drops it, or the call fails. */
+type Submit = 'enter' | 'drop' | 'fail'
 
 type World = {
   opened: unknown[]
@@ -167,16 +191,24 @@ type World = {
   said: { text: string; origin: unknown }[]
   statuses: unknown[]
   registered: string[]
+  clock: MockClock
+  /** What the next prompt the pane submits meets. */
+  submit: Submit
   /** Holds the next recall until `release` is called. */
   hold: () => void
   release: () => void
+}
+
+type Setting = {
+  /** What this machine's store already holds, as another session left it. */
+  store?: Record<string, unknown>
 }
 
 /**
  * Registers the world beneath the plugin. `servers` answers each server's calls in turn: the
  * first call gets the first answer, and the last answer repeats.
  */
-function world(on: On, tools: ToolInfo[], servers: Record<string, ServerAnswer[]>): World {
+function world(on: On, tools: ToolInfo[], servers: Record<string, ServerAnswer[]>, setting: Setting = {}): World {
   let gate: Promise<void> | undefined
   let open: () => void = () => {}
   const turns: Record<string, number> = {}
@@ -186,6 +218,8 @@ function world(on: On, tools: ToolInfo[], servers: Record<string, ServerAnswer[]
     said: [],
     statuses: [],
     registered: [],
+    clock: mock.clock(on, { now: Date.parse('2026-10-07T06:15:00Z') }),
+    submit: 'enter',
     hold: () => {
       gate = new Promise<void>(resolve => {
         open = resolve
@@ -196,7 +230,7 @@ function world(on: On, tools: ToolInfo[], servers: Record<string, ServerAnswer[]
       open()
     },
   }
-  mock.store(on)
+  mock.store(on, setting.store ?? {})
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   on('command.register', ($, e) => {
     w.registered.push(e.name)
@@ -225,14 +259,22 @@ function world(on: On, tools: ToolInfo[], servers: Record<string, ServerAnswer[]
   })
   on('prompt.submit', ($, e) => {
     w.said.push({ text: e.text, origin: e.origin })
-    return { text: e.text }
+    if (w.submit === 'fail') throw new Error('the session could not take the prompt')
+    return w.submit === 'drop' ? { drop: 'a hook dropped it' } : { text: e.text }
   })
-  // The session's own calls, as the AI makes them: its plate, and marking an item done.
+  // The session's own calls, as the AI makes them: its plate, and marking an item done, each
+  // answered in the board's real shape and read the way the model reads it.
   on('tool.call', ($, e) => {
-    if (e.tool === 'mcp__dazzer__recall') return { result: answered(PLATE_AFTER), text: JSON.stringify(PLATE_AFTER) }
-    return { result: answered({ done: true }), text: 'Marked item 7236 done.' }
+    const reply = e.tool === 'mcp__dazzer__recall' ? answered(PLATE_RELAYED) : answered({ id: 7236, state: 'done' })
+    return { result: reply, text: asRead(reply) }
   })
   return w
+}
+
+/** Lets what the pane scheduled run: a timer due now, and the reads it started. */
+async function settle(w: World): Promise<void> {
+  await w.clock.advance(1)
+  for (let turn = 0; turn < 20; turn++) await new Promise<void>(resolve => setTimeout(resolve, 2))
 }
 
 /** The surface drawing the pane, as it does once the pane is open. */
@@ -300,6 +342,7 @@ test('nothing draws before the person asks', async ($, on) => {
   // The AI reads the plate and marks an item done in the same session: still nobody asked.
   await $.tool.call({ tool: 'mcp__dazzer__recall', tool_use_id: 't1', query: 'what is on my plate', view: 'plate' })
   await $.tool.call({ tool: 'mcp__dazzer__track', tool_use_id: 't2', id: 7236 })
+  await settle(w)
 
   expect(w.opened, NOT_ASKED).toEqual([])
   expect(w.statuses, NOT_ASKED).toEqual([])
@@ -328,15 +371,17 @@ test('/plate finds the board among the connected tools and reads the plate once'
   expect(ZONE.length).toBeGreaterThan(0)
 })
 
-test('with no board connected it says so in one line, and how to connect it', async ($, on) => {
-  const w = world(on, [tool('Read', false), tool('mcp__figma__get_screenshot')], {})
+test('with no board found it says so in one line, and how to connect it', async ($, on) => {
+  // A server offering recall but not track is no board, and is never asked anything.
+  const tools = [tool('Read', false), tool('mcp__figma__get_screenshot'), tool('mcp__notes__recall')]
+  const w = world(on, tools, { notes: [answered(PLATE)] })
   await $.session.start(STARTED)
   await $.command.run(ASK)
 
-  expect(w.calls).toEqual([])
+  expect(w.calls, 'a server without track was asked').toEqual([])
   for (const surface of SURFACES) {
     const ui = await mount($, surface)
-    expect(await textAt(ui, 'status:absent')).toBe('Dazzer is not connected here.')
+    expect(await textAt(ui, 'status:absent')).toBe('Dazzer was not found here.')
     expect(wordsOf(await ui.drawn())).toContain('/plugin install dazzer-connect@dazzer')
     expect(wordsOf(await ui.drawn())).not.toContain('Needs you now')
     expect(allOf(await ui.drawn(), 'Button').map(b => b.props?.key)).toEqual(['refresh'])
@@ -437,6 +482,40 @@ test('a failed refresh keeps the last plate and says when it was read', async ($
   expect(w.calls).toHaveLength(2)
 })
 
+test('a read that never answers ends in one failed line after 20 seconds', async ($, on) => {
+  const w = world(on, DAZZER_TOOLS, { dazzer: [answered(PLATE)] })
+  await $.session.start(STARTED)
+  w.hold()
+  let isAnswered = false
+  const asking = $.command.run(ASK).then(answer => {
+    isAnswered = true
+    return answer
+  })
+  while (w.calls.length === 0) await new Promise<void>(resolve => setTimeout(resolve, 5))
+
+  await w.clock.advance(19_999)
+  const ui = await mount($, 'terminal')
+  expect(await textAt(ui, 'status:loading')).toBe('Reading your plate.')
+  await w.clock.advance(1)
+  for (let turn = 0; turn < 50 && !isAnswered; turn++) await new Promise<void>(resolve => setTimeout(resolve, 5))
+  expect(isAnswered, 'the read held /plate past its 20 seconds').toBe(true)
+  expect(await textAt(ui, 'status:failed')).toBe('Could not reach Dazzer.')
+  expect(await ui.find({ key: 'status:loading' })).toBeUndefined()
+  await asking
+})
+
+test("a failed read never shows a plate this session did not read, such as another account's", async ($, on) => {
+  const theirs: PlateReply = { ...PLATE, now: [{ id: 4242, title: 'Someone else entirely', why: 'today' }] }
+  world(on, DAZZER_TOOLS, { dazzer: [{ refuse: 'connection refused' }] }, { store: { 'last-plate': theirs } })
+  await $.session.start(STARTED)
+  await $.command.run(ASK)
+
+  const ui = await mount($, 'desktop')
+  expect(await textAt(ui, 'status:failed')).toBe('Could not reach Dazzer.')
+  expect(wordsOf(await ui.drawn()), 'a plate from outside this session was shown').not.toContain('Someone else entirely')
+  expect(await ui.find({ key: 'datum:as_of:last' })).toBeUndefined()
+})
+
 test('refresh reads the plate again', async ($, on) => {
   const w = world(on, DAZZER_TOOLS, { dazzer: [answered(PLATE), answered(PLATE_AFTER)] })
   await $.session.start(STARTED)
@@ -507,15 +586,90 @@ test("the session's own calls refresh an open pane", async ($, on) => {
   const ui = await mount($, 'terminal')
   expect(await ui.find({ key: 'row:7236' })).toBeDefined()
 
-  // The AI marks it done: the pane reads the plate again.
+  // The AI marks it done: its call answers at once, and the pane reads the plate after it.
   await $.tool.call({ tool: 'mcp__dazzer__track', tool_use_id: 't1', id: 7236 })
+  expect(w.calls, "the pane's read held up the AI's own call").toHaveLength(1)
+  await settle(w)
   expect(w.calls).toHaveLength(2)
   expect(await ui.find({ key: 'row:7236' })).toBeUndefined()
 
-  // The AI reads the plate itself: the pane draws that answer without a call of its own.
+  // The AI reads the plate itself, its reply in the board's real shape (the plate, then where it
+  // landed, then the next move): the pane draws that answer without a call of its own.
   await $.tool.call({ tool: 'mcp__dazzer__recall', tool_use_id: 't2', query: 'what is on my plate' })
+  await settle(w)
   expect(w.calls).toHaveLength(2)
-  expect(await textAt(ui, 'group:coming')).toStartWith('Coming up 3')
+  expect(await textAt(ui, 'datum:plain:later')).toBe('34 more things can wait until later.')
+})
+
+test('done that does not reach the AI stays offered, and says it was not sent', async ($, on) => {
+  const w = world(on, DAZZER_TOOLS, { dazzer: [answered(PLATE)] })
+  await $.session.start(STARTED)
+  await $.command.run(ASK)
+
+  for (const [surface, how] of [['terminal', 'drop'], ['desktop', 'fail']] as const) {
+    w.submit = how
+    const ui = await mount($, surface)
+    await ui.press({ key: 'done:7236' })
+    expect(await textAt(ui, 'status:unsent:7236'), `a ${how} counted as sent`).toBe('Not sent. Try again.')
+    expect(await ui.find({ key: 'status:sent:7236' })).toBeUndefined()
+    expect(await ui.find({ key: 'done:7236' })).toBeDefined()
+    await keep('not-sent', ui)
+    await ui.unmount()
+  }
+  w.submit = 'enter'
+  const ui = await mount($, 'terminal')
+  await ui.press({ key: 'done:7236' })
+  expect(await textAt(ui, 'status:sent:7236')).toBe('Sent to your AI.')
+  expect(w.said.map(said => said.text)).toEqual(['Mark item 7236 done.', 'Mark item 7236 done.', 'Mark item 7236 done.'])
+})
+
+test('a sent item stays sent until it leaves the plate, so done is never offered twice', async ($, on) => {
+  const w = world(on, DAZZER_TOOLS, { dazzer: [answered(PLATE), answered(PLATE), answered(PLATE_AFTER), answered(PLATE)] })
+  await $.session.start(STARTED)
+  await $.command.run(ASK)
+  const ui = await mount($, 'desktop')
+  await ui.press({ key: 'done:7236' })
+
+  // A read before the AI has marked it: the item is still on the plate, and still sent.
+  await ui.press({ key: 'refresh' })
+  expect(await ui.find({ key: 'done:7236' }), 'a read brought done back for a sent item').toBeUndefined()
+  expect(await textAt(ui, 'status:sent:7236')).toBe('Sent to your AI.')
+
+  // It leaves the plate; were it ever to come back, it is a new ask.
+  await ui.press({ key: 'refresh' })
+  expect(await ui.find({ key: 'row:7236' })).toBeUndefined()
+  await ui.press({ key: 'refresh' })
+  expect(await ui.find({ key: 'done:7236' })).toBeDefined()
+  expect(w.said).toHaveLength(1)
+})
+
+test('the later line is the reply\'s own, never a row whose title ends the same way', async ($, on) => {
+  const tricky: PlateRow = { id: 5001, title: 'Ten things can wait until later.', why: 'today', due: '2026-10-07' }
+  const plate: PlateReply = {
+    ...PLATE,
+    now: [tricky, ...NOW.slice(1)],
+    plain: PLAIN.replace('- #6217 YC application, this week · 62 days late (suggested)', '- #5001 Ten things can wait until later. · due today'),
+  }
+  world(on, DAZZER_TOOLS, { dazzer: [answered(plate)] })
+  await $.session.start(STARTED)
+  await $.command.run(ASK)
+  const ui = await mount($, 'terminal')
+  expect(await textAt(ui, 'datum:plain:later')).toBe('35 more things can wait until later.')
+})
+
+test("a row's marks pass through the same neutralising as its title", async ($, on) => {
+  const plate: PlateReply = {
+    ...PLATE,
+    plain: PLAIN.replace('waiting on Gal for 65 days', 'waiting on Gal\u{202e} for\x0765 days'),
+  }
+  world(on, DAZZER_TOOLS, { dazzer: [answered(plate)] })
+  await $.session.start(STARTED)
+  await $.command.run(ASK)
+  const ui = await mount($, 'terminal')
+  const mark = (await ui.find({ key: 'datum:plain:mark:6215' })) as Node | undefined
+  const shown = allOf(mark, 'Text').flatMap(text => text.children ?? []).join('')
+  expect(shown, 'a mark kept a direction override').not.toContain('\u{202e}')
+  expect(shown).toBe('waiting on Gal for 65 days')
 })
 
 test('nothing on the plate is one plain line', async ($, on) => {
@@ -561,15 +715,19 @@ test('a board whose recall refuses the plate view counts as switched off', async
   expect(await textAt(ui, 'status:off')).toBe('Your plate is switched off.')
 })
 
-test('of two servers offering recall, it reads the one that answers a plate, and names it', async ($, on) => {
-  const w = world(on, [tool('mcp__notes__recall'), ...DAZZER_TOOLS], {
-    notes: [answered({ view: 'work', items: [] })],
+test('of two boards offering recall and track, it reads the one that answers a plate, and names it', async ($, on) => {
+  // notes offers recall alone, so it is no board: the query, the zone and the conversation name
+  // never go to it. old offers both and answers something else; dazzer answers the plate.
+  const tools = [tool('mcp__notes__recall'), tool('mcp__old__recall'), tool('mcp__old__track'), ...DAZZER_TOOLS]
+  const w = world(on, tools, {
+    notes: [answered(PLATE)],
+    old: [answered({ view: 'work', items: [] })],
     dazzer: [answered(PLATE)],
   })
   await $.session.start(STARTED)
   await $.command.run(ASK)
 
-  expect(w.calls.map(call => call.server)).toEqual(['notes', 'dazzer'])
+  expect(w.calls.map(call => call.server), 'a server without track was asked').toEqual(['old', 'dazzer'])
   for (const surface of SURFACES) {
     const ui = await mount($, surface)
     expect(await textAt(ui, 'datum:tool.list:from')).toBe('From dazzer')
