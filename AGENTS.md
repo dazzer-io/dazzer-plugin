@@ -26,8 +26,10 @@ Brain, not here.**
 pane's Refresh), it calls the board's `recall` for the plate view through the connection the
 person's Claude Code already has (`$.mcp.call`, the engine's own connection and credentials). It
 holds no credentials and no connection of its own, finds the board among the tools already
-connected rather than by a name written into it, and never writes: a row's done is a sentence to
-the person's AI, which does the writing.
+connected rather than by a name written into it (only a server offering both `recall` and `track`
+is ever asked), and never writes: a row's done is a sentence carrying the item's number alone, to
+the person's AI, which does the writing. It keeps the last plate it read in the session's own
+state and nowhere else: nothing on disk, nothing shared between sessions.
 
 ## Layout
 
