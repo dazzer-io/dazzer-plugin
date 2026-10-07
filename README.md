@@ -394,8 +394,9 @@ from a terminal the same way; the app picks it up on your next conversation.
 **Then type `/plate`.** Nothing opens by itself: the pane draws only once you ask, and its
 **Refresh** button reads your plate again. Each row shows the item's number, its title as it was
 written, and when it is due or how long it has waited. Each row offers **done**, which sends your AI
-one sentence with that item's number and title (`Mark item 7240, Send Ron Snir context and blurb,
-done`); your AI marks it, and the pane reads your plate again once it has.
+one sentence with that item's number and nothing else (`Mark item 7240 done.`); your AI marks it,
+and the pane reads your plate again once it has. The title never goes with it: anyone in your
+workspace can write a title, and that sentence goes as your own words.
 
 **It needs Dazzer connected** (see Reaching your Brain above): it reads through the connection
 Claude Code already has and brings none of its own. Without one, the pane says Dazzer is not

@@ -374,7 +374,7 @@
     "note": "Typed into Claude itself, after the two Claude Code lines. On the desktop app, install it from a terminal the same way; the app picks it up on your next conversation.",
     "open": "/plate",
     "opensOnlyWhenAsked": true,
-    "reads": "Through the Dazzer connection Claude Code already has; it carries none of its own, holds no credentials and writes nothing. A row's done sends your AI one sentence with the item's number and title, and your AI marks it.",
+    "reads": "Through the Dazzer connection Claude Code already has; it carries none of its own, holds no credentials and writes nothing. A row's done sends your AI one sentence with the item's number and nothing else (Mark item 7240 done.), and your AI marks it; the title never goes with it.",
     "withoutConnection": "The pane says Dazzer is not connected here, and how to connect it.",
     "turnOff": "Set its Plate pane option to off in /config, and there is no /plate at all."
   },
