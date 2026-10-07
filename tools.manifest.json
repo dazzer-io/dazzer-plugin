@@ -8,7 +8,8 @@
     "marketplace": "dazzer-io/dazzer-plugin",
     "repository": "https://github.com/dazzer-io/dazzer-plugin.git",
     "remindersPlugin": "dazzer@dazzer",
-    "connectionPlugin": "dazzer-connect@dazzer"
+    "connectionPlugin": "dazzer-connect@dazzer",
+    "panelPlugin": "dazzer-plate@dazzer"
   },
   "reminders": [
     {
@@ -357,6 +358,26 @@
       }
     }
   },
+  "panel": {
+    "what": "Your plate from your Dazzer board in a pane beside the chat: what needs you now, what is waiting on someone else, what is coming up, and how many things can wait.",
+    "plugin": "dazzer-plate@dazzer",
+    "tools": [
+      "claude-code"
+    ],
+    "steps": [
+      {
+        "kind": "run",
+        "where": "claude",
+        "command": "/plugin install dazzer-plate@dazzer"
+      }
+    ],
+    "note": "Typed into Claude itself, after the two Claude Code lines. On the desktop app, install it from a terminal the same way; the app picks it up on your next conversation.",
+    "open": "/plate",
+    "opensOnlyWhenAsked": true,
+    "reads": "Through the Dazzer connection Claude Code already has; it carries none of its own, holds no credentials and writes nothing. A row's done sends your AI one sentence with the item's number and title, and your AI marks it.",
+    "withoutConnection": "The pane says Dazzer is not connected here, and how to connect it.",
+    "turnOff": "Set its Plate pane option to off in /config, and there is no /plate at all."
+  },
   "provenance": {
     "what": "All six were installed into a real copy of the tool and watched working, which proved too little: on three of them nothing reached the AI at all - Codex and Cursor discarded the words, and Claude Code never loaded the plugin. Proving the words arrive from a hand-written file proved too little in turn, because it says nothing about whether the shipped file loads, and a tool reporting its own reminders as registered proved nothing either - it says so even when it is delivering nothing. What counts is installing the real thing and asking the AI for a word only the reminder carried. Claude Code and Cursor each answer it. Codex runs every reminder from an installed copy, which is the weaker evidence of the two. Devin takes the plain wording it already gets. Antigravity and Copilot are given no reminders at all rather than ones that would be silently dead.",
     "tools": [
@@ -386,9 +407,13 @@
           {
             "kind": "run",
             "command": "claude plugin update dazzer-connect@dazzer"
+          },
+          {
+            "kind": "run",
+            "command": "claude plugin update dazzer-plate@dazzer"
           }
         ],
-        "note": "All three, in that order, then restart. The first refreshes the list of what exists and does NOTHING to the plugin being used - it prints a success message either way, which is how a person ran it, restarted, and got the old behaviour back. Only the update lines move the version actually in use. Drop the third where the connection was never installed separately. To stop doing it by hand, open the plugin panel with /plugin, go to Marketplaces, choose dazzer, turn on auto-update.",
+        "note": "All of them, in that order, then restart. The first refreshes the list of what exists and does NOTHING to the plugin being used - it prints a success message either way, which is how a person ran it, restarted, and got the old behaviour back. Only the update lines move the version actually in use. Drop the third where the connection was never installed separately, and the fourth where the plate pane was never installed. To stop doing it by hand, open the plugin panel with /plugin, go to Marketplaces, choose dazzer, turn on auto-update.",
         "proven": "watched: 0.8.3 to 0.9.0 on a real machine, after the marketplace command had reported success and changed nothing"
       },
       "antigravity": {

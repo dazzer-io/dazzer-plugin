@@ -19,7 +19,7 @@
  */
 
 import { existsSync } from "node:fs";
-import { join, sep } from "node:path";
+import { dirname, join, sep } from "node:path";
 import { REPO_ROOT, readJson, rel, runGate, walk } from "./lib/gate.mjs";
 
 const MANIFEST = join(REPO_ROOT, "tools.manifest.json");
@@ -270,8 +270,9 @@ const claudeShaped = (event) => ({
  * here off at once and leave the run green - the exact edit these rules exist to refuse.
  *
  * Antigravity earned a row once it was run and watched working, and its row names a DIFFERENT
- * PLUGIN FOLDER - the only row that does. It cannot share Devin's file at the plugin root, and
- * that was proven both ways rather than assumed.
+ * PLUGIN FOLDER - the first row that did. It cannot share Devin's file at the plugin root, and
+ * that was proven both ways rather than assumed. The plate pane's row names a folder of its own
+ * too, and holds no reminders at all: its file names a module, and its row keeps it to that.
  *
  * Copilot still has no row, and that is not an oversight. A reminder there runs and has no way
  * to say anything back - five shapes of reply were tried and the model received none of them -
@@ -388,6 +389,26 @@ const HOMES = [
       ["Stop", { who: "Antigravity", runs: true, runsWhere: "at the end of a reply" }],
     ]),
   },
+  {
+    // NOT A REMINDERS FILE, AND HELD ALL THE SAME. The plate pane is a Claude Code mod: its
+    // hooks file names the one module that draws the pane, under `modules`, and nothing else.
+    // Only Claude Code reads it, and Codex would refuse a whole file over that key - which is
+    // why the pane is a plugin of its own and never a line in the shared file. Its row lets it
+    // carry `modules` and nothing more: a moment written beside it would be a reminder no rule
+    // here reads, so any other key is refused, as in every other row.
+    plugin: "dazzer-plate",
+    at: ["hooks", "hooks.json"],
+    hosts: "Claude Code, for the plate pane",
+    modulesOnly: true,
+    optionalPlugin: true,
+    topLevel: new Set(["modules"]),
+    requires: ["modules"],
+    ifMissing:
+      "and it is the only place that names the module drawing the plate pane, so losing it " +
+      "leaves /plate with nothing behind it.",
+    listing: { dir: ".claude-plugin", host: "Claude Code", pointsHere: false },
+    moments: new Map(),
+  },
 ];
 
 /** Where a home sits, both as a path and as the tail `walk` finds it by. */
@@ -455,6 +476,25 @@ function spokenByHooks(findings, declaredById) {
           "file as written rather than converting it first, and refuses the whole thing " +
           "without that key - so every reminder in it reaches nobody.",
       });
+    }
+
+    // A file that names a module and nothing else holds no moments to read. What it owes is one
+    // module, and that module there: Claude Code loads nothing from a file whose module is not.
+    if (home.modulesOnly) {
+      const modules = parsed.modules;
+      const named = Array.isArray(modules) && modules.length === 1 ? modules[0] : undefined;
+      if (typeof named !== "string" || named.length === 0) {
+        findings.push({
+          file: where,
+          message: '"modules" must name exactly one module, as a path beside this file; Claude Code loads one per plugin.',
+        });
+      } else if (!existsSync(join(dirname(file), named))) {
+        findings.push({
+          file: where,
+          message: `names the module "${named}", which is not there, so the plugin loads nothing behind it.`,
+        });
+      }
+      continue;
     }
 
     // Read whichever form the file is written in. Taken from the path instead, removing one
@@ -629,6 +669,10 @@ function declared(findings) {
  */
 function homesAreWired(findings) {
   for (const home of HOMES) {
+    // A plugin a person installs only if they want it is owed nothing while its folder is
+    // absent: the install list's own gate (manifest-parity) says when a listed plugin has gone.
+    // Once its folder is here, its file and its wiring are owed like any other.
+    if (home.optionalPlugin && !existsSync(join(REPO_ROOT, "plugins", folderOf(home)))) continue;
     const file = pathOf(home);
     if (!existsSync(file)) {
       findings.push({ file: rel(file), message: `is missing, ${home.ifMissing}` });

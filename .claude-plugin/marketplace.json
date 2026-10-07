@@ -19,6 +19,11 @@
       "name": "dazzer-antigravity",
       "source": "./plugins/dazzer-antigravity",
       "description": "The Dazzer reminders in the one shape Antigravity accepts. Only for Antigravity, and only alongside the main plugin - every other tool reads its reminders from that one."
+    },
+    {
+      "name": "dazzer-plate",
+      "source": "./plugins/dazzer-plate",
+      "description": "Your plate in a pane beside the chat, in Claude Code only: what needs you now, what waits on someone else, what is coming up. Opens only when you type /plate, and reads through the Dazzer connection you already have."
     }
   ]
 }

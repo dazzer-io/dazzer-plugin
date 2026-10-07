@@ -1,0 +1,24 @@
+{
+  "name": "dazzer-plate",
+  "displayName": "Dazzer plate",
+  "version": "0.11.0",
+  "description": "Your plate from your Dazzer board in a pane beside the chat, in Claude Code: what needs you now, what waits on someone else, and what is coming up. It opens only when you type /plate, and reads through the Dazzer connection you already have, carrying none of its own.",
+  "author": {
+    "name": "Dazzer",
+    "url": "https://dazzer.io"
+  },
+  "homepage": "https://dazzer.io",
+  "repository": "https://github.com/dazzer-io/dazzer-plugin",
+  "license": "MIT",
+  "keywords": ["memory", "knowledge", "brain", "plate"],
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "plate": {
+      "type": "string",
+      "title": "Plate pane",
+      "description": "command: /plate opens your plate in a pane. off: no /plate at all. It never opens by itself.",
+      "default": "command",
+      "options": ["command", "off"]
+    }
+  }
+}
