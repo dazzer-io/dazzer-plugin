@@ -11,8 +11,9 @@
 // is a plate is the board.
 //
 // WHO WRITES. Never this pane. A row's done sends the person's AI one sentence carrying the item's
-// number and title; the AI marks it done through its own connection, and the pane reads the plate
-// again once the AI's own call has run.
+// number and nothing else ("Mark item 7236 done."); the AI marks it done through its own
+// connection, and the pane reads the plate again once the AI's own call has run. The title never
+// travels with it: anyone in the workspace can write a title, and done speaks as the person.
 //
 // WHOSE WORDS. The counted sentence, each row's marks and the later line are the board's own plain
 // words, taken from the reply's `plain`; a title is drawn as its writer wrote it, through the same
@@ -227,10 +228,13 @@ async function readPlate($: EngineInterface): Promise<void> {
   }
 }
 
-/** Asks the person's AI to mark one item done, in a sentence carrying its number and title. */
+/**
+ * Asks the person's AI to mark one item done, by its number alone. Sent as the person's own words,
+ * so it carries nothing anyone else wrote: the number is all the AI needs.
+ */
 async function askDone($: EngineInterface, row: PlateRow): Promise<void> {
   await update($, sent, ids => (ids.includes(row.id) ? ids : [...ids, row.id]))
-  await $.prompt.submit({ text: `Mark item ${row.id}, ${neutral(row.title)}, done`, asUser: true })
+  await $.prompt.submit({ text: `Mark item ${row.id} done.`, asUser: true })
 }
 
 export const register: Register = (on, options) => {
