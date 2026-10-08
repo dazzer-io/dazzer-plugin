@@ -407,15 +407,24 @@ time zone and the pane's name never go to any other server. When it finds none, 
 Dazzer was not found here and how to connect it. A read that has not answered in 20 seconds says
 it could not reach Dazzer, rather than waiting forever.
 
+**In auto permission mode it asks your AI instead.** Where Claude Code allows it, the pane reads
+your plate directly through your connection, and nothing appears in your chat. In auto permission
+mode Claude Code refuses the pane that read, so the pane says "Asking your AI." and sends your AI,
+as your own words, `What is on my plate? My time zone is <your time zone>.`; when your AI reads
+your plate, the pane draws it. **So in auto mode that question, and your AI's answer, also appear
+in your chat.** The pane remembers the refusal for the rest of the session and asks your AI
+straight away after that. Its 20-second limit holds here too.
+
 **What it keeps:** the last plate it read, in this session's memory only, so a read that fails can
 still show it with the time it was read. Nothing is saved to disk, and nothing is shared with another
 session or another account.
 
 To keep `/plate` from being offered at all, set its **Plate pane** option to **off** in `/config`.
 
-What is proven: its tests draw every state on both the terminal and the desktop app. What is not
-yet: a real desktop app session reading a real plate. Until that has been watched, treat the
-desktop app as expected rather than tried.
+What is proven: its tests draw every state on both the terminal and the desktop app. Watched once,
+live, in the desktop app in auto permission mode: the pane opened, found the board, and Claude Code
+refused its own read, which is why it asks your AI there. Not yet watched live: the pane asking your
+AI and drawing its answer, and a direct read in the desktop app outside auto mode.
 
 ## Two pieces, on purpose
 
@@ -468,8 +477,10 @@ That is deliberate: it means the rules can change in your Brain and take effect 
 without you updating anything.
 
 The plate pane is the one piece that reads from Dazzer itself, and only once you ask: it asks for
-your plate through the connection Claude Code already has, holds no credentials of its own, and
-never writes. Marking a row done is a sentence to your AI, which does the writing.
+your plate through the connection Claude Code already has, where Claude Code allows it, holds no
+credentials of its own, and never writes. In auto permission mode it asks your AI for your plate
+instead, so the question and the answer appear in your chat. Marking a row done is a sentence to
+your AI, which does the writing.
 
 ## Where the rules live
 
