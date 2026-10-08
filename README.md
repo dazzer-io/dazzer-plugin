@@ -392,13 +392,25 @@ Typed into Claude itself, after the two Claude Code lines above. On the desktop 
 from a terminal the same way; the app picks it up on your next conversation.
 
 **Then type `/plate`.** Nothing opens by itself: the pane draws only once you ask, and its
-**Refresh** button reads your plate again. Each row shows the item's number, its title as it was
-written, and when it is due or how long it has waited. Each row offers **done**, which sends your AI
-one sentence with that item's number and nothing else (`Mark item 7240 done.`). **Your AI marks it
-done, and the pane updates on the next plate it sees.** The title never goes with it: anyone in your
-workspace can write a title, and that sentence goes as your own words. The row says it was sent
-only once your session took the sentence, and keeps saying so until a plate arrives without that
-item; if it was not taken, the row says so and offers done again.
+**Refresh** button reads your plate again. At the top: the day, and one line of counts. Below it,
+four tabs: **Needs you**, **Waiting**, **Coming up** and **Later**, each with its count. Each thing
+on a tab is a card: a coloured tag saying why it is there (`8 DAYS LATE`, `WAITING ON YOU · 6 DAYS`,
+`STARTED`, `ON GAL · 65 DAYS`, `DUE SAT 10 OCT`, with `(A GUESS)` where Dazzer read it from the words
+and is unsure), its title as it was written, and one line saying what it is part of, who it is from
+and when it last moved. **Open** shows what it is, and two buttons:
+
+- **Done** sends your AI one sentence with that item's number and nothing else (`Mark item 7240
+  done.`). **Your AI marks it done, and the pane updates on the next plate it sees.** The card says
+  it was sent only once your session took the sentence, and keeps saying so until a plate arrives
+  without that item; if it was not taken, it says so and offers Done again.
+- **Talk about it** sends `Tell me about item 7240.`, so you and your AI can talk it through.
+
+The title never goes with either: anyone in your workspace can write a title, and those sentences
+go as your own words.
+
+**Later** lists what can wait, grouped by what each thing belongs to, each with its count. Open a
+group to see its items and when each last moved; once read, a group stays read for the session.
+Until your Dazzer board sends those groups, Later shows how many things can wait.
 
 **It needs Dazzer connected** (see Reaching your Brain above): it reads through the connection
 Claude Code already has and brings none of its own. It looks only among the tools your session has
@@ -407,26 +419,28 @@ time zone and the pane's name never go to any other server. When it finds none, 
 Dazzer was not found here and how to connect it. A read that has not answered in 20 seconds says
 it could not reach Dazzer, rather than waiting forever.
 
-**In auto mode, /plate and Refresh put one question and your AI's answer in your chat.** Where
-Claude Code lets the pane read your plate itself, nothing appears in your chat. In auto mode it does
-not, so `/plate` and **Refresh** each try the read first and, when it is refused, put one question
-to your AI, as your own words: `What is on my plate? My time zone is <your time zone>.` The pane
-draws the plate your AI reads. While that question is unanswered, `/plate` and **Refresh** send
-nothing more, and the pane says your AI answers after its current reply.
+**In auto mode, /plate, Refresh and opening a later group put one question and your AI's answer
+in your chat.** Where Claude Code lets the pane read your plate itself, nothing appears in your chat.
+In auto mode it does not, so `/plate` and **Refresh** each try the read first and, when it is
+refused, put one question to your AI, as your own words: `What is on my plate? My time zone is <your
+time zone>.` Opening a later group does the same for that group: `Show my later items in <its name>
+(plate group <its number>).` The pane draws what your AI reads. One question at a time: while one is
+unanswered, the pane sends nothing more and says it is waiting on your AI.
 
-**Nothing else ever posts in your name.** Only `/plate`, **Refresh** and a row's **done** do, and
-only when you use them.
+**Nothing else ever posts in your name.** Only `/plate`, **Refresh**, opening a later group, and a
+card's **Done** and **Talk about it** do, and only when you use them.
 
-**What it keeps:** the last plate it read, in this session's memory only, so a read that fails can
-still show it with the time it was read. Nothing is saved to disk, and nothing is shared with another
-session or another account.
+**What it keeps:** the last plate it read, and each later group it read, in this session's memory
+only, so a read that fails can still show your plate with the time it was read. Nothing is saved to
+disk, and nothing is shared with another session or another account.
 
 To keep `/plate` from being offered at all, set its **Plate pane** option to **off** in `/config`.
 
 What is proven: its tests draw every state on both the terminal and the desktop app. Watched live in
 the desktop app in auto mode, on the version before commit fa5da50 (which added the one-question
 limit): the pane asked your AI, drew the plate it read, and its done buttons reached your AI. Not yet
-watched live: the one-question limit, and a direct read in the desktop app outside auto mode.
+watched live: the one-question limit, a direct read in the desktop app outside auto mode, and the
+tabs, cards, Talk about it and later groups drawn on 8 Oct.
 
 ## Two pieces, on purpose
 
@@ -480,9 +494,9 @@ without you updating anything.
 
 The plate pane is the one piece that reads from Dazzer itself, and only once you ask: it asks for
 your plate through the connection Claude Code already has, where Claude Code allows it, holds no
-credentials of its own, and never writes. In auto mode, `/plate` and Refresh put one question to
-your AI instead, so that question and its answer appear in your chat. Marking a row done is a sentence to
-your AI, which does the writing.
+credentials of its own, and never writes. In auto mode, `/plate`, Refresh and opening a later group
+put one question to your AI instead, so that question and its answer appear in your chat. Marking a
+card done, or asking to talk about it, is a sentence to your AI, which does the writing.
 
 ## Where the rules live
 

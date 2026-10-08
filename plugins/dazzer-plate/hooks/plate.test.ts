@@ -478,7 +478,7 @@ const mount = (engine: Engine, surface: (typeof SURFACES)[number]) =>
 // ---------------------------------------------------------------------------------------------
 // Reading a drawing.
 
-type Node = { type?: string; key?: string; props?: Record<string, unknown>; children?: unknown[] }
+type Node = { type?: string; key?: string; props?: Record<string, unknown>; hover?: Record<string, unknown>; children?: unknown[] }
 
 /** Every word the drawing shows, in order: string children and each Button's label. */
 function wordsOf(node: unknown): string {
@@ -536,6 +536,10 @@ const textAt = async (ui: Pick<Ui, 'find'>, key: string) => wordsOf(await ui.fin
 /** The props of the element keyed `key`, as drawn. */
 const propsAt = async (ui: Pick<Ui, 'find'>, key: string) =>
   ((await ui.find({ key })) as { props?: Record<string, unknown> } | undefined)?.props ?? {}
+
+/** What the surface applies under the pointer to the Box keyed `key`, as drawn beside its props. */
+const hoverAt = async (ui: Pick<Ui, 'drawn'>, key: string) =>
+  allOf(await ui.drawn(), 'Box').find(box => box.props?.key === key)?.hover ?? {}
 
 /** The Box holding a card's tag: keyed "datum:<the row fields it is read from>:tag:<id>". */
 async function tagBox(ui: Pick<Ui, 'drawn'>, id: number): Promise<Node | undefined> {
@@ -634,7 +638,7 @@ test('the plate draws its day, one line of counts, four tabs and a card per row 
       const card = await propsAt(ui, `card:${row.id}`)
       expect(card.borderStyle, `card ${row.id} has no border`).toBe('round')
       expect(card.borderColor).toBe('gray')
-      expect((card.hover as { borderColor?: string } | undefined)?.borderColor, `card ${row.id} is not lit on hover`).toBeDefined()
+      expect((await hoverAt(ui, `card:${row.id}`)).borderColor, `card ${row.id} is not lit on hover`).toBeDefined()
     }
     expect(await ui.find({ key: 'card:7311' }), 'a waiting card drew on the needs-you tab').toBeUndefined()
 
@@ -1566,7 +1570,7 @@ test('the later tab lists its groups with their counts, and opening one reads th
     expect(await textAt(ui, 'datum:later_groups:name:none')).toBe('Not part of anything')
     const group = await propsAt(ui, 'group:7001')
     expect(group.borderStyle).toBe('round')
-    expect((group.hover as { borderColor?: string } | undefined)?.borderColor, 'a group is not lit on hover').toBeDefined()
+    expect((await hoverAt(ui, 'group:7001')).borderColor, 'a group is not lit on hover').toBe('cyan')
     expect(await buttonsOf(ui)).toEqual([...TABS, 'group-open:7001', 'group-open:unfiled', 'group-open:7002', 'group-open:none', 'refresh'])
     await keep('later-groups', ui)
     await ui.unmount()
@@ -1614,24 +1618,22 @@ test('while a group is read it says so; one that fails says so, and opening it a
   const ui = await mount($, 'terminal')
   await ui.press({ key: 'tab:later' })
 
+  const desktop = await mount($, 'desktop')
   w.hold()
   const opening = ui.press({ key: 'group-open:7001' })
   while (w.calls.length < 2) await new Promise<void>(resolve => setTimeout(resolve, 5))
-  for (const surface of SURFACES) {
-    const shown = surface === 'terminal' ? ui : await mount($, surface)
+  for (const shown of [ui, desktop]) {
     expect(await textAt(shown, 'status:group-loading:7001')).toBe('Reading this group.')
     await keep('later-group-loading', shown)
   }
   w.release()
   await opening
 
-  for (const surface of SURFACES) {
-    const shown = await mount($, surface)
+  for (const shown of [ui, desktop]) {
     expect(await textAt(shown, 'status:group-failed:7001')).toBe('Could not reach Dazzer.')
     // The plate itself still stands.
     expect((await propsAt(shown, 'tab:later')).label).toBe('Later 23')
     await keep('later-group-failed', shown)
-    await shown.unmount()
   }
   expect(w.said, 'a failed group read was handed to the AI').toEqual([])
 
