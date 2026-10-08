@@ -206,6 +206,8 @@ type World = {
   submit: Submit
   /** Every key the plugin wrote to or removed from the store, in order. */
   storeWrites: string[]
+  /** The loop each of the session's own calls came from, as the plugin passed it on. */
+  callers: (string | undefined)[]
   /** Holds the next recall until `release` is called. */
   hold: () => void
   release: () => void
@@ -238,6 +240,7 @@ function world(on: On, tools: ToolInfo[], servers: Record<string, ServerAnswer[]
     clock: mock.clock(on, { now: Date.parse('2026-10-07T06:15:00Z') }),
     submit: 'enter',
     storeWrites: [],
+    callers: [],
     hold: () => {
       gate = new Promise<void>(resolve => {
         open = resolve
@@ -307,10 +310,20 @@ function world(on: On, tools: ToolInfo[], servers: Record<string, ServerAnswer[]
   // The session's own calls, as the AI makes them: its plate, and marking an item done, each
   // answered in the board's real shape and read the way the model reads it.
   on('tool.call', ($, e) => {
-    const reply = e.tool === 'mcp__dazzer__recall' ? answered(PLATE_RELAYED) : answered({ id: 7236, state: 'done' })
+    w.callers.push((e as { agentId?: string }).agentId)
+    const reply = /^mcp__.+__recall$/.test(String(e.tool)) ? answered(PLATE_RELAYED) : answered({ id: 7236, state: 'done' })
     return { result: reply, text: asRead(reply) }
   })
+  // A model turn's start and end, as the engine raises them.
+  on('turn.start', ($, e) => ({ turnId: e.turnId }))
+  on('turn.complete', ($, e) => ({ text: e.answer }))
   return w
+}
+
+/** The turn the pane's question starts, run to its end, with no plate read during it. */
+async function questionTurn($: Engine, turnId: string, text = QUESTION): Promise<void> {
+  await $.turn.start({ text, turnId })
+  await $.turn.complete({ answer: 'I could not read your plate.', durationMs: 900, isAborted: false, turnId, reason: 'answer' })
 }
 
 /** Lets what the pane scheduled run: a timer due now, and the reads it started. */
@@ -818,44 +831,62 @@ test('when the engine refuses the pane its own read, it asks the AI and draws th
   ])
   for (const surface of SURFACES) {
     const ui = await mount($, surface)
-    expect(await textAt(ui, 'status:asking')).toBe('Asking your AI.')
+    expect(await textAt(ui, 'status:asked')).toBe('Asked your AI.')
+    expect(wordsOf(await ui.drawn())).toContain('It answers after its current reply.')
     expect(wordsOf(await ui.drawn())).not.toContain('Could not reach Dazzer')
-    await keep('asking', ui)
+    await keep('asked', ui)
     await ui.unmount()
   }
 
   // The AI reads the plate, its reply in the board's real shape: the pane draws that answer.
-  await $.tool.call({ tool: 'mcp__dazzer__recall', tool_use_id: 't1', query: 'What is on my plate?', view: 'plate', time_zone: ZONE })
+  await $.tool.call({ tool: 'mcp__dazzer__recall', tool_use_id: 't1', query: 'What is on my plate?' })
   await settle(w)
   for (const surface of SURFACES) {
     const ui = await mount($, surface)
-    expect(await ui.find({ key: 'status:asking' })).toBeUndefined()
+    expect(await ui.find({ key: 'status:asked' })).toBeUndefined()
     expect(await textAt(ui, 'datum:plain:later')).toBe('34 more things can wait until later.')
     await ui.unmount()
   }
   expect(w.calls).toHaveLength(1)
+  expect(w.said).toHaveLength(1)
 })
 
-test('a wait for the AI ends after 20 seconds in one failed line, keeping the last plate', async ($, on) => {
-  const w = world(on, DAZZER_TOOLS, { dazzer: [answered(PLATE), { refuse: REFUSED }] })
-  await $.session.start(STARTED)
-  await $.command.run(ASK)
-  const ui = await mount($, 'terminal')
-  await ui.press({ key: 'refresh' })
-  await settle(w)
-  expect(w.said.map(said => said.text)).toEqual([QUESTION])
-  expect(await textAt(ui, 'status:asking')).toBe('Asking your AI.')
-  expect(await textAt(ui, 'datum:row.title:6217')).toBe('YC application, this week')
+for (const words of [
+  REFUSED,
+  'Permission for this action was denied by the Claude Code auto mode classifier. Reason: reads a private workspace',
+  'Auto mode classifier blocked action: mcp__dazzer__recall',
+  'Permission for this tool use was denied. The tool use was rejected.',
+  "Permission to use mcp__dazzer__recall has been denied because Claude Code is running in don't ask mode.",
+]) {
+  test(`the engine's own refusal asks the AI: ${words.slice(0, 48)}`, async ($, on) => {
+    const w = world(on, DAZZER_TOOLS, { dazzer: [{ refuse: words }] })
+    await $.session.start(STARTED)
+    await $.command.run(ASK)
+    await settle(w)
+    expect(w.said.map(said => said.text), 'the engine refused and the AI was not asked').toEqual([QUESTION])
+  })
+}
 
-  await w.clock.advance(19_998)
-  expect(await textAt(ui, 'status:asking')).toBe('Asking your AI.')
-  await settle(w)
-  expect(await textAt(ui, 'status:failed'), 'the wait for the AI never ended').toBe('Could not reach Dazzer.')
-  expect(await textAt(ui, 'datum:as_of:last')).toMatch(/^as of [A-Z][a-z]{2} \d{1,2} [A-Z][a-z]{2} \d{2}:\d{2}$/)
-  expect(await textAt(ui, 'datum:row.title:6217')).toBe('YC application, this week')
-})
+for (const words of [
+  'You do not have permission to read this workspace',
+  'Access denied',
+  'The server refused the connection',
+]) {
+  for (const how of ['thrown', 'answered'] as const) {
+    test(`a server saying "${words}" (${how}) stays one failed line and asks nothing`, async ($, on) => {
+      const answer: ServerAnswer = how === 'thrown' ? { refuse: words } : answered({ what: words }, true)
+      const w = world(on, DAZZER_TOOLS, { dazzer: [answer] })
+      await $.session.start(STARTED)
+      await $.command.run(ASK)
+      await settle(w)
+      const ui = await mount($, 'terminal')
+      expect(await textAt(ui, 'status:failed')).toBe('Could not reach Dazzer.')
+      expect(w.said, "a server's words were taken for the engine's refusal").toEqual([])
+    })
+  }
+}
 
-test('once refused, later reads go straight to the AI, with no refused call each time', async ($, on) => {
+test('one question at a time: a read while it is unanswered tries the board and sends nothing', async ($, on) => {
   const w = world(on, DAZZER_TOOLS, { dazzer: [{ refuse: REFUSED }] })
   await $.session.start(STARTED)
   await $.command.run(ASK)
@@ -866,9 +897,116 @@ test('once refused, later reads go straight to the AI, with no refused call each
   await $.command.run(ASK)
   await settle(w)
 
-  expect(w.calls, 'the pane tried its own read again after it was refused').toHaveLength(1)
-  expect(w.said.map(said => said.text)).toEqual([QUESTION, QUESTION, QUESTION])
-  expect(await textAt(ui, 'status:asking')).toBe('Asking your AI.')
+  expect(w.calls, 'a read the person started did not try the board first').toHaveLength(3)
+  expect(w.said.map(said => said.text), 'a second question went while the first was unanswered').toEqual([QUESTION])
+  expect(await textAt(ui, 'status:asked')).toBe('Asked your AI.')
+})
+
+test('a question the AI never answers ends with its turn, saying so, and never "Could not reach Dazzer."', async ($, on) => {
+  const w = world(on, DAZZER_TOOLS, { dazzer: [answered(PLATE), { refuse: REFUSED }] })
+  await $.session.start(STARTED)
+  await $.command.run(ASK)
+  const ui = await mount($, 'terminal')
+  await ui.press({ key: 'refresh' })
+  await settle(w)
+  expect(w.said.map(said => said.text)).toEqual([QUESTION])
+  expect(await textAt(ui, 'status:asked')).toBe('Asked your AI.')
+
+  // Another reply's turn ends first: the question still waits.
+  await questionTurn($, 'turn-before', 'something else the person asked')
+  expect(await textAt(ui, 'status:asked')).toBe('Asked your AI.')
+
+  // The question's own turn ends with no plate read.
+  await questionTurn($, 'turn-question')
+  await settle(w)
+  expect(await textAt(ui, 'status:unanswered'), 'the wait outlived its turn').toBe('No plate from your AI.')
+  expect(wordsOf(await ui.drawn())).not.toContain('Could not reach Dazzer')
+  expect(await textAt(ui, 'datum:row.title:6217')).toBe('YC application, this week')
+  await keep('unanswered', ui)
+
+  // Now a read the person starts may ask again.
+  await ui.press({ key: 'refresh' })
+  await settle(w)
+  expect(w.said.map(said => said.text)).toEqual([QUESTION, QUESTION])
+})
+
+test('a question the session did not take says so plainly', async ($, on) => {
+  const w = world(on, DAZZER_TOOLS, { dazzer: [{ refuse: REFUSED }] })
+  w.submit = 'drop'
+  await $.session.start(STARTED)
+  await $.command.run(ASK)
+  await settle(w)
+  for (const surface of SURFACES) {
+    const ui = await mount($, surface)
+    expect(await textAt(ui, 'status:unsent')).toBe('Your question was not sent.')
+    expect(wordsOf(await ui.drawn())).not.toContain('Could not reach Dazzer')
+    await keep('question-unsent', ui)
+    await ui.unmount()
+  }
+})
+
+test("after a refusal, the AI's own track asks nothing and keeps what the pane shows", async ($, on) => {
+  const w = world(on, DAZZER_TOOLS, { dazzer: [answered(PLATE), { refuse: REFUSED }] })
+  await $.session.start(STARTED)
+  await $.command.run(ASK)
+  const ui = await mount($, 'terminal')
+  await ui.press({ key: 'done:7236' })
+  // The AI marks it done; the pane tries the board again, is refused, and asks no one.
+  await $.tool.call({ tool: 'mcp__dazzer__track', tool_use_id: 't1', id: 7236 })
+  await settle(w)
+  await $.tool.call({ tool: 'mcp__dazzer__track', tool_use_id: 't2', id: 7095 })
+  await settle(w)
+
+  expect(w.calls, "the pane did not re-read after the AI's track").toHaveLength(3)
+  expect(w.said.map(said => said.text), "the AI's track made the pane post in the person's name").toEqual([
+    'Mark item 7236 done.',
+  ])
+  expect(await textAt(ui, 'status:sent:7236')).toBe('Sent to your AI.')
+  expect(await textAt(ui, 'datum:row.title:6217')).toBe('YC application, this week')
+})
+
+test("a subagent's track asks nothing either", async ($, on) => {
+  const w = world(on, DAZZER_TOOLS, { dazzer: [{ refuse: REFUSED }] })
+  await $.session.start(STARTED)
+  await $.command.run(ASK)
+  await settle(w)
+  await questionTurn($, 'turn-question')
+  await settle(w)
+  const said = w.said.length
+
+  await $.tool.call({ tool: 'mcp__dazzer__track', tool_use_id: 't1', id: 7236, agentId: 'sub-1' } as never)
+  await settle(w)
+  expect(w.callers.at(-1)).toBe('sub-1')
+  expect(w.said, "a subagent's track made the pane post in the person's name").toHaveLength(said)
+})
+
+test('a read the person starts after the engine relents reads the board directly again', async ($, on) => {
+  const w = world(on, DAZZER_TOOLS, { dazzer: [{ refuse: REFUSED }, answered(PLATE)] })
+  await $.session.start(STARTED)
+  await $.command.run(ASK)
+  await settle(w)
+  await questionTurn($, 'turn-question')
+  await settle(w)
+  const ui = await mount($, 'terminal')
+  await ui.press({ key: 'refresh' })
+  await settle(w)
+  expect(w.calls, 'the refusal was remembered as a switch').toHaveLength(2)
+  expect(await textAt(ui, 'datum:row.title:6217')).toBe('YC application, this week')
+  expect(w.said.map(said => said.text)).toEqual([QUESTION])
+})
+
+test('with two boards both refused, a plate from either one\'s recall is drawn', async ($, on) => {
+  const tools = [tool('mcp__other__recall'), tool('mcp__other__track'), ...DAZZER_TOOLS]
+  const w = world(on, tools, { other: [{ refuse: REFUSED }], dazzer: [{ refuse: REFUSED }] })
+  await $.session.start(STARTED)
+  await $.command.run(ASK)
+  await settle(w)
+  expect(w.said.map(said => said.text)).toEqual([QUESTION])
+
+  await $.tool.call({ tool: 'mcp__dazzer__recall', tool_use_id: 't1', query: 'what is on my plate' })
+  await settle(w)
+  const ui = await mount($, 'desktop')
+  expect(await textAt(ui, 'datum:plain:later'), "the second board's plate was not drawn").toBe('34 more things can wait until later.')
 })
 
 test('while the session takes a done, the row says it is sending, on both surfaces', async ($, on) => {
