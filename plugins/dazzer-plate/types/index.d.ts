@@ -42,10 +42,17 @@ export type PlateReply = {
 /** Where one row's done stands: on its way to the AI, taken by the session, or not taken. */
 export type PlateAsk = 'sending' | 'sent' | 'unsent'
 
+/**
+ * How the pane reads the plate in this session: itself, through the session's connection, or by
+ * asking the person's AI, once the engine has refused it the direct read (auto permission mode).
+ */
+export type PlateRoute = 'direct' | 'ai'
+
 /** What the pane shows. Unasked until the person asks, and nothing is drawn while it is. */
 export type PlateView =
   | { kind: 'unasked' }
   | { kind: 'loading' }
+  | { kind: 'asking'; last: PlateReply | null }
   | { kind: 'absent' }
   | { kind: 'off' }
   | { kind: 'shown'; plate: PlateReply; server: string; named: boolean }
@@ -63,6 +70,8 @@ declare module 'claude-code' {
       asked: Record<string, PlateAsk>
       /** The connected server the plate was last read from, in this session. */
       board: string | null
+      /** Whether this session lets the pane read the board itself, or it asks the AI instead. */
+      route: PlateRoute
     }
   }
 }

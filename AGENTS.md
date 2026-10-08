@@ -31,6 +31,13 @@ is ever asked), and never writes: a row's done is a sentence carrying the item's
 the person's AI, which does the writing. It keeps the last plate it read in the session's own
 state and nowhere else: nothing on disk, nothing shared between sessions.
 
+It reads directly only where Claude Code allows it. In auto permission mode the engine refuses the
+pane's own call (seen live in the Desktop app: "the auto mode classifier gave no verdict"), so the
+pane asks the person's AI instead, sending as the person's own words "What is on my plate? My time
+zone is <zone>." and drawing the plate from the AI's own `recall` as it comes back through
+`tool.call`. There the question and the AI's answer also appear in the chat. The refusal is
+remembered for the session; a plain failure to reach the board is not a refusal and asks nothing.
+
 ## Layout
 
 | Path | What it is |

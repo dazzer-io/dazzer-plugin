@@ -374,12 +374,13 @@
     "note": "Typed into Claude itself, after the two Claude Code lines. On the desktop app, install it from a terminal the same way; the app picks it up on your next conversation.",
     "open": "/plate",
     "opensOnlyWhenAsked": true,
-    "reads": "Through the Dazzer connection Claude Code already has; it carries none of its own, holds no credentials and writes nothing. A row's done sends your AI one sentence with the item's number and nothing else (Mark item 7240 done.), and your AI marks it; the title never goes with it.",
+    "reads": "Through the Dazzer connection Claude Code already has, directly, where Claude Code allows it; it carries none of its own, holds no credentials and writes nothing. A row's done sends your AI one sentence with the item's number and nothing else (Mark item 7240 done.), and your AI marks it; the title never goes with it.",
     "withoutConnection": "The pane says Dazzer was not found here, and how to connect it. It looks only among the tools the session has right now.",
     "turnOff": "Set its Plate pane option to off in /config, and there is no /plate at all.",
     "finds": "Only a server offering both recall and track, so the person's words, time zone and the pane's name never go to any other server.",
     "keeps": "The last plate it read, in the session's own memory only, for the time shown when a read fails. Nothing is saved to disk and nothing is shared with another session or account.",
-    "readLimit": "A read that has not answered in 20 seconds says it could not reach Dazzer."
+    "readLimit": "A read that has not answered in 20 seconds says it could not reach Dazzer.",
+    "autoMode": "In auto permission mode Claude Code refuses the pane its own read, so the pane asks the person's AI instead, sending as their own words: What is on my plate? My time zone is <their zone>. The question and the AI's answer then also appear in the chat. The refusal is remembered for the session, and the 20-second limit holds."
   },
   "provenance": {
     "what": "All six were installed into a real copy of the tool and watched working, which proved too little: on three of them nothing reached the AI at all - Codex and Cursor discarded the words, and Claude Code never loaded the plugin. Proving the words arrive from a hand-written file proved too little in turn, because it says nothing about whether the shipped file loads, and a tool reporting its own reminders as registered proved nothing either - it says so even when it is delivering nothing. What counts is installing the real thing and asking the AI for a word only the reminder carried. Claude Code and Cursor each answer it. Codex runs every reminder from an installed copy, which is the weaker evidence of the two. Devin takes the plain wording it already gets. Antigravity and Copilot are given no reminders at all rather than ones that would be silently dead.",
