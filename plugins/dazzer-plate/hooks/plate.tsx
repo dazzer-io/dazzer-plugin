@@ -622,13 +622,20 @@ async function releaseHolds($: EngineInterface): Promise<void> {
 }
 
 /**
- * Ends the question that is out: answered (what it asked for has been drawn), unanswered (its
- * turn ended with nothing), or unsent (the session did not take it). The slot is then free.
+ * Ends the question that is out, by its own number: answered (what it asked for has been drawn),
+ * unanswered (its turn ended with nothing), or unsent (the session did not take it). The slot is
+ * then free. A question that is no longer the one out is left alone, so a press that saw an older
+ * question can never end the one another press has just put.
  */
-async function endQuestion($: EngineInterface, how: 'answered' | 'unanswered' | 'unsent'): Promise<void> {
-  const out = await read($, question)
-  if (out.state === 'none') return
-  await update($, question, (): PlateQuestion => ({ state: 'none' }))
+async function endQuestion($: EngineInterface, how: 'answered' | 'unanswered' | 'unsent', id: number | undefined): Promise<void> {
+  let ended = null as PlateQuestion | null
+  await update($, question, (current): PlateQuestion => {
+    const isIt = current.state !== 'none' && current.id === id
+    ended = isIt ? current : null
+    return isIt ? { state: 'none' } : current
+  })
+  if (ended === null || ended.state === 'none') return
+  const out = ended
   if (how !== 'answered') {
     const kind = how
     const group = out.group
@@ -647,15 +654,15 @@ async function endQuestion($: EngineInterface, how: 'answered' | 'unanswered' | 
 }
 
 /**
- * Whether the question out is lost: taken by the session, held by no turn, the session idle, and
- * the turn it waited behind ended more than QUIET_MS ago. Queued behind a turn the person then
- * cancelled, it never runs, and would otherwise keep every later press from asking.
+ * The number of the question out when it is lost: taken by the session, held by no turn, the
+ * session idle, and the turn it waited behind ended more than QUIET_MS ago. Queued behind a turn
+ * the person then cancelled, it never runs, and would otherwise keep every later press from asking.
  */
-async function isLost($: EngineInterface): Promise<boolean> {
+async function lostQuestion($: EngineInterface): Promise<number | undefined> {
   const out = await read($, question)
-  if (out.state !== 'waiting' || out.turnId !== null || out.behindEndedAt === undefined) return false
-  if ((await read($, runningTurn)) !== null) return false
-  return (await $.clock.now()) - out.behindEndedAt > QUIET_MS
+  if (out.state !== 'waiting' || out.turnId !== null || out.behindEndedAt === undefined) return undefined
+  if ((await read($, runningTurn)) !== null) return undefined
+  return (await $.clock.now()) - out.behindEndedAt > QUIET_MS ? out.id : undefined
 }
 
 /**
@@ -665,7 +672,7 @@ async function isLost($: EngineInterface): Promise<boolean> {
 async function endIfQuiet($: EngineInterface, id: number | undefined, startedAtEnd: number): Promise<void> {
   const out = await read($, question)
   if (out.state === 'none' || out.id !== id || out.turnId !== null || turnsStarted !== startedAtEnd) return
-  await endQuestion($, 'unanswered')
+  await endQuestion($, 'unanswered', id)
 }
 
 /**
@@ -675,15 +682,16 @@ async function endIfQuiet($: EngineInterface, id: number | undefined, startedAtE
  * dispatch that asked, so it never waits on a turn that dispatch holds.
  */
 async function askTheAI($: EngineInterface, text: string, group?: string): Promise<void> {
-  // A question that will never run frees the slot for this press.
-  if (await isLost($)) await endQuestion($, 'unanswered')
-  const id = questionsPut + 1
+  // A question that will never run frees the slot for this press: that question, by its number.
+  const lost = await lostQuestion($)
+  if (lost !== undefined) await endQuestion($, 'unanswered', lost)
+  questionsPut += 1
+  const id = questionsPut
   let isNew = false
   await update($, question, (current): PlateQuestion => {
     isNew = current.state === 'none'
     return isNew ? { state: 'sending', id, text, turnId: null, ...(group === undefined ? {} : { group }) } : current
   })
-  if (isNew) questionsPut = id
   const out = await read($, question)
   if (out.state === 'none' || out.group !== group) {
     if (group === undefined) await update($, plateHeld, () => true)
@@ -695,22 +703,28 @@ async function askTheAI($: EngineInterface, text: string, group?: string): Promi
   else await setGroup($, group, { kind })
   if (!isNew) return
   $.clock.after(0, () => {
-    void putTheQuestion($, text, group).catch(() => undefined)
+    void putTheQuestion($, id, text, group).catch(() => undefined)
   })
 }
 
 /**
- * Submits the question as the person's own words, and says so plainly when it was not taken. A
- * question put while another main-loop turn runs is queued behind it, and the session takes it at
- * once: so the turn running now is noted on the question, and its end does not end it.
+ * Submits the question as the person's own words, and says so plainly when it was not taken. It
+ * drops out, sending nothing, when its question is no longer the one out. A question put while
+ * another main-loop turn runs is queued behind it, and the session takes it at once: so the turn
+ * running now is noted on the question, and its end does not end it.
  */
-async function putTheQuestion($: EngineInterface, text: string, group: string | undefined): Promise<void> {
+async function putTheQuestion($: EngineInterface, id: number, text: string, group: string | undefined): Promise<void> {
   const behind = await read($, runningTurn)
-  if (behind !== null) {
-    await update($, question, (current): PlateQuestion =>
-      current.state !== 'none' && current.text === text && current.group === group ? { ...current, behind } : current,
-    )
-  }
+  let isOut = false
+  await update($, question, (current): PlateQuestion => {
+    if (current.state !== 'sending' || current.id !== id) {
+      isOut = false
+      return current
+    }
+    isOut = true
+    return behind === null ? current : { ...current, behind }
+  })
+  if (!isOut) return
   let isTaken = false
   try {
     isTaken = (await $.prompt.submit({ text, asUser: true })).drop === undefined
@@ -718,10 +732,12 @@ async function putTheQuestion($: EngineInterface, text: string, group: string | 
     isTaken = false
   }
   if (!isTaken) {
-    await endQuestion($, 'unsent')
+    await endQuestion($, 'unsent', id)
     return
   }
-  await update($, question, (current): PlateQuestion => (current.state === 'sending' ? { ...current, state: 'waiting' } : current))
+  await update($, question, (current): PlateQuestion =>
+    current.state === 'sending' && current.id === id ? { ...current, state: 'waiting' } : current,
+  )
   if (group === undefined) {
     await update($, view, (current): PlateView => (current.kind === 'asking' ? { kind: 'asked', last: current.last } : current))
   } else {
@@ -951,7 +967,7 @@ async function followTheAI(
   const out = await read($, question)
   if (answer.kind === 'plate') {
     const known = await read($, boards)
-    if (out.state !== 'none' && out.group === undefined) await endQuestion($, 'answered')
+    if (out.state !== 'none' && out.group === undefined) await endQuestion($, 'answered', out.id)
     await show($, answer.plate, server, known.length > 1)
     return
   }
@@ -962,7 +978,7 @@ async function followTheAI(
   groupReadsMade += 1
   newestGroupRead.set(key, groupReadsMade)
   await setGroup($, key, { kind: 'rows', rows: answer.rows, count: answer.count })
-  if (out.state !== 'none' && out.group === key) await endQuestion($, 'answered')
+  if (out.state !== 'none' && out.group === key) await endQuestion($, 'answered', out.id)
 }
 
 export const register: Register = (on, options) => {
@@ -1062,14 +1078,14 @@ export const register: Register = (on, options) => {
             void endIfQuiet($, out.id, startedAtEnd).catch(() => undefined)
           })
         } else if (out.turnId === e.turnId) {
-          await endQuestion($, 'unanswered')
+          await endQuestion($, 'unanswered', out.id)
         } else if (out.behind === e.turnId) {
           const at = await $.clock.now()
           await update($, question, (current): PlateQuestion =>
             current.state !== 'none' && current.id === out.id ? { ...current, behindEndedAt: at } : current,
           )
         } else if (out.state === 'waiting' && out.turnId === null && out.behind === undefined) {
-          await endQuestion($, 'unanswered')
+          await endQuestion($, 'unanswered', out.id)
         }
       }
     } catch {
