@@ -3,7 +3,8 @@
 // WHEN IT DRAWS. Only once the person asks: /plate, or the pane's own refresh once it is open.
 // Nothing here opens a pane, reads the board or sets a status line from the session's start, a
 // timer or anything the AI does on its own; until the person asks, the pane's state is "unasked"
-// and it draws nothing.
+// and it draws nothing. It only notes which main-loop turn is running, so that a question it puts
+// later is never ended by the turn it was queued behind.
 //
 // WHAT IT DRAWS (the design approved on 8 Oct, parts/where-it-shows.md section 8). The day and one
 // line of counts; four tabs, one per group, the chosen one the primary button; a bordered card per
@@ -30,7 +31,8 @@
 // at a time, across the plate and its groups: while one is unanswered, every read the person starts
 // still tries the board and sends nothing more, and the pane says it waits on the AI. The question
 // ends with its own turn, or failing that the first turn to end after the session took it; if
-// nothing came, the pane says so. Any other refusal of the engine's (a deny rule, don't-ask mode, a
+// nothing came, the pane says so. Put while another turn is running, it waits behind that turn:
+// that turn's end does not end it, and the next main-loop turn is its own whatever it opens with. Any other refusal of the engine's (a deny rule, don't-ask mode, a
 // hook) is not cured by asking: the pane says Claude Code does not let it read here, and asks
 // nothing. Every read the person starts tries the board first, so a change of mode takes effect at
 // once.
@@ -53,7 +55,8 @@
 //
 // WHAT IT KEEPS. The last plate this session read, and each later group it read, in the session's
 // own state (`$.state`), so a failed read can still show the plate with its time and a group opened
-// again is not read again until the next Refresh, which forgets every group's rows. Nothing is written to disk and nothing is shared with another session,
+// again is not read again: until the next Refresh, which forgets every group's rows, or a plate
+// arriving with that group's count changed. Nothing is written to disk and nothing is shared with another session,
 // so a failed read never shows anyone else's plate.
 //
 // WHOSE WORDS. Titles, what a row is, the names of what it is part of, and the members it names
@@ -208,9 +211,10 @@ const isLaterRow = (row: unknown): row is PlateLaterRow =>
 /** What a row is part of, when the reply says so in a shape the pane can read. */
 function partOf(value: unknown): PlatePart | undefined {
   if (value === null || typeof value !== 'object') return undefined
-  const part = value as Partial<PlatePart>
+  const part = value as { id?: unknown; name?: unknown; unfiled?: unknown }
+  // What is not filed yet has no number and no name: known by its mark, read first.
+  if (part.unfiled === true) return { id: null, name: null, unfiled: true }
   if (!isNumber(part.id)) return undefined
-  if (part.unfiled === true) return { id: part.id, name: null, unfiled: true }
   const name = textOf(part.name)
   return name === undefined ? undefined : { id: part.id, name }
 }
@@ -506,14 +510,29 @@ const setGroup = ($: EngineInterface, key: string, next: PlateGroupView) =>
 
 /**
  * Shows a plate. A row's done stays where it stood while its item is still on the plate, and is
- * forgotten once a plate arrives without it, as is its talk.
+ * forgotten once a plate arrives without it; its talk is offered again by every plate that arrives.
+ * A later group whose count changed (or that is no longer listed) loses its kept rows, and closes.
  */
 async function show($: EngineInterface, plate: PlateReply, server: string, named: boolean): Promise<void> {
   const onPlate = new Set([...plate.now, ...plate.waiting, ...plate.coming].map(row => String(row.id)))
-  const onlyOnPlate = (current: Record<string, PlateAsk>) =>
-    Object.fromEntries(Object.entries(current).filter(([id]) => onPlate.has(id)))
-  await update($, asked, onlyOnPlate)
-  await update($, talks, onlyOnPlate)
+  await update($, asked, (current): Record<string, PlateAsk> =>
+    Object.fromEntries(Object.entries(current).filter(([id]) => onPlate.has(id))),
+  )
+  await update($, talks, (current): Record<string, PlateAsk> =>
+    Object.fromEntries(Object.entries(current).filter(([id, state]) => onPlate.has(id) && state === 'sending')),
+  )
+  const counts = new Map((plate.later_groups ?? []).map(group => [keyOf(group), group.count]))
+  const stale = Object.entries(await read($, groups))
+    .filter(([key, state]) => state.kind === 'rows' && counts.get(key) !== state.count)
+    .map(([key]) => key)
+  if (stale.length > 0) {
+    await update($, groups, (current): Record<string, PlateGroupView> =>
+      Object.fromEntries(
+        Object.entries(current).filter(([key, state]) => !(stale.includes(key) && state.kind === 'rows' && counts.get(key) !== state.count)),
+      ),
+    )
+    await update($, openGroup, current => (current !== null && stale.includes(current) ? null : current))
+  }
   await update($, source, () => server)
   await update($, plateHeld, () => false)
   await update($, view, (): PlateView => ({ kind: 'shown', plate, server, named }))
@@ -640,8 +659,18 @@ async function askTheAI($: EngineInterface, text: string, group?: string): Promi
   })
 }
 
-/** Submits the question as the person's own words, and says so plainly when it was not taken. */
+/**
+ * Submits the question as the person's own words, and says so plainly when it was not taken. A
+ * question put while another main-loop turn runs is queued behind it, and the session takes it at
+ * once: so the turn running now is noted on the question, and its end does not end it.
+ */
 async function putTheQuestion($: EngineInterface, text: string, group: string | undefined): Promise<void> {
+  const behind = await read($, runningTurn)
+  if (behind !== null) {
+    await update($, question, (current): PlateQuestion =>
+      current.state !== 'none' && current.text === text && current.group === group ? { ...current, behind } : current,
+    )
+  }
   let isTaken = false
   try {
     isTaken = (await $.prompt.submit({ text, asUser: true })).drop === undefined
@@ -746,7 +775,8 @@ async function findTheGroup($: EngineInterface, server: string, key: string): Pr
 /**
  * Reads one later group the person opened, the same way a plate read goes: directly, within
  * READ_LIMIT_MS; refused by the classifier, one question to the AI on this press; refused
- * otherwise, the line saying the pane may not read here. Its rows, once read, are kept.
+ * otherwise, the line saying the pane may not read here. Its rows, once read, are kept. A group
+ * closed before its read answers drops that read: it asks no one.
  */
 async function readGroup($: EngineInterface, group: PlateLaterGroup): Promise<void> {
   const key = keyOf(group)
@@ -770,6 +800,13 @@ async function readGroup($: EngineInterface, group: PlateLaterGroup): Promise<vo
     await update($, refusedHere, () => false)
   }
   if (newestGroupRead.get(key) !== mine) return
+  // Closed while its read was on its way: the read is dropped, and asks no one.
+  if ((await read($, openGroup)) !== key) {
+    await update($, groups, (current): Record<string, PlateGroupView> =>
+      current[key]?.kind === 'loading' ? Object.fromEntries(Object.entries(current).filter(([one]) => one !== key)) : current,
+    )
+    return
+  }
   if (found === 'late' || found.kind === 'failed') await setGroup($, key, { kind: 'failed' })
   else if (found.kind === 'rows') await setGroup($, key, found)
   else if (found.kind === 'blocked') await setGroup($, key, { kind: 'blocked' })
@@ -824,21 +861,30 @@ async function isTakenBy($: EngineInterface, text: string): Promise<boolean> {
  */
 async function askDone($: EngineInterface, row: PlateRow): Promise<void> {
   const key = String(row.id)
-  const now = (await read($, asked))[key]
-  if (now === 'sending' || now === 'sent') return
-  await update($, asked, (current): Record<string, PlateAsk> => ({ ...current, [key]: 'sending' }))
+  // Decided where the value is written, so a double press posts once.
+  let isMine = false
+  await update($, asked, (current): Record<string, PlateAsk> => {
+    isMine = current[key] !== 'sending' && current[key] !== 'sent'
+    return isMine ? { ...current, [key]: 'sending' } : current
+  })
+  if (!isMine) return
   const outcome: PlateAsk = (await isTakenBy($, `Mark item ${row.id} done.`)) ? 'sent' : 'unsent'
   await update($, asked, (current): Record<string, PlateAsk> => ({ ...current, [key]: outcome }))
 }
 
 /**
  * Talk about it: asks the person's AI about one item, by its number alone ("Tell me about item
- * <n>."), on each press. It carries nothing anyone else wrote.
+ * <n>."), once per item until a plate arrives again. It carries nothing anyone else wrote.
  */
 async function askTalk($: EngineInterface, row: PlateRow): Promise<void> {
   const key = String(row.id)
-  if ((await read($, talks))[key] === 'sending') return
-  await update($, talks, (current): Record<string, PlateAsk> => ({ ...current, [key]: 'sending' }))
+  // Decided where the value is written, so a double press posts once.
+  let isMine = false
+  await update($, talks, (current): Record<string, PlateAsk> => {
+    isMine = current[key] !== 'sending' && current[key] !== 'sent'
+    return isMine ? { ...current, [key]: 'sending' } : current
+  })
+  if (!isMine) return
   const outcome: PlateAsk = (await isTakenBy($, `Tell me about item ${row.id}.`)) ? 'sent' : 'unsent'
   await update($, talks, (current): Record<string, PlateAsk> => ({ ...current, [key]: outcome }))
 }
@@ -869,8 +915,9 @@ async function followTheAI(
     await show($, answer.plate, server, known.length > 1)
     return
   }
-  // A later group's read never replaces the plate: it is that group's rows, kept.
-  const key = answer.key ?? askedFor
+  // A later group's read never replaces the plate: it is that group's rows, kept under the part
+  // the AI named, else the group the reply names.
+  const key = askedFor ?? answer.key
   if (key === undefined) return
   groupReadsMade += 1
   newestGroupRead.set(key, groupReadsMade)
@@ -924,18 +971,18 @@ export const register: Register = (on, options) => {
     return ran
   }).catch(($, e, next) => next(e))
 
-  // The main loop's turns, once the person has asked: which one runs now, and the question's own,
-  // known by its words when it starts. Before the person asks, these do nothing.
+  // The main loop's turns: which one runs now (noted from the start, and nothing else before the
+  // person asks), and the question's own. That is the turn opening with its words or, for a
+  // question queued behind a running turn, the next turn after that one, whatever it opens with.
   on('turn.start', async ($, e, next) => {
     try {
-      if ((await read($, view)).kind !== 'unasked') {
-        await update($, runningTurn, () => e.turnId)
-        const out = await read($, question)
-        if (out.state !== 'none' && out.turnId === null && e.text === out.text) {
-          await update($, question, (current): PlateQuestion =>
-            current.state !== 'none' && current.turnId === null ? { ...current, turnId: e.turnId } : current,
-          )
-        }
+      await update($, runningTurn, () => e.turnId)
+      const out = await read($, question)
+      const isQueued = out.state !== 'none' && out.behind !== undefined && e.turnId !== out.behind
+      if (out.state !== 'none' && out.turnId === null && (isQueued || e.text === out.text)) {
+        await update($, question, (current): PlateQuestion =>
+          current.state !== 'none' && current.turnId === null ? { ...current, turnId: e.turnId } : current,
+        )
       }
     } catch {
       // The turn goes on whatever happens here.
@@ -945,13 +992,15 @@ export const register: Register = (on, options) => {
 
   // A question ends with its own turn or, failing that, with the first main-loop turn to end after
   // the session took it, whatever words that turn opened with: it never stays out for the session.
+  // The turn it was queued behind is not that turn: its end leaves the question out.
   on('turn.complete', async ($, e, next) => {
     const ended = await next(e)
     try {
-      if (e.agentId === undefined && (await read($, view)).kind !== 'unasked') {
+      if (e.agentId === undefined) {
         await update($, runningTurn, current => (current === e.turnId ? null : current))
         const out = await read($, question)
-        if (out.state !== 'none' && (out.turnId === e.turnId || out.state === 'waiting')) {
+        const isBehind = out.state !== 'none' && out.behind === e.turnId
+        if (out.state !== 'none' && (out.turnId === e.turnId || (out.state === 'waiting' && !isBehind))) {
           await endQuestion($, 'unanswered')
         }
       }
@@ -1038,12 +1087,11 @@ export const register: Register = (on, options) => {
         )
       }
       if (ask === 'sent') {
-        return [
-          button,
+        return (
           <Box key={`status:talk-sent:${row.id}`}>
             <Text dimColor>Sent to your AI.</Text>
-          </Box>,
-        ]
+          </Box>
+        )
       }
       if (ask === 'unsent') {
         return [
@@ -1096,7 +1144,7 @@ export const register: Register = (on, options) => {
           {pieces.length > 0 && (
             <Box key={`line:${row.id}`} gap={1}>
               {pieces.flatMap((piece, at) => [
-                ...(at > 0 ? [<Text dimColor>{'\u{b7}'}</Text>] : []),
+                ...(at > 0 ? [<Text key={`sep:${row.id}:${at}`} dimColor>{'\u{b7}'}</Text>] : []),
                 <Box key={piece.key} flexShrink={1}>
                   <Text dimColor wrap="truncate-end">
                     {piece.text}
@@ -1257,13 +1305,20 @@ export const register: Register = (on, options) => {
           </Box>
         )
       }
-      if (listed.length === 0) return nothingHere
+      // The board lists the largest groups and counts the rest.
+      const more = isNumber(plate.later_groups_more) && plate.later_groups_more > 0 ? plate.later_groups_more : 0
+      if (listed.length === 0 && more === 0) return nothingHere
       return (
         <Box flexDirection="column" marginTop={1}>
           <Text dimColor wrap="wrap">
             Grouped by what each item belongs to.
           </Text>
           {listed.map(group => groupBox(plate, group))}
+          {more > 0 && (
+            <Box key="datum:later_groups_more:later" marginTop={1}>
+              <Text dimColor>{`And ${more} more ${more === 1 ? 'group' : 'groups'}.`}</Text>
+            </Box>
+          )}
         </Box>
       )
     }
@@ -1311,7 +1366,9 @@ export const register: Register = (on, options) => {
       <Box flexDirection="column">
         <Box gap={1} marginTop={1}>
           {TABS.map(each => (
-            <Text dimColor>{each.name}</Text>
+            <Text key={`placeholder-tab:${each.key}`} dimColor>
+              {each.name}
+            </Text>
           ))}
         </Box>
         {[1, 2].map(n => (

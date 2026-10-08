@@ -31,10 +31,12 @@ connected rather than by a name written into it (only a server offering both `re
 is ever asked), and never writes: a card's Done ("Mark item <n> done.") and Talk about it ("Tell
 me about item <n>.") are sentences carrying the item's number alone, to the person's AI, which does
 the writing. Opening a later group reads that group (`recall` with `part`) from the board the plate
-came from. Tags come from each row's own fields, never from `plain`; an answer without `part`,
-`moved`, `about` or `later_groups` still draws, with later as a count. It keeps the last plate, and
-each later group it read until the next Refresh, in the session's own state and nowhere else:
-nothing on disk, nothing shared between sessions.
+came from: the board lists the 30 largest groups and counts the rest (`later_groups_more`). Tags
+come from each row's own fields, never from `plain`; an answer without `part`, `moved`, `about` or
+`later_groups` still draws, with later as a count. Talk about it sends once per item until the next
+plate arrives, as Done sends once until the item leaves it. It keeps the last plate, and each later
+group it read (until Refresh, or until a plate arrives with that group's count changed), in the
+session's own state and nowhere else: nothing on disk, nothing shared between sessions.
 
 In auto mode, `/plate`, Refresh and opening a later group put one question and the AI's answer in
 the chat: each tries the direct read first and, when the auto mode classifier refuses it, sends the
@@ -43,7 +45,9 @@ or "Show my later items in plate group <part>." for a group (its number alone: a
 someone else's words, as a title is), then draws what the AI's own
 `recall` returns through `tool.call`; a group's read never replaces the plate. One question at a
 time, across the plate and its groups; it ends with its own turn, or the first turn to end after it
-was taken. Done is marked by the AI, and the pane updates on the next plate it sees. Nothing else
+was taken. A question put while another main-loop turn runs is queued behind that turn: that turn's
+end leaves it out, and the next main-loop turn is the question's own, whatever words it opens with.
+Done is marked by the AI, and the pane updates on the next plate it sees. Nothing else
 ever posts in the person's name: not the AI's track or reads, a subagent's, a timer, or the
 session's start.
 

@@ -1,12 +1,12 @@
 // The plate pane's contract: the reply it reads and the state it draws from.
 
-/** What an item is part of: its readable parent, or the holder of work not filed yet. */
-export type PlatePart = {
-  id: number
-  /** The parent's name; null for the holder of unfiled work. */
-  name: string | null
-  unfiled?: boolean
-}
+/**
+ * What an item is part of: its readable parent, by number and name, or, for work not filed yet,
+ * no number and no name, only the mark.
+ */
+export type PlatePart =
+  | { id: number; name: string | null; unfiled?: undefined }
+  | { id: null; name: null; unfiled: true }
 
 /** One row of a plate, as the board's recall answers it for the plate view. */
 export type PlateRow = {
@@ -62,8 +62,10 @@ export type PlateReply = {
   now: PlateRow[]
   waiting: PlateRow[]
   coming: PlateRow[]
-  /** The later items by what each belongs to; absent from today's server, which counts them only. */
+  /** The later items by what each belongs to, the largest 30; absent from today's server. */
   later_groups?: PlateLaterGroup[]
+  /** How many later groups there are beyond those listed. */
+  later_groups_more?: number
   /** A later group read's rows; absent on a plate look. */
   later?: PlateLaterRow[]
   people: Record<string, string>
@@ -81,10 +83,11 @@ export type PlateTab = 'now' | 'waiting' | 'coming' | 'later'
  * The one question the pane may have put to the person's AI, when the engine refused the pane its
  * own read: none, on its way, or taken by the session and waiting for its turn (`turnId` once that
  * turn has started). `group` names the later group it asks for; absent, it asks for the plate.
+ * `behind` is the main-loop turn that was running when it was put, which it queued behind.
  */
 export type PlateQuestion =
   | { state: 'none' }
-  | { state: 'sending' | 'waiting'; text: string; turnId: string | null; group?: string }
+  | { state: 'sending' | 'waiting'; text: string; turnId: string | null; group?: string; behind?: string }
 
 /**
  * What one later group shows once opened. Its rows, once read, are kept for the session. `held`
@@ -125,7 +128,7 @@ declare module 'claude-code' {
       view: PlateView
       /** Each row's done, by item number, kept until that item leaves the plate. */
       asked: Record<string, PlateAsk>
-      /** Each row's talk about it, by item number, kept until that item leaves the plate. */
+      /** Each row's talk about it, by item number, until a plate arrives again. */
       talks: Record<string, PlateAsk>
       /** The servers offering both recall and track, as the latest read found them. */
       boards: string[]
