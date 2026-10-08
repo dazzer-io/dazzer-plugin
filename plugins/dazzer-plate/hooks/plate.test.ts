@@ -185,6 +185,16 @@ type Call = { server: string; tool: string; args: Record<string, unknown> }
 /** What becomes of a prompt the pane submits: it enters, a hook drops it, or the call fails. */
 type Submit = 'enter' | 'drop' | 'fail'
 
+/**
+ * How the engine refused the pane's own read in the operator's Desktop session, in auto
+ * permission mode (the live try): the words `$.mcp.call` threw.
+ */
+const REFUSED =
+  "The server-side auto mode classifier gave no verdict for mcp__dazzer__recall: the request that produced this action did not ask for one. Issue the action again once, as-is; if it is denied again, continue with other tasks that don't require it."
+
+/** The question the pane sends the person's AI when it may not read the board itself. */
+const QUESTION = `What is on my plate? My time zone is ${ZONE}.`
+
 type World = {
   opened: unknown[]
   calls: Call[]
@@ -194,9 +204,14 @@ type World = {
   clock: MockClock
   /** What the next prompt the pane submits meets. */
   submit: Submit
+  /** Every key the plugin wrote to or removed from the store, in order. */
+  storeWrites: string[]
   /** Holds the next recall until `release` is called. */
   hold: () => void
   release: () => void
+  /** Holds the prompts the pane submits until `releaseSubmit` is called. */
+  holdSubmit: () => void
+  releaseSubmit: () => void
 }
 
 type Setting = {
@@ -211,6 +226,8 @@ type Setting = {
 function world(on: On, tools: ToolInfo[], servers: Record<string, ServerAnswer[]>, setting: Setting = {}): World {
   let gate: Promise<void> | undefined
   let open: () => void = () => {}
+  let submitGate: Promise<void> | undefined
+  let openSubmit: () => void = () => {}
   const turns: Record<string, number> = {}
   const w: World = {
     opened: [],
@@ -220,6 +237,7 @@ function world(on: On, tools: ToolInfo[], servers: Record<string, ServerAnswer[]
     registered: [],
     clock: mock.clock(on, { now: Date.parse('2026-10-07T06:15:00Z') }),
     submit: 'enter',
+    storeWrites: [],
     hold: () => {
       gate = new Promise<void>(resolve => {
         open = resolve
@@ -229,8 +247,31 @@ function world(on: On, tools: ToolInfo[], servers: Record<string, ServerAnswer[]
       gate = undefined
       open()
     },
+    holdSubmit: () => {
+      submitGate = new Promise<void>(resolve => {
+        openSubmit = resolve
+      })
+    },
+    releaseSubmit: () => {
+      submitGate = undefined
+      openSubmit()
+    },
   }
-  mock.store(on, setting.store ?? {})
+  // The store, answered from memory and watched: what another session left there is readable,
+  // and every write is recorded.
+  const stored = new Map<string, unknown>(Object.entries(setting.store ?? {}))
+  on('store.get', ($, e) => ({ value: stored.get(e.key) }))
+  on('store.set', ($, e) => {
+    w.storeWrites.push(e.key)
+    stored.set(e.key, e.value)
+    return { value: undefined }
+  })
+  on('store.delete', ($, e) => {
+    w.storeWrites.push(e.key)
+    stored.delete(e.key)
+    return { value: undefined }
+  })
+  on('store.keys', () => ({ value: [...stored.keys()] }))
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   on('command.register', ($, e) => {
     w.registered.push(e.name)
@@ -257,8 +298,9 @@ function world(on: On, tools: ToolInfo[], servers: Record<string, ServerAnswer[]
     w.statuses.push(e)
     return { value: undefined }
   })
-  on('prompt.submit', ($, e) => {
+  on('prompt.submit', async ($, e) => {
     w.said.push({ text: e.text, origin: e.origin })
+    if (submitGate !== undefined) await submitGate
     if (w.submit === 'fail') throw new Error('the session could not take the prompt')
     return w.submit === 'drop' ? { drop: 'a hook dropped it' } : { text: e.text }
   })
@@ -347,6 +389,7 @@ test('nothing draws before the person asks', async ($, on) => {
   expect(w.opened, NOT_ASKED).toEqual([])
   expect(w.statuses, NOT_ASKED).toEqual([])
   expect(w.calls, NOT_ASKED).toEqual([])
+  expect(w.said, NOT_ASKED).toEqual([])
   for (const surface of SURFACES) {
     const ui = await mount($, surface)
     expect(wordsOf(await ui.drawn()), NOT_ASKED).toBe('')
@@ -451,9 +494,12 @@ test('while the plate is read, the pane shows its layout and never an empty plat
 })
 
 test('a failed read says so in one line and never shows an empty plate', async ($, on) => {
-  world(on, DAZZER_TOOLS, { dazzer: [{ refuse: 'connection refused' }] })
+  const w = world(on, DAZZER_TOOLS, { dazzer: [{ refuse: 'connection refused' }] })
   await $.session.start(STARTED)
   await $.command.run(ASK)
+  await settle(w)
+  // A plain failure to reach the board is not the engine refusing the pane: nothing goes to the AI.
+  expect(w.said, 'a plain failure was handed to the AI').toEqual([])
 
   for (const surface of SURFACES) {
     const ui = await mount($, surface)
@@ -755,6 +801,110 @@ test('a hostile title is drawn as plain text, never a link or a control', async 
     )
     await ui.unmount()
   }
+})
+
+// ---------------------------------------------------------------------------------------------
+// When the engine will not let the pane read the board itself (auto permission mode, as the live
+// try in the Desktop app found), the pane asks the person's AI and draws the plate the AI reads.
+
+test('when the engine refuses the pane its own read, it asks the AI and draws the plate the AI reads', async ($, on) => {
+  const w = world(on, DAZZER_TOOLS, { dazzer: [{ refuse: REFUSED }] })
+  await $.session.start(STARTED)
+  await $.command.run(ASK)
+  await settle(w)
+
+  expect(w.said, 'the refused read was not handed to the AI').toEqual([
+    { text: QUESTION, origin: { kind: 'plugin', name: PLUGIN, asUser: true } },
+  ])
+  for (const surface of SURFACES) {
+    const ui = await mount($, surface)
+    expect(await textAt(ui, 'status:asking')).toBe('Asking your AI.')
+    expect(wordsOf(await ui.drawn())).not.toContain('Could not reach Dazzer')
+    await keep('asking', ui)
+    await ui.unmount()
+  }
+
+  // The AI reads the plate, its reply in the board's real shape: the pane draws that answer.
+  await $.tool.call({ tool: 'mcp__dazzer__recall', tool_use_id: 't1', query: 'What is on my plate?', view: 'plate', time_zone: ZONE })
+  await settle(w)
+  for (const surface of SURFACES) {
+    const ui = await mount($, surface)
+    expect(await ui.find({ key: 'status:asking' })).toBeUndefined()
+    expect(await textAt(ui, 'datum:plain:later')).toBe('34 more things can wait until later.')
+    await ui.unmount()
+  }
+  expect(w.calls).toHaveLength(1)
+})
+
+test('a wait for the AI ends after 20 seconds in one failed line, keeping the last plate', async ($, on) => {
+  const w = world(on, DAZZER_TOOLS, { dazzer: [answered(PLATE), { refuse: REFUSED }] })
+  await $.session.start(STARTED)
+  await $.command.run(ASK)
+  const ui = await mount($, 'terminal')
+  await ui.press({ key: 'refresh' })
+  await settle(w)
+  expect(w.said.map(said => said.text)).toEqual([QUESTION])
+  expect(await textAt(ui, 'status:asking')).toBe('Asking your AI.')
+  expect(await textAt(ui, 'datum:row.title:6217')).toBe('YC application, this week')
+
+  await w.clock.advance(19_998)
+  expect(await textAt(ui, 'status:asking')).toBe('Asking your AI.')
+  await settle(w)
+  expect(await textAt(ui, 'status:failed'), 'the wait for the AI never ended').toBe('Could not reach Dazzer.')
+  expect(await textAt(ui, 'datum:as_of:last')).toMatch(/^as of [A-Z][a-z]{2} \d{1,2} [A-Z][a-z]{2} \d{2}:\d{2}$/)
+  expect(await textAt(ui, 'datum:row.title:6217')).toBe('YC application, this week')
+})
+
+test('once refused, later reads go straight to the AI, with no refused call each time', async ($, on) => {
+  const w = world(on, DAZZER_TOOLS, { dazzer: [{ refuse: REFUSED }] })
+  await $.session.start(STARTED)
+  await $.command.run(ASK)
+  await settle(w)
+  const ui = await mount($, 'desktop')
+  await ui.press({ key: 'refresh' })
+  await settle(w)
+  await $.command.run(ASK)
+  await settle(w)
+
+  expect(w.calls, 'the pane tried its own read again after it was refused').toHaveLength(1)
+  expect(w.said.map(said => said.text)).toEqual([QUESTION, QUESTION, QUESTION])
+  expect(await textAt(ui, 'status:asking')).toBe('Asking your AI.')
+})
+
+test('while the session takes a done, the row says it is sending, on both surfaces', async ($, on) => {
+  const w = world(on, DAZZER_TOOLS, { dazzer: [answered(PLATE)] })
+  await $.session.start(STARTED)
+  await $.command.run(ASK)
+  w.holdSubmit()
+  const first = await mount($, 'terminal')
+  const pressing = first.press({ key: 'done:7236' })
+  while (w.said.length === 0) await new Promise<void>(resolve => setTimeout(resolve, 5))
+
+  for (const surface of SURFACES) {
+    const ui = surface === 'terminal' ? first : await mount($, surface)
+    expect(await textAt(ui, 'status:sending:7236')).toBe('Sending to your AI.')
+    expect(await ui.find({ key: 'done:7236' })).toBeUndefined()
+    await keep('sending', ui)
+    if (ui !== first) await ui.unmount()
+  }
+  w.releaseSubmit()
+  await pressing
+  expect(await textAt(first, 'status:sent:7236')).toBe('Sent to your AI.')
+})
+
+test('the pane writes nothing to the store, whatever a session does', async ($, on) => {
+  const w = world(on, DAZZER_TOOLS, { dazzer: [answered(PLATE), { refuse: 'connection refused' }, { refuse: REFUSED }] })
+  await $.session.start(STARTED)
+  await $.command.run(ASK)
+  const ui = await mount($, 'terminal')
+  await ui.press({ key: 'done:7236' })
+  await ui.press({ key: 'refresh' })
+  await ui.press({ key: 'refresh' })
+  await settle(w)
+  await $.tool.call({ tool: 'mcp__dazzer__recall', tool_use_id: 't1', query: 'what is on my plate' })
+  await $.tool.call({ tool: 'mcp__dazzer__track', tool_use_id: 't2', id: 7236 })
+  await settle(w)
+  expect(w.storeWrites, 'the pane wrote to the store').toEqual([])
 })
 
 const OFF: PluginOptions = { plate: 'off' }
