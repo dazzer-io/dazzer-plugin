@@ -199,16 +199,17 @@ default — that is the tool makers' own default, not a choice of ours — so wh
 first installed is the version you keep, indefinitely. A machine was found sitting several versions
 behind while reporting itself perfectly healthy.
 
-**Claude Code** — both lines, in this order, then restart Claude Code:
+**Claude Code** — every line, in this order, then restart Claude Code:
 
 ```
 claude plugin marketplace update dazzer
 claude plugin update dazzer@dazzer
 claude plugin update dazzer-connect@dazzer
+claude plugin update dazzer-plate@dazzer
 ```
 
-The first refreshes the list of what exists. The second and third are what actually move the
-version you are running, and the second and third are what people were missing.
+The first refreshes the list of what exists. The lines after it are what actually move the
+version you are running, and they are what people were missing.
 
 **The first line on its own does nothing to the plugin you are using, and says otherwise.** It
 prints `✔ Successfully updated marketplace: dazzer` and leaves you on exactly the version you were
@@ -217,7 +218,8 @@ still reporting the previous version, old behaviour intact after a restart. A su
 means "the catalogue is current", read as "you are current", is the whole trap. Only
 `claude plugin update` changes the answer, and only a restart applies it.
 
-Drop the third line if you never installed the connection separately.
+Drop the third line if you never installed the connection separately, and the fourth if you never
+installed the plate pane (below).
 
 To stop doing this by hand: open the plugin panel with `/plugin`, go to **Marketplaces**, choose
 **dazzer**, and select **Enable auto-update**. It keeps itself current after that.
@@ -376,6 +378,80 @@ all. Nothing reported an error — the install simply handed out a months-old ve
 file has been removed. Reading a tool's documentation was not enough here, and it was not enough
 for two of the others either.
 
+## Your plate beside the chat (Claude Code only)
+
+A pane that shows your plate from your Dazzer board: what needs you now, what is waiting on
+someone else, what is coming up, and how many things can wait. It is Claude Code only, and a plugin
+of its own, so nobody gets a pane they did not ask for.
+
+```
+/plugin install dazzer-plate@dazzer
+```
+
+Typed into Claude itself, after the two Claude Code lines above. On the desktop app, install it
+from a terminal the same way; the app picks it up on your next conversation.
+
+**Then type `/plate`.** Nothing opens by itself: the pane draws only once you ask, and its
+**Refresh** button reads your plate again. At the top: the day, and one line of counts. Below it,
+four tabs: **Needs you**, **Waiting**, **Coming up** and **Later**, each with its count. Each thing
+on a tab is a card: a coloured tag saying why it is there (`8 DAYS LATE`, `WAITING ON YOU · 6 DAYS`,
+`STARTED`, `ON GAL · 65 DAYS`, `DUE SAT 10 OCT`, with `(A GUESS)` where Dazzer read it from the words
+and is unsure), its title as it was written, and one line saying what it is part of, who it is from
+and when it last moved, ending `maybe yours (a guess)` where Dazzer is unsure it is yours to do.
+**Open** shows what it is, and two buttons:
+
+- **Done** sends your AI one sentence with that item's number and nothing else (`Mark item 7240
+  done.`). **Your AI marks it done, and the pane updates on the next plate it sees.** The card says
+  it was sent only once your session took the sentence, and keeps saying so until a plate arrives
+  without that item; if it was not taken, it says so and offers Done again.
+- **Talk about it** sends `Tell me about item 7240.`, so you and your AI can talk it through. It
+  sends once for that item until the pane reads your plate again, so a double click never sends it
+  twice.
+
+The title never goes with either: anyone in your workspace can write a title, and those sentences
+go as your own words.
+
+**Later** lists what can wait, grouped by what each thing belongs to, each with its count: the 30
+largest groups, then how many more groups there are. Open a group to see its items and when each
+last moved. Once read, a group stays read until you press **Refresh**, which forgets every group, or
+until the pane reads your plate again and that group's count has changed; then the next Open reads
+it again. Until your Dazzer board sends those groups, Later shows how many things can wait.
+
+**It needs Dazzer connected** (see Reaching your Brain above): it reads through the connection
+Claude Code already has and brings none of its own. It looks only among the tools your session has
+right now, and only at a server offering both of Dazzer's recall and track, so your words, your
+time zone and the pane's name never go to any other server. When it finds none, the pane says
+Dazzer was not found here and how to connect it. A read that has not answered in 20 seconds says
+it could not reach Dazzer, rather than waiting forever.
+
+**In auto mode, /plate, Refresh and opening a later group put one question and your AI's answer
+in your chat.** Where Claude Code lets the pane read your plate itself, nothing appears in your chat.
+In auto mode it does not, so `/plate` and **Refresh** each try the read first and, when it is
+refused, put one question to your AI, as your own words: `What is on my plate? My time zone is <your
+time zone>.` Opening a later group does the same for that group: `Show my later items in plate
+group <its number>.` Its name never goes with it, for the same reason a title never does. The pane
+draws what your AI reads. One question at a time: while one is unanswered, the pane sends nothing
+more and says it is waiting on your AI. If your AI is busy when the pane asks, the question waits
+its turn behind the current reply and anything you typed meanwhile, and the pane keeps saying it
+asked until the question's own turn ends. If that question never runs (you pressed Esc), the pane
+lets your next press ask again once your AI has been idle for 10 seconds.
+
+**Nothing else ever posts in your name.** Only `/plate`, **Refresh**, opening a later group, and a
+card's **Done** and **Talk about it** do, and only when you use them.
+
+**What it keeps:** the last plate it read, and each later group it read (until the next Refresh, or
+until that group's count changes), in this session's memory only, so a read that fails can still
+show your plate with the time it was read. Nothing is saved to disk, and nothing is shared with
+another session or another account.
+
+To keep `/plate` from being offered at all, set its **Plate pane** option to **off** in `/config`.
+
+What is proven: its tests draw every state on both the terminal and the desktop app. Watched live in
+the desktop app in auto mode, on the version before commit fa5da50 (which added the one-question
+limit): the pane asked your AI, drew the plate it read, and its done buttons reached your AI. Not yet
+watched live: the one-question limit, a direct read in the desktop app outside auto mode, and the
+tabs, cards, Talk about it and later groups drawn on 8 Oct.
+
 ## Two pieces, on purpose
 
 **`dazzer`** is the part that changes behaviour: the reminders, the capture sweep, and the skill.
@@ -390,6 +466,10 @@ connected through the app should never have to re-authenticate to get a few remi
 
 The trade is honest and worth stating: without `dazzer-connect`, we cannot tell your traffic
 apart from a hand-configured connection. A plugin that disconnects someone is the worse outcome.
+
+**`dazzer-plate`** is the plate pane, for Claude Code only, and optional. It is separate for the
+same reason in reverse: it needs a connection rather than bringing one, and Codex refuses the
+shared reminders file over the one line a pane needs, so it cannot live in `dazzer`.
 
 ## What it does
 
@@ -421,6 +501,12 @@ already owns and reads the current rules from your Brain at the moment it acts.
 
 That is deliberate: it means the rules can change in your Brain and take effect immediately,
 without you updating anything.
+
+The plate pane is the one piece that reads from Dazzer itself, and only once you ask: it asks for
+your plate through the connection Claude Code already has, where Claude Code allows it, holds no
+credentials of its own, and never writes. In auto mode, `/plate`, Refresh and opening a later group
+put one question to your AI instead, so that question and its answer appear in your chat. Marking a
+card done, or asking to talk about it, is a sentence to your AI, which does the writing.
 
 ## Where the rules live
 
@@ -472,6 +558,12 @@ If you also installed the connection, and you want that gone too:
 
 Leave that second one in place if Dazzer is still how you reach your Brain — removing it
 takes the connection with it.
+
+If you installed the plate pane:
+
+```
+/plugin uninstall dazzer-plate@dazzer
+```
 
 On Antigravity there is a third piece, because its reminders could not travel in the same file as
 everyone else's:

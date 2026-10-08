@@ -7,3 +7,6 @@
 # Records that a review ran against one exact commit on ONE machine. Sharing it would let
 # the gate read someone else's approval as if it were this machine's.
 .claude/pr-gate/
+# What a proof writes for itself on each run (the plate pane's kept states, read by the words
+# check). The proof deletes it before every run, so it never holds anything worth keeping.
+tmp/

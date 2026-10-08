@@ -15,11 +15,46 @@ What people install so their AI actually uses their Dazzer memory. It adds three
 check the memory before answering, save what settled once enough has accumulated, and get
 re-oriented after a context reset.
 
-**It never talks to Dazzer.** It has no credentials and no reliable moment at which a
-connection is up. All it does is tap the model at the right instant; the model then acts
-through the connection it already owns and reads the current rules from the Brain at the
+**The behaviour plugin never talks to Dazzer.** It has no credentials and no reliable moment
+at which a connection is up. All it does is tap the model at the right instant; the model then
+acts through the connection it already owns and reads the current rules from the Brain at the
 moment it acts. That is why the shipped script is near-static: **change the rules in the
 Brain, not here.**
+
+**The plate pane is the one piece that reads from Dazzer**, and it is its own plugin
+(`plugins/dazzer-plate`, Claude Code only, optional). Only once the person asks (`/plate`, or the
+pane's Refresh), it calls the board's `recall` for the plate view through the connection the
+person's Claude Code already has (`$.mcp.call`, the engine's own connection and credentials). It
+also re-reads after the AI's own track, except in a session where its own read was refused. It
+holds no credentials and no connection of its own, finds the board among the tools already
+connected rather than by a name written into it (only a server offering both `recall` and `track`
+is ever asked), and never writes: a card's Done ("Mark item <n> done.") and Talk about it ("Tell
+me about item <n>.") are sentences carrying the item's number alone, to the person's AI, which does
+the writing. Opening a later group reads that group (`recall` with `part`) from the board the plate
+came from: the board lists the 30 largest groups and counts the rest (`later_groups_more`). Tags
+come from each row's own fields, never from `plain`; an answer without `part`, `moved`, `about` or
+`later_groups` still draws, with later as a count. Talk about it sends once per item until the next
+plate arrives, as Done sends once until the item leaves it. It keeps the last plate, and each later
+group it read (until Refresh, or until a plate arrives with that group's count changed), in the
+session's own state and nowhere else: nothing on disk, nothing shared between sessions.
+
+In auto mode, `/plate`, Refresh and opening a later group put one question and the AI's answer in
+the chat: each tries the direct read first and, when the auto mode classifier refuses it, sends the
+person's AI, as the person's own words, "What is on my plate? My time zone is <zone>." for the plate
+or "Show my later items in plate group <part>." for a group (its number alone: a group's name is
+someone else's words, as a title is), then draws what the AI's own
+`recall` returns through `tool.call`; a group's read never replaces the plate. One question at a
+time, across the plate and its groups; it ends with its own turn, or the first turn to end after it
+was taken. A question put while another main-loop turn runs is queued behind that turn: that turn's
+end leaves it out. The turn opening with the question's own words is its turn, even after another
+turn held it; a later turn opening with other words (the question reworded, or a message or task
+notification queued ahead of it) holds it only tentatively, and the question ends after such a turn
+only once no turn has started for 10 seconds. A question that never runs (its queued turn cancelled)
+is lost once the session has been idle for 10 seconds since the turn it waited behind ended, and
+the person's next press may ask again.
+Done is marked by the AI, and the pane updates on the next plate it sees. Nothing else
+ever posts in the person's name: not the AI's track or reads, a subagent's, a timer, or the
+session's start.
 
 ## Layout
 
@@ -27,6 +62,8 @@ Brain, not here.**
 | --- | --- |
 | `plugins/dazzer/` | The behaviour: triggers, the checkpoint script, the skill. **Carries no connection.** |
 | `plugins/dazzer-connect/` | The connection, and nothing else, for people who have not already got one. |
+| `plugins/dazzer-plate/` | The plate pane: a Claude Code mod (`hooks/plate.tsx`) that draws the person's plate when they ask. Reads through the connection the person already has; **carries none.** Its `hooks/hooks.json` holds only `modules`, which is why it is a plugin of its own: Codex refuses the shared file over that key. |
+| `scripts/kept-states.mjs` | Writes the pages a plugin test prints, since `claude plugin test` gives a test no file system; the words check reads them. |
 | `.claude-plugin/marketplace.json` | The list people install from. |
 | `README.md` | How to install it, written for a person. **The authority for the install steps.** |
 | `tools.manifest.json` | The same install steps in a shape a screen can render. **Mirrors the README; never leads it.** |
