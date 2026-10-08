@@ -188,7 +188,8 @@ const CTX_NOW: PlateRow[] = [
     moved: '2026-10-02',
     about: 'Gal sent three versions; pick one so the printer can start.',
   },
-  { id: 7303, title: 'Draft the quarterly update', why: 'started', part: { id: 7900, name: null, unfiled: true }, moved: '2026-10-06' },
+  // What is not filed yet, as the board rules it: no number, no name.
+  { id: 7303, title: 'Draft the quarterly update', why: 'started', part: { id: null, name: null, unfiled: true }, moved: '2026-10-06' },
   { id: 7304, title: 'Call the accountant about the VAT return', why: 'today', due: '2026-10-08', due_suggested: true, from: BEN, moved: '2025-12-15' },
 ]
 const CTX_WAITING: PlateRow[] = [
@@ -1910,6 +1911,178 @@ test('Refresh clears the kept group rows, so the next Open reads the group again
   await ui.press({ key: 'group-open:7002' })
   expect(w.calls, 'a group read before the Refresh was kept past it').toHaveLength(6)
   expect(w.said).toEqual([])
+})
+
+// ---------------------------------------------------------------------------------------------
+// The review's cases.
+
+test('a question queued behind a running turn outlives that turn; the next turn is its own, whatever it opens with', async ($, on) => {
+  const w = world(on, DAZZER_TOOLS, { dazzer: [answered(PLATE), { refuse: REFUSED }] })
+  await $.session.start(STARTED)
+  await $.command.run(ASK)
+  const ui = await mount($, 'terminal')
+
+  // The AI is busy with something else when the person presses Refresh: the question waits behind it.
+  await $.turn.start({ text: 'something the person asked before', turnId: 'turn-running' })
+  await ui.press({ key: 'refresh' })
+  await settle(w)
+  expect(w.said.map(said => said.text)).toEqual([QUESTION])
+  await $.turn.complete({ answer: 'Done with that.', durationMs: 900, isAborted: false, turnId: 'turn-running', reason: 'answer' })
+  await settle(w)
+  expect(await textAt(ui, 'status:asked'), 'the running turn ended a question queued behind it').toBe('Asked your AI.')
+
+  // A second Refresh while it is still out posts nothing.
+  await ui.press({ key: 'refresh' })
+  await settle(w)
+  expect(w.said.map(said => said.text), 'a second question went while the first was queued').toEqual([QUESTION])
+
+  // The next main-loop turn is the question's, even reworded; its end ends the question.
+  await $.turn.start({ text: 'What is on my plate? Reworded by another plugin.', turnId: 'turn-question' })
+  expect(await textAt(ui, 'status:asked')).toBe('Asked your AI.')
+  await $.turn.complete({ answer: 'I could not read it.', durationMs: 900, isAborted: false, turnId: 'turn-question', reason: 'answer' })
+  await settle(w)
+  expect(await textAt(ui, 'status:unanswered')).toBe('No plate from your AI.')
+})
+
+test("a group's question queued behind a running turn outlives that turn too", async ($, on) => {
+  const w = world(on, DAZZER_TOOLS, { dazzer: [answered(PLATE_CTX)] }, { groups: { '7001': [{ refuse: REFUSED }] } })
+  await $.session.start(STARTED)
+  await $.command.run(ASK)
+  const ui = await mount($, 'terminal')
+  await ui.press({ key: 'tab:later' })
+  await $.turn.start({ text: 'something the person asked before', turnId: 'turn-running' })
+  await ui.press({ key: 'group-open:7001' })
+  await settle(w)
+  await $.turn.complete({ answer: 'Done with that.', durationMs: 900, isAborted: false, turnId: 'turn-running', reason: 'answer' })
+  await settle(w)
+  expect(await textAt(ui, 'status:group-asked:7001'), 'the running turn ended a group question queued behind it').toBe('Asked your AI.')
+  await ui.press({ key: 'group-open:7001' })
+  await ui.press({ key: 'group-open:7001' })
+  await settle(w)
+  expect(w.said.map(said => said.text)).toEqual([OFFICE_QUESTION])
+})
+
+test('more groups than the board lists are counted: "And N more groups."', async ($, on) => {
+  const many: PlateReply = { ...PLATE_CTX, later_groups_more: 4 }
+  const one: PlateReply = { ...PLATE_CTX, later_groups_more: 1 }
+  world(on, DAZZER_TOOLS, { dazzer: [answered(many), answered(one)] })
+  await $.session.start(STARTED)
+  await $.command.run(ASK)
+  for (const surface of SURFACES) {
+    const ui = await mount($, surface)
+    await ui.press({ key: 'tab:later' })
+    expect(await textAt(ui, 'datum:later_groups_more:later')).toBe('And 4 more groups.')
+    await keep('later-groups-more', ui)
+    await ui.unmount()
+  }
+  const ui = await mount($, 'terminal')
+  await ui.press({ key: 'refresh' })
+  expect(await textAt(ui, 'datum:later_groups_more:later')).toBe('And 1 more group.')
+})
+
+test('any re-read drops the kept rows of a group whose count changed, and keeps the rest', async ($, on) => {
+  const moved: PlateReply = {
+    ...PLATE_CTX,
+    as_of: '2026-10-08T06:30:00Z',
+    later_groups: [{ ...OFFICE_GROUP, count: 8 }, UNFILED_GROUP, BRAND_GROUP, NONE_GROUP],
+    counts: { ...PLATE_CTX.counts, later: 22 },
+  }
+  const w = world(
+    on,
+    DAZZER_TOOLS,
+    { dazzer: [answered(PLATE_CTX), answered(moved)] },
+    { groups: { '7001': [answered(OFFICE_READ)], '7002': [answered(BRAND_READ)] } },
+  )
+  await $.session.start(STARTED)
+  await $.command.run(ASK)
+  const ui = await mount($, 'terminal')
+  await ui.press({ key: 'tab:later' })
+  await ui.press({ key: 'group-open:7002' })
+  await ui.press({ key: 'group-open:7001' })
+  expect(await textAt(ui, 'datum:later.title:7401')).toBe('Measure the new meeting room')
+  expect(w.calls).toHaveLength(3)
+
+  // The AI marks something done; the pane reads the plate again, and Office move now holds 8.
+  await $.tool.call({ tool: 'mcp__dazzer__track', tool_use_id: 't1', id: 7401 })
+  await settle(w)
+  expect(w.calls).toHaveLength(4)
+  expect(await ui.find({ key: 'later:7401' }), 'a group whose count changed kept its rows').toBeUndefined()
+  expect((await propsAt(ui, 'group-open:7001')).label).toBe('Open')
+
+  await ui.press({ key: 'group-open:7002' })
+  expect(w.calls, 'a group whose count did not change was read again').toHaveLength(4)
+  expect(await textAt(ui, 'datum:later.title:7421')).toBe('Collect the old business cards')
+  await ui.press({ key: 'group-open:7001' })
+  expect(w.calls, 'the changed group was not read again').toHaveLength(5)
+})
+
+test("the AI's group read is kept for the part it named, before the reply's own first group", async ($, on) => {
+  const w = world(on, DAZZER_TOOLS, { dazzer: [answered(PLATE_CTX)] }, { aiGroup: () => BRAND_READ })
+  await $.session.start(STARTED)
+  await $.command.run(ASK)
+  const ui = await mount($, 'terminal')
+  await $.tool.call({ tool: 'mcp__dazzer__recall', tool_use_id: 't1', query: 'later', view: 'plate', part: 'unfiled' })
+  await settle(w)
+  await ui.press({ key: 'tab:later' })
+  await ui.press({ key: 'group-open:unfiled' })
+  expect(w.calls, 'the AI named unfiled, and the pane kept it elsewhere').toHaveLength(1)
+  expect(await textAt(ui, 'datum:later.title:7421')).toBe('Collect the old business cards')
+})
+
+test('a group closed while its read is on its way posts no question', async ($, on) => {
+  const w = world(on, DAZZER_TOOLS, { dazzer: [answered(PLATE_CTX)] }, { groups: { '7001': [{ refuse: REFUSED }] } })
+  await $.session.start(STARTED)
+  await $.command.run(ASK)
+  const ui = await mount($, 'terminal')
+  await ui.press({ key: 'tab:later' })
+  w.hold()
+  const opening = ui.press({ key: 'group-open:7001' })
+  while (w.calls.length < 2) await new Promise<void>(resolve => setTimeout(resolve, 5))
+  // Pressed again: the group closes before its read answers.
+  await ui.press({ key: 'group-open:7001' })
+  w.release()
+  await opening
+  await settle(w)
+  expect(w.said, 'a closed group posted its question').toEqual([])
+  expect((await propsAt(ui, 'group-open:7001')).label).toBe('Open')
+  expect(await ui.find({ key: 'status:group-loading:7001' })).toBeUndefined()
+
+  // Opened again, it reads again, and may ask.
+  await ui.press({ key: 'group-open:7001' })
+  await settle(w)
+  expect(w.calls).toHaveLength(3)
+  expect(w.said.map(said => said.text)).toEqual([OFFICE_QUESTION])
+})
+
+test('Talk about it sends once per item until the plate is read again, as Done does', async ($, on) => {
+  const w = world(on, DAZZER_TOOLS, { dazzer: [answered(PLATE_CTX), answered(PLATE_CTX)] })
+  await $.session.start(STARTED)
+  await $.command.run(ASK)
+  const ui = await mount($, 'terminal')
+  await ui.press({ key: 'open:7302' })
+  await ui.press({ key: 'talk:7302' })
+  expect(await textAt(ui, 'status:talk-sent:7302')).toBe('Sent to your AI.')
+  expect(await ui.find({ key: 'talk:7302' }), 'Talk about it stayed offered after it was sent').toBeUndefined()
+  // Read again, the plate offers it again.
+  await ui.press({ key: 'refresh' })
+  expect(await ui.find({ key: 'status:talk-sent:7302' })).toBeUndefined()
+  await ui.press({ key: 'talk:7302' })
+  expect(w.said.map(said => said.text)).toEqual(['Tell me about item 7302.', 'Tell me about item 7302.'])
+})
+
+test('a double press of Done or Talk about it posts once', async ($, on) => {
+  const w = world(on, DAZZER_TOOLS, { dazzer: [answered(PLATE_CTX)] })
+  await $.session.start(STARTED)
+  await $.command.run(ASK)
+  const ui = await mount($, 'terminal')
+  await ui.press({ key: 'open:7301' })
+  w.holdSubmit()
+  const presses = [ui.press({ key: 'done:7301' }), ui.press({ key: 'done:7301' }), ui.press({ key: 'talk:7301' }), ui.press({ key: 'talk:7301' })]
+  while (w.said.length < 2) await new Promise<void>(resolve => setTimeout(resolve, 5))
+  for (let turn = 0; turn < 10; turn++) await new Promise<void>(resolve => setTimeout(resolve, 2))
+  w.releaseSubmit()
+  await Promise.allSettled(presses)
+  expect(w.said.map(said => said.text), 'a double press posted twice').toEqual(['Mark item 7301 done.', 'Tell me about item 7301.'])
 })
 
 const OFF: PluginOptions = { plate: 'off' }
