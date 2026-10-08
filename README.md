@@ -397,7 +397,8 @@ four tabs: **Needs you**, **Waiting**, **Coming up** and **Later**, each with it
 on a tab is a card: a coloured tag saying why it is there (`8 DAYS LATE`, `WAITING ON YOU · 6 DAYS`,
 `STARTED`, `ON GAL · 65 DAYS`, `DUE SAT 10 OCT`, with `(A GUESS)` where Dazzer read it from the words
 and is unsure), its title as it was written, and one line saying what it is part of, who it is from
-and when it last moved. **Open** shows what it is, and two buttons:
+and when it last moved, ending `maybe yours (a guess)` where Dazzer is unsure it is yours to do.
+**Open** shows what it is, and two buttons:
 
 - **Done** sends your AI one sentence with that item's number and nothing else (`Mark item 7240
   done.`). **Your AI marks it done, and the pane updates on the next plate it sees.** The card says
@@ -409,8 +410,9 @@ The title never goes with either: anyone in your workspace can write a title, an
 go as your own words.
 
 **Later** lists what can wait, grouped by what each thing belongs to, each with its count. Open a
-group to see its items and when each last moved; once read, a group stays read for the session.
-Until your Dazzer board sends those groups, Later shows how many things can wait.
+group to see its items and when each last moved; once read, a group stays read until you press
+**Refresh**, which forgets every group, so the next Open reads it again. Until your Dazzer board sends
+those groups, Later shows how many things can wait.
 
 **It needs Dazzer connected** (see Reaching your Brain above): it reads through the connection
 Claude Code already has and brings none of its own. It looks only among the tools your session has
@@ -423,15 +425,17 @@ it could not reach Dazzer, rather than waiting forever.
 in your chat.** Where Claude Code lets the pane read your plate itself, nothing appears in your chat.
 In auto mode it does not, so `/plate` and **Refresh** each try the read first and, when it is
 refused, put one question to your AI, as your own words: `What is on my plate? My time zone is <your
-time zone>.` Opening a later group does the same for that group: `Show my later items in <its name>
-(plate group <its number>).` The pane draws what your AI reads. One question at a time: while one is
-unanswered, the pane sends nothing more and says it is waiting on your AI.
+time zone>.` Opening a later group does the same for that group: `Show my later items in plate
+group <its number>.` Its name never goes with it, for the same reason a title never does. The pane
+draws what your AI reads. One question at a time: while one is unanswered, the pane sends nothing
+more and says it is waiting on your AI.
 
 **Nothing else ever posts in your name.** Only `/plate`, **Refresh**, opening a later group, and a
 card's **Done** and **Talk about it** do, and only when you use them.
 
-**What it keeps:** the last plate it read, and each later group it read, in this session's memory
-only, so a read that fails can still show your plate with the time it was read. Nothing is saved to
+**What it keeps:** the last plate it read, and each later group it read until the next Refresh, in
+this session's memory only, so a read that fails can still show your plate with the time it was
+read. Nothing is saved to
 disk, and nothing is shared with another session or another account.
 
 To keep `/plate` from being offered at all, set its **Plate pane** option to **off** in `/config`.
