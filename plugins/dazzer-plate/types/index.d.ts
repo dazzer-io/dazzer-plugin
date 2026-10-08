@@ -43,16 +43,22 @@ export type PlateReply = {
 export type PlateAsk = 'sending' | 'sent' | 'unsent'
 
 /**
- * How the pane reads the plate in this session: itself, through the session's connection, or by
- * asking the person's AI, once the engine has refused it the direct read (auto permission mode).
+ * The one question the pane may have put to the person's AI, when the engine refused the pane its
+ * own read: none, on its way, or taken by the session and waiting for its turn (`turnId` once that
+ * turn has started).
  */
-export type PlateRoute = 'direct' | 'ai'
+export type PlateQuestion =
+  | { state: 'none' }
+  | { state: 'sending' | 'waiting'; text: string; turnId: string | null }
 
 /** What the pane shows. Unasked until the person asks, and nothing is drawn while it is. */
 export type PlateView =
   | { kind: 'unasked' }
   | { kind: 'loading' }
   | { kind: 'asking'; last: PlateReply | null }
+  | { kind: 'asked'; last: PlateReply | null }
+  | { kind: 'unanswered'; last: PlateReply | null }
+  | { kind: 'unsent'; last: PlateReply | null }
   | { kind: 'absent' }
   | { kind: 'off' }
   | { kind: 'shown'; plate: PlateReply; server: string; named: boolean }
@@ -68,10 +74,10 @@ declare module 'claude-code' {
       view: PlateView
       /** Each row's done, by item number, kept until that item leaves the plate. */
       asked: Record<string, PlateAsk>
-      /** The connected server the plate was last read from, in this session. */
-      board: string | null
-      /** Whether this session lets the pane read the board itself, or it asks the AI instead. */
-      route: PlateRoute
+      /** The servers offering both recall and track, as the latest read found them. */
+      boards: string[]
+      /** The one question to the person's AI, while there is one. */
+      question: PlateQuestion
     }
   }
 }
