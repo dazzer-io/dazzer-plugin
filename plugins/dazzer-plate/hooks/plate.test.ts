@@ -2170,6 +2170,54 @@ test('a double press of Done or Talk about it posts once', async ($, on) => {
   expect(w.said.map(said => said.text), 'a double press posted twice').toEqual(['Mark item 7301 done.', 'Tell me about item 7301.'])
 })
 
+test('after a lost question, two presses refused in the same tick post exactly one question', async ($, on) => {
+  // A busy host answers each read of the running turn a little later than the one before: both
+  // presses see the lost question, the first frees it and puts its own, and only then does the
+  // second, still holding what it saw, go on.
+  let isStalling = false
+  let turnReads = 0
+  on('state.get', async ($, e, next) => {
+    if (isStalling && (e as { key?: string }).key === 'runningTurn') {
+      turnReads += 1
+      await new Promise<void>(resolve => setTimeout(resolve, turnReads * 60))
+    }
+    return next(e)
+  })
+  const w = world(on, DAZZER_TOOLS, { dazzer: [answered(PLATE_CTX), { refuse: REFUSED }] }, { groups: { '7001': [{ refuse: REFUSED }] } })
+  await $.session.start(STARTED)
+  await $.command.run(ASK)
+  const ui = await mount($, 'terminal')
+  await ui.press({ key: 'tab:later' })
+  // A question queued behind a turn the person then cancelled: lost after 10 idle seconds.
+  await $.turn.start({ text: 'something the person asked before', turnId: 'turn-running' })
+  await ui.press({ key: 'refresh' })
+  await settle(w)
+  await $.turn.complete({ answer: 'Done with that.', durationMs: 900, isAborted: false, turnId: 'turn-running', reason: 'answer' })
+  await w.clock.advance(10_001)
+  await settle(w)
+  expect(w.said.map(said => said.text)).toEqual([QUESTION])
+
+  // Refresh and a later group's Open, both refused in the same tick: one of them asks, the other
+  // waits. Both reads are held until both are on their way, then answered together.
+  const before = w.calls.length
+  w.hold()
+  const presses = [ui.press({ key: 'refresh' }), ui.press({ key: 'group-open:7001' })]
+  while (w.calls.length < before + 2) await new Promise<void>(resolve => setTimeout(resolve, 5))
+  isStalling = true
+  w.release()
+  await Promise.all(presses)
+  isStalling = false
+  // Let what the presses started finish: the reads still held, then each question's send.
+  for (let turn = 0; turn < 12; turn++) {
+    await w.clock.advance(1)
+    await new Promise<void>(resolve => setTimeout(resolve, 60))
+  }
+  await settle(w)
+  expect(w.said, 'two presses at once both posted').toHaveLength(2)
+  const waiting = [await ui.find({ key: 'status:held' }), await ui.find({ key: 'status:group-held:7001' })]
+  expect(waiting.filter(found => found !== undefined), 'the press that did not ask did not say it waits').toHaveLength(1)
+})
+
 const OFF: PluginOptions = { plate: 'off' }
 test('with the plate set to off, there is no /plate at all', { options: OFF }, async ($, on) => {
   const w = world(on, DAZZER_TOOLS, { dazzer: [answered(PLATE)] })
