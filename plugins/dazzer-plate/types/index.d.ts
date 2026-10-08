@@ -81,13 +81,26 @@ export type PlateTab = 'now' | 'waiting' | 'coming' | 'later'
 
 /**
  * The one question the pane may have put to the person's AI, when the engine refused the pane its
- * own read: none, on its way, or taken by the session and waiting for its turn (`turnId` once that
- * turn has started). `group` names the later group it asks for; absent, it asks for the plate.
- * `behind` is the main-loop turn that was running when it was put, which it queued behind.
+ * own read: none, on its way, or taken by the session and waiting for its turn.
  */
 export type PlateQuestion =
   | { state: 'none' }
-  | { state: 'sending' | 'waiting'; text: string; turnId: string | null; group?: string; behind?: string }
+  | {
+      state: 'sending' | 'waiting'
+      /** This question's own number in the session. */
+      id?: number
+      text: string
+      /** The turn holding it, once one has started. */
+      turnId: string | null
+      /** Whether that turn opened with the question's own words; false when it holds it tentatively. */
+      exact?: boolean
+      /** The later group it asks for; absent, it asks for the plate. */
+      group?: string
+      /** The main-loop turn running when it was put, which it is queued behind. */
+      behind?: string
+      /** When the last turn it waited behind ended, in milliseconds since the epoch. */
+      behindEndedAt?: number
+    }
 
 /**
  * What one later group shows once opened. Its rows, once read, are kept for the session. `held`

@@ -32,7 +32,12 @@
 // still tries the board and sends nothing more, and the pane says it waits on the AI. The question
 // ends with its own turn, or failing that the first turn to end after the session took it; if
 // nothing came, the pane says so. Put while another turn is running, it waits behind that turn:
-// that turn's end does not end it, and the next main-loop turn is its own whatever it opens with. Any other refusal of the engine's (a deny rule, don't-ask mode, a
+// that turn's end does not end it. The turn opening with its own words is its turn; a turn opening
+// with other words may be it reworded, or a turn queued ahead of it (a message the person typed, a
+// task notification), so it holds the question only tentatively, and the question ends after such
+// a turn only once no turn has started for 10 seconds. A question that never runs (its queued turn
+// cancelled) is lost once the session has been idle for 10 seconds since the turn it waited
+// behind: the person's next press may ask again. Any other refusal of the engine's (a deny rule, don't-ask mode, a
 // hook) is not cured by asking: the pane says Claude Code does not let it read here, and asks
 // nothing. Every read the person starts tries the board first, so a change of mode takes effect at
 // once.
@@ -89,6 +94,11 @@ const GROUP_WORDS = 'what can wait until later'
 const CONVERSATION = 'plate-pane'
 /** How long one read may take before the pane says it could not reach Dazzer. */
 const READ_LIMIT_MS = 20_000
+/**
+ * How long with no turn starting before a question that is not running counts as not going to: one
+ * held only tentatively by a turn that has ended, or one queued behind a turn that has ended.
+ */
+const QUIET_MS = 10_000
 /** A connected server's recall tool, as the session names it. */
 const RECALL = /^mcp__(.+)__recall$/
 const BACKSLASH = '\x5c'
@@ -145,6 +155,10 @@ let personReads = 0
 /** The newest read of each later group, by its key; an older one that answers late changes nothing. */
 const newestGroupRead = new Map<string, number>()
 let groupReadsMade = 0
+/** Main-loop turns started this session, so a later check can tell whether one has started since. */
+let turnsStarted = 0
+/** Questions put this session: each question's own number. */
+let questionsPut = 0
 
 /** The line the pane shows when the engine refuses it in a way asking cannot cure. */
 const NOT_ALLOWED = 'Claude Code does not let the pane read your plate here.'
@@ -633,17 +647,43 @@ async function endQuestion($: EngineInterface, how: 'answered' | 'unanswered' | 
 }
 
 /**
+ * Whether the question out is lost: taken by the session, held by no turn, the session idle, and
+ * the turn it waited behind ended more than QUIET_MS ago. Queued behind a turn the person then
+ * cancelled, it never runs, and would otherwise keep every later press from asking.
+ */
+async function isLost($: EngineInterface): Promise<boolean> {
+  const out = await read($, question)
+  if (out.state !== 'waiting' || out.turnId !== null || out.behindEndedAt === undefined) return false
+  if ((await read($, runningTurn)) !== null) return false
+  return (await $.clock.now()) - out.behindEndedAt > QUIET_MS
+}
+
+/**
+ * Ends a question a turn held only tentatively, once QUIET_MS has passed after that turn with no
+ * turn starting: had that turn been one queued ahead of it, the question's own would have started.
+ */
+async function endIfQuiet($: EngineInterface, id: number | undefined, startedAtEnd: number): Promise<void> {
+  const out = await read($, question)
+  if (out.state === 'none' || out.id !== id || out.turnId !== null || turnsStarted !== startedAtEnd) return
+  await endQuestion($, 'unanswered')
+}
+
+/**
  * Puts one question to the person's AI, for a read the person started that the engine refused:
  * the plate's, or a later group's (`group`). One question at a time: while another is out, nothing
  * is sent and the pane says it waits on the AI. The question goes from a timer, outside the
  * dispatch that asked, so it never waits on a turn that dispatch holds.
  */
 async function askTheAI($: EngineInterface, text: string, group?: string): Promise<void> {
+  // A question that will never run frees the slot for this press.
+  if (await isLost($)) await endQuestion($, 'unanswered')
+  const id = questionsPut + 1
   let isNew = false
   await update($, question, (current): PlateQuestion => {
     isNew = current.state === 'none'
-    return isNew ? { state: 'sending', text, turnId: null, ...(group === undefined ? {} : { group }) } : current
+    return isNew ? { state: 'sending', id, text, turnId: null, ...(group === undefined ? {} : { group }) } : current
   })
+  if (isNew) questionsPut = id
   const out = await read($, question)
   if (out.state === 'none' || out.group !== group) {
     if (group === undefined) await update($, plateHeld, () => true)
@@ -972,16 +1012,24 @@ export const register: Register = (on, options) => {
   }).catch(($, e, next) => next(e))
 
   // The main loop's turns: which one runs now (noted from the start, and nothing else before the
-  // person asks), and the question's own. That is the turn opening with its words or, for a
-  // question queued behind a running turn, the next turn after that one, whatever it opens with.
+  // person asks), and the question's own. The turn opening with the question's words is its own,
+  // even after another turn held it. For a question queued behind a running turn, a later turn
+  // opening with other words holds it only tentatively: it may be the question reworded, or a turn
+  // queued ahead of it.
   on('turn.start', async ($, e, next) => {
     try {
+      turnsStarted += 1
       await update($, runningTurn, () => e.turnId)
       const out = await read($, question)
-      const isQueued = out.state !== 'none' && out.behind !== undefined && e.turnId !== out.behind
-      if (out.state !== 'none' && out.turnId === null && (isQueued || e.text === out.text)) {
+      if (out.state !== 'none' && e.text === out.text) {
         await update($, question, (current): PlateQuestion =>
-          current.state !== 'none' && current.turnId === null ? { ...current, turnId: e.turnId } : current,
+          current.state !== 'none' && current.id === out.id ? { ...current, turnId: e.turnId, exact: true } : current,
+        )
+      } else if (out.state !== 'none' && out.turnId === null && out.behind !== undefined && e.turnId !== out.behind) {
+        await update($, question, (current): PlateQuestion =>
+          current.state !== 'none' && current.id === out.id && current.turnId === null
+            ? { ...current, turnId: e.turnId, exact: false }
+            : current,
         )
       }
     } catch {
@@ -990,17 +1038,37 @@ export const register: Register = (on, options) => {
     return next(e)
   }).catch(($, e, next) => next(e))
 
-  // A question ends with its own turn or, failing that, with the first main-loop turn to end after
-  // the session took it, whatever words that turn opened with: it never stays out for the session.
-  // The turn it was queued behind is not that turn: its end leaves the question out.
+  // A question ends with its own turn or, put while no turn ran, with the first main-loop turn to end
+  // after the session took it, whatever words that turn opened with: it never stays out for the
+  // session. The turn it was queued behind is not its turn: its end leaves the question out, and is
+  // noted. A turn that held it only tentatively ends it only once no turn has started for QUIET_MS.
   on('turn.complete', async ($, e, next) => {
     const ended = await next(e)
     try {
       if (e.agentId === undefined) {
         await update($, runningTurn, current => (current === e.turnId ? null : current))
         const out = await read($, question)
-        const isBehind = out.state !== 'none' && out.behind === e.turnId
-        if (out.state !== 'none' && (out.turnId === e.turnId || (out.state === 'waiting' && !isBehind))) {
+        if (out.state === 'none') {
+          // Nothing out.
+        } else if (out.turnId === e.turnId && out.exact === false) {
+          const at = await $.clock.now()
+          const startedAtEnd = turnsStarted
+          await update($, question, (current): PlateQuestion =>
+            current.state !== 'none' && current.id === out.id && current.turnId === e.turnId
+              ? { ...current, turnId: null, exact: undefined, behindEndedAt: at }
+              : current,
+          )
+          $.clock.after(QUIET_MS, () => {
+            void endIfQuiet($, out.id, startedAtEnd).catch(() => undefined)
+          })
+        } else if (out.turnId === e.turnId) {
+          await endQuestion($, 'unanswered')
+        } else if (out.behind === e.turnId) {
+          const at = await $.clock.now()
+          await update($, question, (current): PlateQuestion =>
+            current.state !== 'none' && current.id === out.id ? { ...current, behindEndedAt: at } : current,
+          )
+        } else if (out.state === 'waiting' && out.turnId === null && out.behind === undefined) {
           await endQuestion($, 'unanswered')
         }
       }

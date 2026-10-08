@@ -432,7 +432,9 @@ time zone>.` Opening a later group does the same for that group: `Show my later 
 group <its number>.` Its name never goes with it, for the same reason a title never does. The pane
 draws what your AI reads. One question at a time: while one is unanswered, the pane sends nothing
 more and says it is waiting on your AI. If your AI is busy when the pane asks, the question waits
-for its turn after the current reply, and the pane keeps saying it asked until that turn ends.
+its turn behind the current reply and anything you typed meanwhile, and the pane keeps saying it
+asked until the question's own turn ends. If that question never runs (you pressed Esc), the pane
+lets your next press ask again once your AI has been idle for 10 seconds.
 
 **Nothing else ever posts in your name.** Only `/plate`, **Refresh**, opening a later group, and a
 card's **Done** and **Talk about it** do, and only when you use them.
