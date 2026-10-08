@@ -832,7 +832,6 @@ test('when the engine refuses the pane its own read, it asks the AI and draws th
   for (const surface of SURFACES) {
     const ui = await mount($, surface)
     expect(await textAt(ui, 'status:asked')).toBe('Asked your AI.')
-    expect(wordsOf(await ui.drawn())).toContain('It answers after its current reply.')
     expect(wordsOf(await ui.drawn())).not.toContain('Could not reach Dazzer')
     await keep('asked', ui)
     await ui.unmount()
@@ -851,19 +850,57 @@ test('when the engine refuses the pane its own read, it asks the AI and draws th
   expect(w.said).toHaveLength(1)
 })
 
+test('"It answers after its current reply." shows only while another turn is running', async ($, on) => {
+  const w = world(on, DAZZER_TOOLS, { dazzer: [{ refuse: REFUSED }] })
+  await $.session.start(STARTED)
+  await $.command.run(ASK)
+  await settle(w)
+  const ui = await mount($, 'terminal')
+  expect(await textAt(ui, 'status:asked')).toBe('Asked your AI.')
+  expect(wordsOf(await ui.drawn()), 'it said the AI was busy while no turn ran').not.toContain('It answers after its current reply.')
+
+  await $.turn.start({ text: 'something the person asked before', turnId: 'turn-busy' })
+  expect(wordsOf(await ui.drawn())).toContain('It answers after its current reply.')
+  await keep('asked-busy', ui)
+})
+
+// Only the auto mode classifier's refusal is cured by the person asking their AI themselves.
 for (const words of [
   REFUSED,
   'Permission for this action was denied by the Claude Code auto mode classifier. Reason: reads a private workspace',
   'Auto mode classifier blocked action: mcp__dazzer__recall',
-  'Permission for this tool use was denied. The tool use was rejected.',
-  "Permission to use mcp__dazzer__recall has been denied because Claude Code is running in don't ask mode.",
 ]) {
-  test(`the engine's own refusal asks the AI: ${words.slice(0, 48)}`, async ($, on) => {
+  test(`the auto mode classifier's refusal asks the AI: ${words.slice(0, 44)}`, async ($, on) => {
     const w = world(on, DAZZER_TOOLS, { dazzer: [{ refuse: words }] })
     await $.session.start(STARTED)
     await $.command.run(ASK)
     await settle(w)
-    expect(w.said.map(said => said.text), 'the engine refused and the AI was not asked').toEqual([QUESTION])
+    expect(w.said.map(said => said.text), 'the classifier refused and the AI was not asked').toEqual([QUESTION])
+  })
+}
+
+// Any other refusal of the engine's own is not cured by asking: the pane says so and asks nothing.
+const BLOCKED = [
+  'Permission for this tool use was denied. The tool use was rejected.',
+  "Permission to use mcp__dazzer__recall has been denied because Claude Code is running in don't ask mode.",
+  'Permission to use mcp__dazzer__recall has been denied by your rule',
+  'Permission denied by PermissionRequest hook',
+]
+for (const [at, words] of BLOCKED.entries()) {
+  test(`another refusal of the engine's says the pane may not read here, and asks nothing: ${words.slice(0, 40)}`, async ($, on) => {
+    const w = world(on, DAZZER_TOOLS, { dazzer: [{ refuse: words }] })
+    await $.session.start(STARTED)
+    await $.command.run(ASK)
+    await settle(w)
+    expect(w.said, 'a refusal asking cannot cure sent the question').toEqual([])
+    for (const surface of SURFACES) {
+      const ui = await mount($, surface)
+      expect(await textAt(ui, 'status:blocked')).toBe('Not allowed here.')
+      expect(wordsOf(await ui.drawn())).toContain('Claude Code does not let the pane read your plate here.')
+      expect(wordsOf(await ui.drawn())).not.toContain('Could not reach Dazzer')
+      if (at === 0) await keep('blocked', ui)
+      await ui.unmount()
+    }
   })
 }
 
@@ -912,10 +949,6 @@ test('a question the AI never answers ends with its turn, saying so, and never "
   expect(w.said.map(said => said.text)).toEqual([QUESTION])
   expect(await textAt(ui, 'status:asked')).toBe('Asked your AI.')
 
-  // Another reply's turn ends first: the question still waits.
-  await questionTurn($, 'turn-before', 'something else the person asked')
-  expect(await textAt(ui, 'status:asked')).toBe('Asked your AI.')
-
   // The question's own turn ends with no plate read.
   await questionTurn($, 'turn-question')
   await settle(w)
@@ -928,6 +961,24 @@ test('a question the AI never answers ends with its turn, saying so, and never "
   await ui.press({ key: 'refresh' })
   await settle(w)
   expect(w.said.map(said => said.text)).toEqual([QUESTION, QUESTION])
+})
+
+test('a question also ends at the first turn after it was taken, whatever that turn opened with', async ($, on) => {
+  const w = world(on, DAZZER_TOOLS, { dazzer: [{ refuse: REFUSED }] })
+  await $.session.start(STARTED)
+  await $.command.run(ASK)
+  await settle(w)
+  expect(w.said.map(said => said.text)).toEqual([QUESTION])
+
+  // A turn whose opening words are not the question's (another plugin reworded it) ends.
+  await questionTurn($, 'turn-other', 'What is on my plate? Reworded by another plugin.')
+  await settle(w)
+  const ui = await mount($, 'terminal')
+  expect(await textAt(ui, 'status:unanswered'), 'the question stayed out after the turn ended').toBe('No plate from your AI.')
+
+  await $.command.run(ASK)
+  await settle(w)
+  expect(w.said.map(said => said.text), '/plate could not ask again').toEqual([QUESTION, QUESTION])
 })
 
 test('a question the session did not take says so plainly', async ($, on) => {
@@ -951,18 +1002,55 @@ test("after a refusal, the AI's own track asks nothing and keeps what the pane s
   await $.command.run(ASK)
   const ui = await mount($, 'terminal')
   await ui.press({ key: 'done:7236' })
-  // The AI marks it done; the pane tries the board again, is refused, and asks no one.
+  // The AI marks it done; the pane tries the board again, is refused, and asks no one. The next
+  // track does not try again: refusals must not pile up in a busy session.
   await $.tool.call({ tool: 'mcp__dazzer__track', tool_use_id: 't1', id: 7236 })
   await settle(w)
   await $.tool.call({ tool: 'mcp__dazzer__track', tool_use_id: 't2', id: 7095 })
   await settle(w)
 
-  expect(w.calls, "the pane did not re-read after the AI's track").toHaveLength(3)
+  expect(w.calls, "the pane's reads after the AI's tracks").toHaveLength(2)
   expect(w.said.map(said => said.text), "the AI's track made the pane post in the person's name").toEqual([
     'Mark item 7236 done.',
   ])
   expect(await textAt(ui, 'status:sent:7236')).toBe('Sent to your AI.')
   expect(await textAt(ui, 'datum:row.title:6217')).toBe('YC application, this week')
+})
+
+test('after a refusal, tracks call the board no more, and /plate still tries it', async ($, on) => {
+  const w = world(on, DAZZER_TOOLS, { dazzer: [{ refuse: REFUSED }] })
+  await $.session.start(STARTED)
+  await $.command.run(ASK)
+  await settle(w)
+  expect(w.calls).toHaveLength(1)
+  for (const [id, agentId] of [['t1', undefined], ['t2', 'sub-1'], ['t3', undefined]] as const) {
+    await $.tool.call({ tool: 'mcp__dazzer__track', tool_use_id: id, id: 7236, ...(agentId === undefined ? {} : { agentId }) } as never)
+    await settle(w)
+  }
+  expect(w.calls, 'a track piled up another refused call').toHaveLength(1)
+
+  await $.command.run(ASK)
+  await settle(w)
+  expect(w.calls, '/plate did not try the board').toHaveLength(2)
+})
+
+test("a track's read never overtakes a person's read still on its way", async ($, on) => {
+  const w = world(on, DAZZER_TOOLS, { dazzer: [answered(PLATE), answered(PLATE_AFTER), answered(PLATE)] })
+  await $.session.start(STARTED)
+  await $.command.run(ASK)
+  const ui = await mount($, 'terminal')
+
+  w.hold()
+  const refreshing = ui.press({ key: 'refresh' })
+  while (w.calls.length < 2) await new Promise<void>(resolve => setTimeout(resolve, 5))
+  await $.tool.call({ tool: 'mcp__dazzer__track', tool_use_id: 't1', id: 7236 })
+  await settle(w)
+  expect(w.calls, "a track's read ran beside the person's").toHaveLength(2)
+
+  w.release()
+  await refreshing
+  await settle(w)
+  expect(await ui.find({ key: 'row:7236' }), "the track's read overtook the person's").toBeUndefined()
 })
 
 test("a subagent's track asks nothing either", async ($, on) => {
