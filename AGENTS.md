@@ -46,7 +46,12 @@ someone else's words, as a title is), then draws what the AI's own
 `recall` returns through `tool.call`; a group's read never replaces the plate. One question at a
 time, across the plate and its groups; it ends with its own turn, or the first turn to end after it
 was taken. A question put while another main-loop turn runs is queued behind that turn: that turn's
-end leaves it out, and the next main-loop turn is the question's own, whatever words it opens with.
+end leaves it out. The turn opening with the question's own words is its turn, even after another
+turn held it; a later turn opening with other words (the question reworded, or a message or task
+notification queued ahead of it) holds it only tentatively, and the question ends after such a turn
+only once no turn has started for 10 seconds. A question that never runs (its queued turn cancelled)
+is lost once the session has been idle for 10 seconds since the turn it waited behind ended, and
+the person's next press may ask again.
 Done is marked by the AI, and the pane updates on the next plate it sees. Nothing else
 ever posts in the person's name: not the AI's track or reads, a subagent's, a timer, or the
 session's start.
