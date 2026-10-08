@@ -359,7 +359,7 @@
     }
   },
   "panel": {
-    "what": "Your plate from your Dazzer board in a pane beside the chat: what needs you now, what is waiting on someone else, what is coming up, and how many things can wait.",
+    "what": "Your plate from your Dazzer board in a pane beside the chat: the day and its counts, four tabs (needs you, waiting, coming up, later), a card per item with a tag saying why it is there, what it is part of, who it is from and when it last moved, and later as groups you can open.",
     "plugin": "dazzer-plate@dazzer",
     "tools": [
       "claude-code"
@@ -378,11 +378,13 @@
     "withoutConnection": "The pane says Dazzer was not found here, and how to connect it. It looks only among the tools the session has right now.",
     "turnOff": "Set its Plate pane option to off in /config, and there is no /plate at all.",
     "finds": "Only a server offering both recall and track, so the person's words, time zone and the pane's name never go to any other server.",
-    "keeps": "The last plate it read, in the session's own memory only, for the time shown when a read fails. Nothing is saved to disk and nothing is shared with another session or account.",
+    "keeps": "The last plate it read and each later group it read, in the session's own memory only, for the time shown when a read fails and so a group opened again is not read again. Nothing is saved to disk and nothing is shared with another session or account.",
     "readLimit": "A read that has not answered in 20 seconds says it could not reach Dazzer.",
-    "autoMode": "In auto mode, /plate and Refresh put one question and the AI's answer in the chat: each tries the read first and, when it is refused, asks the person's AI as their own words: What is on my plate? My time zone is <their zone>. The pane draws the plate the AI reads. While the question is unanswered, /plate and Refresh send nothing more.",
-    "done": "A row's done sends the person's AI one sentence with the item's number and nothing else (Mark item 7240 done.). Done is marked by the AI, and the pane updates on the next plate it sees.",
-    "postsInTheirName": "Only /plate and Refresh (the one question, in auto mode) and a row's done. Nothing else ever posts in the person's name."
+    "autoMode": "In auto mode, /plate, Refresh and opening a later group put one question and the AI's answer in the chat: each tries the read first and, when it is refused, asks the person's AI as their own words: What is on my plate? My time zone is <their zone>. for the plate, or Show my later items in <name> (plate group <part>). for a group. The pane draws what the AI reads. One question at a time: while it is unanswered, nothing more is sent.",
+    "done": "A card's Done sends the person's AI one sentence with the item's number and nothing else (Mark item 7240 done.). Done is marked by the AI, and the pane updates on the next plate it sees.",
+    "talk": "A card's Talk about it sends the person's AI one sentence with the item's number and nothing else (Tell me about item 7240.).",
+    "later": "Later lists what can wait, grouped by what each item belongs to; opening a group shows its items and when each last moved. Until the board sends those groups, later is a count.",
+    "postsInTheirName": "Only /plate and Refresh (the plate's question, in auto mode), opening a later group (its question, in auto mode), and a card's Done and Talk about it. Nothing else ever posts in the person's name."
   },
   "provenance": {
     "what": "All six were installed into a real copy of the tool and watched working, which proved too little: on three of them nothing reached the AI at all - Codex and Cursor discarded the words, and Claude Code never loaded the plugin. Proving the words arrive from a hand-written file proved too little in turn, because it says nothing about whether the shipped file loads, and a tool reporting its own reminders as registered proved nothing either - it says so even when it is delivering nothing. What counts is installing the real thing and asking the AI for a word only the reminder carried. Claude Code and Cursor each answer it. Codex runs every reminder from an installed copy, which is the weaker evidence of the two. Devin takes the plain wording it already gets. Antigravity and Copilot are given no reminders at all rather than ones that would be silently dead.",

@@ -1,12 +1,20 @@
 // The plate pane's contract: the reply it reads and the state it draws from.
 
+/** What an item is part of: its readable parent, or the holder of work not filed yet. */
+export type PlatePart = {
+  id: number
+  /** The parent's name; null for the holder of unfiled work. */
+  name: string | null
+  unfiled?: boolean
+}
+
 /** One row of a plate, as the board's recall answers it for the plate view. */
 export type PlateRow = {
   /** The item's number: what a person says, and what the AI marks done. */
   id: number
   /** The item's name, else its summary, as its writer wrote it. */
   title: string
-  /** Why it sits where it does: late, today, tomorrow, started, due, waiting, handed. */
+  /** Why it sits where it does: late, today, tomorrow, waiting_on_you, started, due, waiting, handed. */
   why: string
   due?: string
   due_suggested?: boolean
@@ -19,12 +27,32 @@ export type PlateRow = {
   doer_suggested?: boolean
   /** The writer, when it is not the person whose plate this is. */
   from?: number
+  /** What it is part of; absent when it has no parent the person can read (and from today's server). */
+  part?: PlatePart
+  /** The calendar day it last moved (YYYY-MM-DD), in the reply's zone; absent from today's server. */
+  moved?: string
+  /** A line of what it is, beyond its title; absent when the title already says it. */
+  about?: string
 }
+
+/** One later group: a readable parent, the unfiled group, or the group of items part of nothing. */
+export type PlateLaterGroup = {
+  id: number | null
+  name: string | null
+  unfiled?: boolean
+  count: number
+}
+
+/** One row of a later group read: what it is and the day it last moved. */
+export type PlateLaterRow = { id: number; title: string; moved?: string }
 
 /** How many items each group holds in all, beyond the rows it lists. */
 export type PlateCounts = { now: number; waiting: number; coming: number; later: number }
 
-/** The whole plate reply: the counts, up to five rows a group, and the plain words. */
+/**
+ * The whole plate reply: the counts, the rows each group lists, and the plain words. A later
+ * group read is the same reply with the active groups empty and `later` holding that group's rows.
+ */
 export type PlateReply = {
   view: 'plate'
   as_of: string
@@ -34,22 +62,44 @@ export type PlateReply = {
   now: PlateRow[]
   waiting: PlateRow[]
   coming: PlateRow[]
+  /** The later items by what each belongs to; absent from today's server, which counts them only. */
+  later_groups?: PlateLaterGroup[]
+  /** A later group read's rows; absent on a plate look. */
+  later?: PlateLaterRow[]
   people: Record<string, string>
-  /** The plate in plain words, as a chat shows it; the pane takes its sentence and marks here. */
+  /** The plate in plain words, as a chat shows it. The pane draws nothing from it. */
   plain?: string
 }
 
-/** Where one row's done stands: on its way to the AI, taken by the session, or not taken. */
+/** Where one row's done, or its talk, stands: on its way to the AI, taken by the session, or not taken. */
 export type PlateAsk = 'sending' | 'sent' | 'unsent'
+
+/** The tabs, one per group. */
+export type PlateTab = 'now' | 'waiting' | 'coming' | 'later'
 
 /**
  * The one question the pane may have put to the person's AI, when the engine refused the pane its
  * own read: none, on its way, or taken by the session and waiting for its turn (`turnId` once that
- * turn has started).
+ * turn has started). `group` names the later group it asks for; absent, it asks for the plate.
  */
 export type PlateQuestion =
   | { state: 'none' }
-  | { state: 'sending' | 'waiting'; text: string; turnId: string | null }
+  | { state: 'sending' | 'waiting'; text: string; turnId: string | null; group?: string }
+
+/**
+ * What one later group shows once opened. Its rows, once read, are kept for the session. `held`
+ * means its read was refused while another question was out, so nothing was sent.
+ */
+export type PlateGroupView =
+  | { kind: 'loading' }
+  | { kind: 'rows'; rows: PlateLaterRow[]; count: number }
+  | { kind: 'asking' }
+  | { kind: 'asked' }
+  | { kind: 'held' }
+  | { kind: 'unanswered' }
+  | { kind: 'unsent' }
+  | { kind: 'blocked' }
+  | { kind: 'failed' }
 
 /** What the pane shows. Unasked until the person asks, and nothing is drawn while it is. */
 export type PlateView =
@@ -75,8 +125,12 @@ declare module 'claude-code' {
       view: PlateView
       /** Each row's done, by item number, kept until that item leaves the plate. */
       asked: Record<string, PlateAsk>
+      /** Each row's talk about it, by item number, kept until that item leaves the plate. */
+      talks: Record<string, PlateAsk>
       /** The servers offering both recall and track, as the latest read found them. */
       boards: string[]
+      /** The server the plate shown came from: the one a later group is read from. */
+      source: string | null
       /** The one question to the person's AI, while there is one. */
       question: PlateQuestion
       /**
@@ -87,6 +141,16 @@ declare module 'claude-code' {
       refusedHere: boolean
       /** The main loop's turn running now, if any. */
       runningTurn: string | null
+      /** The tab chosen. */
+      tab: PlateTab
+      /** The one card open, by item number. */
+      openCard: number | null
+      /** The one later group open, by its key: its number, `unfiled` or `none`. */
+      openGroup: string | null
+      /** Each later group opened this session, by its key. */
+      groups: Record<string, PlateGroupView>
+      /** A plate read the person started was refused while a group's question was out. */
+      plateHeld: boolean
     }
   }
 }

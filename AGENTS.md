@@ -28,17 +28,23 @@ person's Claude Code already has (`$.mcp.call`, the engine's own connection and 
 also re-reads after the AI's own track, except in a session where its own read was refused. It
 holds no credentials and no connection of its own, finds the board among the tools already
 connected rather than by a name written into it (only a server offering both `recall` and `track`
-is ever asked), and never writes: a row's done is a sentence carrying the item's number alone, to
-the person's AI, which does the writing. It keeps the last plate it read in the session's own
-state and nowhere else: nothing on disk, nothing shared between sessions.
+is ever asked), and never writes: a card's Done ("Mark item <n> done.") and Talk about it ("Tell
+me about item <n>.") are sentences carrying the item's number alone, to the person's AI, which does
+the writing. Opening a later group reads that group (`recall` with `part`) from the board the plate
+came from. Tags come from each row's own fields, never from `plain`; an answer without `part`,
+`moved`, `about` or `later_groups` still draws, with later as a count. It keeps the last plate and
+each later group it read in the session's own state and nowhere else: nothing on disk, nothing
+shared between sessions.
 
-In auto mode, `/plate` and Refresh put one question and the AI's answer in the chat: each tries the
-direct read first and, when the auto mode classifier refuses it, sends the person's AI "What is on
-my plate? My time zone is <zone>." as the person's own words, then draws the plate from the AI's
-own `recall` as it comes back through `tool.call`. One question at a time; it ends with its own
-turn, or the first turn to end after it was taken. Done is marked by the AI, and the pane updates
-on the next plate it sees. Nothing else ever
-posts in the person's name: not the AI's track, a subagent's, a timer, or the session's start.
+In auto mode, `/plate`, Refresh and opening a later group put one question and the AI's answer in
+the chat: each tries the direct read first and, when the auto mode classifier refuses it, sends the
+person's AI, as the person's own words, "What is on my plate? My time zone is <zone>." for the plate
+or "Show my later items in <name> (plate group <part>)." for a group, then draws what the AI's own
+`recall` returns through `tool.call`; a group's read never replaces the plate. One question at a
+time, across the plate and its groups; it ends with its own turn, or the first turn to end after it
+was taken. Done is marked by the AI, and the pane updates on the next plate it sees. Nothing else
+ever posts in the person's name: not the AI's track or reads, a subagent's, a timer, or the
+session's start.
 
 ## Layout
 
