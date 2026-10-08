@@ -59,6 +59,7 @@ export type PlateView =
   | { kind: 'asked'; last: PlateReply | null }
   | { kind: 'unanswered'; last: PlateReply | null }
   | { kind: 'unsent'; last: PlateReply | null }
+  | { kind: 'blocked'; last: PlateReply | null }
   | { kind: 'absent' }
   | { kind: 'off' }
   | { kind: 'shown'; plate: PlateReply; server: string; named: boolean }
@@ -78,6 +79,14 @@ declare module 'claude-code' {
       boards: string[]
       /** The one question to the person's AI, while there is one. */
       question: PlateQuestion
+      /**
+       * Whether the engine has refused the pane its own read in this session. A read the person
+       * starts still tries the board every time; one a track starts does not, so refusals never
+       * pile up in a busy session.
+       */
+      refusedHere: boolean
+      /** The main loop's turn running now, if any. */
+      runningTurn: string | null
     }
   }
 }

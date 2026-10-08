@@ -887,7 +887,7 @@ const BLOCKED = [
   'Permission denied by PermissionRequest hook',
 ]
 for (const [at, words] of BLOCKED.entries()) {
-  test(`another refusal of the engine's says the pane may not read here, and asks nothing: ${words.slice(0, 40)}`, async ($, on) => {
+  test(`another refusal of the engine's (${at + 1}) says the pane may not read here, and asks nothing: ${words.slice(0, 40)}`, async ($, on) => {
     const w = world(on, DAZZER_TOOLS, { dazzer: [{ refuse: words }] })
     await $.session.start(STARTED)
     await $.command.run(ASK)

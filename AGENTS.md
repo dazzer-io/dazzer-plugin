@@ -25,6 +25,7 @@ Brain, not here.**
 (`plugins/dazzer-plate`, Claude Code only, optional). Only once the person asks (`/plate`, or the
 pane's Refresh), it calls the board's `recall` for the plate view through the connection the
 person's Claude Code already has (`$.mcp.call`, the engine's own connection and credentials). It
+also re-reads after the AI's own track, except in a session where its own read was refused. It
 holds no credentials and no connection of its own, finds the board among the tools already
 connected rather than by a name written into it (only a server offering both `recall` and `track`
 is ever asked), and never writes: a row's done is a sentence carrying the item's number alone, to
@@ -32,10 +33,11 @@ the person's AI, which does the writing. It keeps the last plate it read in the 
 state and nowhere else: nothing on disk, nothing shared between sessions.
 
 In auto mode, `/plate` and Refresh put one question and the AI's answer in the chat: each tries the
-direct read first and, when the engine refuses it in its own words, sends the person's AI "What is
-on my plate? My time zone is <zone>." as the person's own words, then draws the plate from the AI's
+direct read first and, when the auto mode classifier refuses it, sends the person's AI "What is on
+my plate? My time zone is <zone>." as the person's own words, then draws the plate from the AI's
 own `recall` as it comes back through `tool.call`. One question at a time; it ends with its own
-turn. Done is marked by the AI, and the pane updates on the next plate it sees. Nothing else ever
+turn, or the first turn to end after it was taken. Done is marked by the AI, and the pane updates
+on the next plate it sees. Nothing else ever
 posts in the person's name: not the AI's track, a subagent's, a timer, or the session's start.
 
 ## Layout
