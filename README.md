@@ -394,11 +394,11 @@ from a terminal the same way; the app picks it up on your next conversation.
 **Then type `/plate`.** Nothing opens by itself: the pane draws only once you ask, and its
 **Refresh** button reads your plate again. Each row shows the item's number, its title as it was
 written, and when it is due or how long it has waited. Each row offers **done**, which sends your AI
-one sentence with that item's number and nothing else (`Mark item 7240 done.`); your AI marks it,
-and the pane reads your plate again once it has. The title never goes with it: anyone in your
+one sentence with that item's number and nothing else (`Mark item 7240 done.`). **Your AI marks it
+done, and the pane updates on the next plate it sees.** The title never goes with it: anyone in your
 workspace can write a title, and that sentence goes as your own words. The row says it was sent
-only once your session took the sentence; if it was not taken, the row says so and offers done
-again.
+only once your session took the sentence, and keeps saying so until a plate arrives without that
+item; if it was not taken, the row says so and offers done again.
 
 **It needs Dazzer connected** (see Reaching your Brain above): it reads through the connection
 Claude Code already has and brings none of its own. It looks only among the tools your session has
@@ -407,13 +407,15 @@ time zone and the pane's name never go to any other server. When it finds none, 
 Dazzer was not found here and how to connect it. A read that has not answered in 20 seconds says
 it could not reach Dazzer, rather than waiting forever.
 
-**In auto permission mode it asks your AI instead.** Where Claude Code allows it, the pane reads
-your plate directly through your connection, and nothing appears in your chat. In auto permission
-mode Claude Code refuses the pane that read, so the pane says "Asking your AI." and sends your AI,
-as your own words, `What is on my plate? My time zone is <your time zone>.`; when your AI reads
-your plate, the pane draws it. **So in auto mode that question, and your AI's answer, also appear
-in your chat.** The pane remembers the refusal for the rest of the session and asks your AI
-straight away after that. Its 20-second limit holds here too.
+**In auto mode, /plate and Refresh put one question and your AI's answer in your chat.** Where
+Claude Code lets the pane read your plate itself, nothing appears in your chat. In auto mode it does
+not, so `/plate` and **Refresh** each try the read first and, when it is refused, put one question
+to your AI, as your own words: `What is on my plate? My time zone is <your time zone>.` The pane
+draws the plate your AI reads. While that question is unanswered, `/plate` and **Refresh** send
+nothing more, and the pane says your AI answers after its current reply.
+
+**Nothing else ever posts in your name.** Only `/plate`, **Refresh** and a row's **done** do, and
+only when you use them.
 
 **What it keeps:** the last plate it read, in this session's memory only, so a read that fails can
 still show it with the time it was read. Nothing is saved to disk, and nothing is shared with another
@@ -421,10 +423,9 @@ session or another account.
 
 To keep `/plate` from being offered at all, set its **Plate pane** option to **off** in `/config`.
 
-What is proven: its tests draw every state on both the terminal and the desktop app. Watched once,
-live, in the desktop app in auto permission mode: the pane opened, found the board, and Claude Code
-refused its own read, which is why it asks your AI there. Not yet watched live: the pane asking your
-AI and drawing its answer, and a direct read in the desktop app outside auto mode.
+What is proven: its tests draw every state on both the terminal and the desktop app. Watched live in
+the desktop app in auto mode: the pane asked your AI, drew the plate it read, and its done buttons
+reached your AI. Not yet watched live: a direct read in the desktop app outside auto mode.
 
 ## Two pieces, on purpose
 
@@ -478,8 +479,8 @@ without you updating anything.
 
 The plate pane is the one piece that reads from Dazzer itself, and only once you ask: it asks for
 your plate through the connection Claude Code already has, where Claude Code allows it, holds no
-credentials of its own, and never writes. In auto permission mode it asks your AI for your plate
-instead, so the question and the answer appear in your chat. Marking a row done is a sentence to
+credentials of its own, and never writes. In auto mode, `/plate` and Refresh put one question to
+your AI instead, so that question and its answer appear in your chat. Marking a row done is a sentence to
 your AI, which does the writing.
 
 ## Where the rules live
