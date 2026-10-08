@@ -1936,12 +1936,97 @@ test('a question queued behind a running turn outlives that turn; the next turn 
   await settle(w)
   expect(w.said.map(said => said.text), 'a second question went while the first was queued').toEqual([QUESTION])
 
-  // The next main-loop turn is the question's, even reworded; its end ends the question.
+  // The next main-loop turn may be the question's, reworded: it holds the question until it ends.
   await $.turn.start({ text: 'What is on my plate? Reworded by another plugin.', turnId: 'turn-question' })
   expect(await textAt(ui, 'status:asked')).toBe('Asked your AI.')
   await $.turn.complete({ answer: 'I could not read it.', durationMs: 900, isAborted: false, turnId: 'turn-question', reason: 'answer' })
   await settle(w)
+  // It may also have been a turn queued ahead of the question: the question stays out until no
+  // turn with its own words has started for 10 seconds, and then it ends.
+  expect(await textAt(ui, 'status:asked'), 'a turn that only might be the question ended it at once').toBe('Asked your AI.')
+  await w.clock.advance(10_000)
+  await settle(w)
   expect(await textAt(ui, 'status:unanswered')).toBe('No plate from your AI.')
+})
+
+test("a turn queued ahead of the question does not end it; the question's own turn does", async ($, on) => {
+  const w = world(on, DAZZER_TOOLS, { dazzer: [answered(PLATE), { refuse: REFUSED }] })
+  await $.session.start(STARTED)
+  await $.command.run(ASK)
+  const ui = await mount($, 'terminal')
+
+  // The AI is busy; the person types a message (queued), then presses Refresh (queued after it).
+  await $.turn.start({ text: 'something the person asked before', turnId: 'turn-running' })
+  await ui.press({ key: 'refresh' })
+  await settle(w)
+  expect(w.said.map(said => said.text)).toEqual([QUESTION])
+  await $.turn.complete({ answer: 'Done with that.', durationMs: 900, isAborted: false, turnId: 'turn-running', reason: 'answer' })
+  await settle(w)
+
+  // The person's own message runs first, and ends.
+  await $.turn.start({ text: 'and add the lease to my notes', turnId: 'turn-typed' })
+  await $.turn.complete({ answer: 'Added.', durationMs: 900, isAborted: false, turnId: 'turn-typed', reason: 'answer' })
+  await settle(w)
+  expect(await textAt(ui, 'status:asked'), "the person's own turn ended the question queued after it").toBe('Asked your AI.')
+  await ui.press({ key: 'refresh' })
+  await settle(w)
+  expect(w.said.map(said => said.text), 'a second question went while the first was still queued').toEqual([QUESTION])
+
+  // The question's own turn starts at once; time passing while it runs ends nothing.
+  await $.turn.start({ text: QUESTION, turnId: 'turn-question' })
+  await w.clock.advance(15_000)
+  await settle(w)
+  expect(await textAt(ui, 'status:asked'), 'the question ended while its own turn ran').toBe('Asked your AI.')
+  await $.turn.complete({ answer: 'I could not read it.', durationMs: 900, isAborted: false, turnId: 'turn-question', reason: 'answer' })
+  await settle(w)
+  expect(await textAt(ui, 'status:unanswered')).toBe('No plate from your AI.')
+})
+
+test('a question that never ran (its turn cancelled) is lost after 10 idle seconds, and a press may ask again', async ($, on) => {
+  const w = world(on, DAZZER_TOOLS, { dazzer: [answered(PLATE), { refuse: REFUSED }] }, { groups: { '7001': [{ refuse: REFUSED }] } })
+  await $.session.start(STARTED)
+  await $.command.run(ASK)
+  const ui = await mount($, 'terminal')
+  await $.turn.start({ text: 'something the person asked before', turnId: 'turn-running' })
+  await ui.press({ key: 'refresh' })
+  await settle(w)
+  await $.turn.complete({ answer: 'Done with that.', durationMs: 900, isAborted: false, turnId: 'turn-running', reason: 'answer' })
+  await settle(w)
+  // The person presses Esc: the queued question never runs, and no turn starts.
+
+  // Within 10 seconds, a press still sends nothing.
+  await w.clock.advance(5_000)
+  await ui.press({ key: 'refresh' })
+  await settle(w)
+  expect(w.said.map(said => said.text), 'a question was taken for lost too soon').toEqual([QUESTION])
+  expect(await textAt(ui, 'status:asked')).toBe('Asked your AI.')
+
+  // Idle, nothing bound, and the turn it waited behind ended more than 10 seconds ago: the next
+  // press asks again.
+  await w.clock.advance(5_001)
+  await ui.press({ key: 'refresh' })
+  await settle(w)
+  expect(w.said.map(said => said.text), 'a lost question kept /plate and Refresh from asking').toEqual([QUESTION, QUESTION])
+  expect(await textAt(ui, 'status:asked')).toBe('Asked your AI.')
+})
+
+test("a lost question frees the slot for a later group's press too", async ($, on) => {
+  const w = world(on, DAZZER_TOOLS, { dazzer: [answered(PLATE_CTX), { refuse: REFUSED }] }, { groups: { '7001': [{ refuse: REFUSED }] } })
+  await $.session.start(STARTED)
+  await $.command.run(ASK)
+  const ui = await mount($, 'terminal')
+  await $.turn.start({ text: 'something the person asked before', turnId: 'turn-running' })
+  await ui.press({ key: 'refresh' })
+  await settle(w)
+  await $.turn.complete({ answer: 'Done with that.', durationMs: 900, isAborted: false, turnId: 'turn-running', reason: 'answer' })
+  await w.clock.advance(10_001)
+  await settle(w)
+  await ui.press({ key: 'tab:later' })
+  await ui.press({ key: 'group-open:7001' })
+  await settle(w)
+  expect(w.said.map(said => said.text)).toEqual([QUESTION, OFFICE_QUESTION])
+  expect(await textAt(ui, 'status:group-asked:7001')).toBe('Asked your AI.')
+  expect(await ui.find({ key: 'status:asked' }), 'the lost plate question still said it was asked').toBeUndefined()
 })
 
 test("a group's question queued behind a running turn outlives that turn too", async ($, on) => {
