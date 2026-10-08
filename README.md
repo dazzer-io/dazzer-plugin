@@ -424,8 +424,9 @@ session or another account.
 To keep `/plate` from being offered at all, set its **Plate pane** option to **off** in `/config`.
 
 What is proven: its tests draw every state on both the terminal and the desktop app. Watched live in
-the desktop app in auto mode: the pane asked your AI, drew the plate it read, and its done buttons
-reached your AI. Not yet watched live: a direct read in the desktop app outside auto mode.
+the desktop app in auto mode, on the version before commit fa5da50 (which added the one-question
+limit): the pane asked your AI, drew the plate it read, and its done buttons reached your AI. Not yet
+watched live: the one-question limit, and a direct read in the desktop app outside auto mode.
 
 ## Two pieces, on purpose
 

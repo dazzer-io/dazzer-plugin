@@ -12,19 +12,22 @@
 // answer holds a plate is the board. Every read ends within 20 seconds, in the plate or in one
 // failed line, never in an endless "Reading your plate."
 //
-// WHERE THE ENGINE WILL NOT LET IT. In auto permission mode the engine refuses the pane's own call
-// (seen live in the Desktop app). Only for a read the person started (/plate or Refresh), and only
-// when the engine's own refusal wording says so, the pane puts one question to the person's AI, as
+// WHERE THE ENGINE WILL NOT LET IT. In auto mode the engine's classifier refuses the pane's own
+// call (seen live in the Desktop app). Only for a read the person started (/plate or Refresh), and
+// only when the auto mode classifier refused it, the pane puts one question to the person's AI, as
 // the person's own words: "What is on my plate? My time zone is <the machine's zone>.". When the
 // AI's own recall returns a plate, the pane draws it. One question at a time: while it is
 // unanswered, /plate and Refresh still try the board and send nothing more. The question ends with
-// its own turn; if that turn read no plate, the pane says so. Every read the person starts tries
-// the board first, so a change of mode takes effect at once.
+// its own turn, or failing that the first turn to end after the session took it; if no plate came,
+// the pane says so. Any other refusal of the engine's (a deny rule, don't-ask mode, a hook) is not
+// cured by asking: the pane says Claude Code does not let it read here, and asks nothing. Every
+// read the person starts tries the board first, so a change of mode takes effect at once.
 //
 // WHAT NEVER POSTS. Nothing but those two acts of the person's ever submits anything in their
 // name: the AI's track (a subagent's included), a timer and the session's start never do. After the
-// AI's own call to the board, the pane only reads the board again itself; refused, it keeps what it
-// shows and asks no one.
+// AI's own call to the board, the pane only reads the board again itself, and not at all once the
+// engine has refused it in this session (so refusals never pile up), nor while a read the person
+// started is still on its way; refused, it keeps what it shows and asks no one.
 //
 // WHO WRITES. Never this pane. A row's done sends the person's AI one sentence carrying the item's
 // number and nothing else ("Mark item 7236 done."); the AI marks it done through its own
@@ -62,12 +65,13 @@ const LATER = /^\d+ (more )?things? can wait until later\.$/
 const BACKSLASH = '\x5c'
 
 /**
- * The engine's own words when it refuses a call (read from Claude Code 2.1.293 itself): the auto
- * mode classifier, and its permission-denied sentences. Nothing a server says matches these, so a
- * server's "Access denied" stays a failure to reach the board and never asks the AI.
+ * The engine's own words when it refuses a call (read from Claude Code 2.1.293 itself). Nothing a
+ * server says matches these, so a server's "Access denied" stays a failure to reach the board.
+ * The auto mode classifier's refusal is the one the person's own request cures: only it asks the
+ * AI. The engine's other refusals (a deny rule, don't-ask mode, a hook) are not, and ask nothing.
  */
+const CLASSIFIER_REFUSAL = /auto mode classifier/i
 const ENGINE_REFUSALS = [
-  /auto mode classifier/i,
   /\bPermission for this (?:action|tool use) (?:was|has been) denied\b/,
   /\bPermission to use \S+ has been denied\b/,
   /\bPermission denied by (?:PermissionRequest )?hook\b/,
@@ -88,9 +92,16 @@ const view = atom({ plugin: 'dazzer-plate', key: 'view' } as const, { kind: 'una
 const asked = atom({ plugin: 'dazzer-plate', key: 'asked' } as const, {} as Record<string, PlateAsk>)
 const boards = atom({ plugin: 'dazzer-plate', key: 'boards' } as const, [] as string[])
 const question = atom({ plugin: 'dazzer-plate', key: 'question' } as const, { state: 'none' } as PlateQuestion)
+const refusedHere = atom({ plugin: 'dazzer-plate', key: 'refusedHere' } as const, false)
+const runningTurn = atom({ plugin: 'dazzer-plate', key: 'runningTurn' } as const, null as string | null)
 
 /** The newest read; an older one that answers late changes nothing. */
 let newestRead = 0
+/** Reads the person started that are still on their way; a track's read never overtakes one. */
+let personReads = 0
+
+/** The line the pane shows when the engine refuses it in a way asking cannot cure. */
+const NOT_ALLOWED = 'Claude Code does not let the pane read your plate here.'
 
 /**
  * The board's one neutralising pass on someone else's words (its `neutralizeText`): a broken
@@ -226,8 +237,14 @@ function plateInCall(ran: ToolCallResult): PlateReply | undefined {
  */
 const namesThePlate = (words: string) => /(^|[^\w-])plate\b/i.test(words)
 
-/** Whether a call that threw was the engine refusing the pane, in the engine's own words. */
-const isRefusal = (words: string) => ENGINE_REFUSALS.some(pattern => pattern.test(words))
+/**
+ * How the engine refused a call that threw, in its own words: by the auto mode classifier, which
+ * the person's own request cures; otherwise, which it does not; or not at all.
+ */
+function refusalOf(words: string): 'classifier' | 'engine' | undefined {
+  if (CLASSIFIER_REFUSAL.test(words)) return 'classifier'
+  return ENGINE_REFUSALS.some(pattern => pattern.test(words)) ? 'engine' : undefined
+}
 
 /** When a plate was read, as a person reads a time: "as of Wed 7 Oct 09:12". */
 function asOf(at: string): string | undefined {
@@ -283,6 +300,7 @@ async function show($: EngineInterface, plate: PlateReply, server: string, named
 type Found = { servers?: string[] } & (
   | { kind: 'plate'; plate: PlateReply; server: string; named: boolean }
   | { kind: 'refused' }
+  | { kind: 'blocked' }
   | { kind: 'absent' }
   | { kind: 'off' }
   | { kind: 'failed' }
@@ -300,6 +318,7 @@ async function findThePlate($: EngineInterface): Promise<Found> {
   const zone = machineZone()
   const args = { query: WORDS, view: 'plate', ...(zone === undefined ? {} : { time_zone: zone }), conversation: CONVERSATION }
   let isRefused = false
+  let isBlocked = false
   let isFailed = false
   let isOff = false
   for (const server of servers) {
@@ -315,8 +334,10 @@ async function findThePlate($: EngineInterface): Promise<Found> {
       words = blocks.join('\n')
     } catch (error) {
       words = error instanceof Error ? error.message : String(error)
-      if (isRefusal(words)) {
-        isRefused = true
+      const refusal = refusalOf(words)
+      if (refusal !== undefined) {
+        if (refusal === 'classifier') isRefused = true
+        else isBlocked = true
         continue
       }
     }
@@ -324,6 +345,7 @@ async function findThePlate($: EngineInterface): Promise<Found> {
     else isFailed = true
   }
   if (isRefused) return { kind: 'refused', servers }
+  if (isBlocked) return { kind: 'blocked', servers }
   return { kind: isFailed ? 'failed' : isOff ? 'off' : 'absent', servers }
 }
 
@@ -370,19 +392,36 @@ async function putTheQuestion($: EngineInterface, text: string): Promise<void> {
 /**
  * Reads the plate and shows what it found, within READ_LIMIT_MS: a read that has not answered by
  * then ends in the failed line, with the last plate this session read. A newer read wins over an
- * older one that answers late. When the engine refuses the read, only a read the person started
- * asks the AI; any other keeps what the pane shows.
+ * older one that answers late.
+ *
+ * A read the person started tries the board every time. One a track started does not run while a
+ * person's read is on its way, nor at all once the engine has refused the pane in this session, so
+ * refusals never pile up. When the engine refuses, only a read the person started acts on it: the
+ * classifier's refusal asks the AI, any other says the pane may not read here. Any other read
+ * keeps what the pane shows.
  */
 async function readPlate($: EngineInterface, by: 'person' | 'ai'): Promise<void> {
+  if (by === 'ai' && (personReads > 0 || (await read($, refusedHere)))) return
   newestRead += 1
   const mine = newestRead
+  if (by === 'person') personReads += 1
   let giveUp: () => void = () => {}
   const late = new Promise<'late'>(resolve => {
     giveUp = () => resolve('late')
   })
   const timer = $.clock.after(READ_LIMIT_MS, () => giveUp())
-  const found = await Promise.race([findThePlate($), late])
-  timer.cancel()
+  let found: Found | 'late'
+  try {
+    found = await Promise.race([findThePlate($), late])
+  } finally {
+    timer.cancel()
+    if (by === 'person') personReads -= 1
+  }
+  if (found !== 'late' && (found.kind === 'refused' || found.kind === 'blocked')) {
+    await update($, refusedHere, () => true)
+  } else if (found !== 'late' && found.kind === 'plate' && by === 'person') {
+    await update($, refusedHere, () => false)
+  }
   if (mine !== newestRead) return
   if (found !== 'late' && found.servers !== undefined) {
     const servers = found.servers
@@ -394,6 +433,8 @@ async function readPlate($: EngineInterface, by: 'person' | 'ai'): Promise<void>
     await show($, found.plate, found.server, found.named)
   } else if (found.kind === 'refused') {
     if (by === 'person') await askTheAI($)
+  } else if (found.kind === 'blocked') {
+    if (by === 'person') await update($, view, (current): PlateView => ({ kind: 'blocked', last: lastOf(current) }))
   } else {
     const kind = found.kind
     await update($, view, (): PlateView => ({ kind }))
@@ -483,14 +524,18 @@ export const register: Register = (on, options) => {
     return ran
   }).catch(($, e, next) => next(e))
 
-  // The question's own turn: known by its words when it starts, and ended with it.
+  // The main loop's turns, once the person has asked: which one runs now, and the question's own,
+  // known by its words when it starts. Before the person asks, these do nothing.
   on('turn.start', async ($, e, next) => {
     try {
-      const out = await read($, question)
-      if (out.state !== 'none' && out.turnId === null && e.text === out.text) {
-        await update($, question, (current): PlateQuestion =>
-          current.state !== 'none' && current.turnId === null ? { ...current, turnId: e.turnId } : current,
-        )
+      if ((await read($, view)).kind !== 'unasked') {
+        await update($, runningTurn, () => e.turnId)
+        const out = await read($, question)
+        if (out.state !== 'none' && out.turnId === null && e.text === out.text) {
+          await update($, question, (current): PlateQuestion =>
+            current.state !== 'none' && current.turnId === null ? { ...current, turnId: e.turnId } : current,
+          )
+        }
       }
     } catch {
       // The turn goes on whatever happens here.
@@ -498,15 +543,20 @@ export const register: Register = (on, options) => {
     return next(e)
   }).catch(($, e, next) => next(e))
 
+  // A question ends with its own turn or, failing that, with the first main-loop turn to end after
+  // the session took it, whatever words that turn opened with: it never stays out for the session.
   on('turn.complete', async ($, e, next) => {
     const ended = await next(e)
     try {
-      const out = await read($, question)
-      if (e.agentId === undefined && out.state !== 'none' && out.turnId === e.turnId) {
-        await update($, question, (): PlateQuestion => ({ state: 'none' }))
-        await update($, view, (current): PlateView =>
-          current.kind === 'asking' || current.kind === 'asked' ? { kind: 'unanswered', last: current.last } : current,
-        )
+      if (e.agentId === undefined && (await read($, view)).kind !== 'unasked') {
+        await update($, runningTurn, current => (current === e.turnId ? null : current))
+        const out = await read($, question)
+        if (out.state !== 'none' && (out.turnId === e.turnId || out.state === 'waiting')) {
+          await update($, question, (): PlateQuestion => ({ state: 'none' }))
+          await update($, view, (current): PlateView =>
+            current.kind === 'asking' || current.kind === 'asked' ? { kind: 'unanswered', last: current.last } : current,
+          )
+        }
       }
     } catch {
       // The turn has ended whatever happens here.
@@ -646,6 +696,10 @@ export const register: Register = (on, options) => {
     }
 
     if (current.kind === 'asking' || current.kind === 'asked') {
+      // The AI answers after its current reply only while some other turn of the main loop runs.
+      const running = await read($, runningTurn)
+      const out = await read($, question)
+      const isBusy = running !== null && (out.state === 'none' || out.turnId !== running)
       return (
         <Box flexDirection="column">
           {current.kind === 'asking' ? (
@@ -657,7 +711,7 @@ export const register: Register = (on, options) => {
               <Box key="status:asked">
                 <Text dimColor>Asked your AI.</Text>
               </Box>
-              <Text dimColor>It answers after its current reply.</Text>
+              {isBusy && <Text dimColor>It answers after its current reply.</Text>}
             </Box>
           )}
           {current.last === null ? placeholders : body(current.last)}
@@ -666,16 +720,23 @@ export const register: Register = (on, options) => {
       )
     }
 
-    if (current.kind === 'unanswered' || current.kind === 'unsent') {
+    if (current.kind === 'unanswered' || current.kind === 'unsent' || current.kind === 'blocked') {
       return (
         <Box flexDirection="column">
           {current.kind === 'unanswered' ? (
             <Box key="status:unanswered">
               <Text>No plate from your AI.</Text>
             </Box>
-          ) : (
+          ) : current.kind === 'unsent' ? (
             <Box key="status:unsent">
               <Text>Your question was not sent.</Text>
+            </Box>
+          ) : (
+            <Box gap={1}>
+              <Box key="status:blocked">
+                <Text>Not allowed here.</Text>
+              </Box>
+              <Text>{NOT_ALLOWED}</Text>
             </Box>
           )}
           {current.last !== null && body(current.last)}
