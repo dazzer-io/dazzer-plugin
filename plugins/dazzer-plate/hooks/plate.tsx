@@ -25,8 +25,8 @@
 // call (seen live in the Desktop app). Only for a read the person started (/plate, Refresh, or
 // opening a later group), and only when the auto mode classifier refused it, the pane puts one
 // question to the person's AI, as the person's own words: "What is on my plate? My time zone is
-// <the machine's zone>." for the plate, "Show my later items in <name> (plate group <part>)." for a
-// group. When the AI's own recall returns that plate or that group, the pane draws it. One question
+// <the machine's zone>." for the plate, "Show my later items in plate group <part>." for a group.
+// When the AI's own recall returns that plate or that group, the pane draws it. One question
 // at a time, across the plate and its groups: while one is unanswered, every read the person starts
 // still tries the board and sends nothing more, and the pane says it waits on the AI. The question
 // ends with its own turn, or failing that the first turn to end after the session took it; if
@@ -45,14 +45,15 @@
 //
 // WHO WRITES. Never this pane. A card's Done sends the person's AI one sentence carrying the item's
 // number and nothing else ("Mark item 7236 done."); Talk about it sends "Tell me about item 7236.".
-// The AI acts through its own connection. A title never travels with either: anyone in the
-// workspace can write a title, and those sentences speak as the person. A press counts as sent
+// The AI acts through its own connection. A title never travels with either, nor a group's name
+// with its question: anyone in the workspace can write those, and these sentences speak as the
+// person. A press counts as sent
 // only once the session took that sentence; a sent Done stays sent until a plate arrives without
 // that item.
 //
 // WHAT IT KEEPS. The last plate this session read, and each later group it read, in the session's
 // own state (`$.state`), so a failed read can still show the plate with its time and a group opened
-// again is not read again. Nothing is written to disk and nothing is shared with another session,
+// again is not read again until the next Refresh, which forgets every group's rows. Nothing is written to disk and nothing is shared with another session,
 // so a failed read never shows anyone else's plate.
 //
 // WHOSE WORDS. Titles, what a row is, the names of what it is part of, and the members it names
@@ -90,8 +91,6 @@ const RECALL = /^mcp__(.+)__recall$/
 const BACKSLASH = '\x5c'
 /** Between the pieces of one line: the counts, a tag's parts. */
 const DOT = ' \u{b7} '
-/** The longest group name the group's question carries. */
-const QUESTION_NAME_MAX = 60
 
 /**
  * The engine's own words when it refuses a call (read from Claude Code 2.1.293 itself). Nothing a
@@ -164,14 +163,6 @@ function neutral(value: string): string {
 
 /** Someone else's words on one line: neutralised, every run of spaces one space, trimmed. */
 const oneLine = (value: string) => neutral(value).replace(/\s+/g, ' ').trim()
-
-/** Cut to `max` characters at a word, with "…" when cut. */
-function cut(text: string, max: number): string {
-  if (text.length <= max) return text
-  const slice = text.slice(0, max - 1)
-  const at = slice.lastIndexOf(' ')
-  return `${(at > 0 ? slice.slice(0, at) : slice).trimEnd()}\u{2026}`
-}
 
 const isNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value)
 const isDay = (value: unknown): value is string => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
@@ -248,16 +239,18 @@ function keyOfAsked(part: unknown): string | undefined {
   return /^\d{1,15}$/.test(word) ? String(Number(word)) : undefined
 }
 
-/** A later group's name as the pane shows it and its question names it. */
+/** A later group's name as the pane shows it. Its question never carries it. */
 function groupName(group: PlateLaterGroup): string {
   if (group.unfiled === true) return 'Not filed yet'
   if (group.id === null) return 'Not part of anything'
   return group.name === null ? 'No name' : oneLine(group.name)
 }
 
-/** The question for one later group, in the person's own words. */
-const groupQuestion = (group: PlateLaterGroup) =>
-  `Show my later items in ${cut(groupName(group), QUESTION_NAME_MAX)} (plate group ${keyOf(group)}).`
+/**
+ * The question for one later group, in the person's own words: its number, `unfiled` or `none`,
+ * and nothing anyone else wrote. A group's name is someone else's words, as a title is.
+ */
+const groupQuestion = (group: PlateLaterGroup) => `Show my later items in plate group ${keyOf(group)}.`
 
 /** What a plate-view reply holds: a plate look, or the read of one later group. */
 type Answer =
@@ -474,7 +467,11 @@ function tagOf(row: PlateRow, people: Record<string, string>): Tag | undefined {
   }
 }
 
-/** A card's dim line: what it is part of, who it is from, when it last moved; each where known. */
+/**
+ * A card's dim line: what it is part of, who it is from, when it last moved, each where known, and
+ * "maybe yours (a guess)" where the board is unsure the item is the person's to do. On a handed row
+ * that guess is about the member it waits on, and its tag says so.
+ */
 function linePieces(row: PlateRow, plate: PlateReply): { key: string; text: string }[] {
   const pieces: { key: string; text: string }[] = []
   const part = partOf(row.part)
@@ -490,6 +487,9 @@ function linePieces(row: PlateRow, plate: PlateReply): { key: string; text: stri
   }
   const moved = isDay(row.moved) ? movedLabel(row.moved, plate.today) : undefined
   if (moved !== undefined) pieces.push({ key: `datum:row.moved:${row.id}`, text: moved })
+  if (row.doer_suggested === true && row.why !== 'handed') {
+    pieces.push({ key: `datum:row.doer_suggested:${row.id}`, text: 'maybe yours (a guess)' })
+  }
   return pieces
 }
 
@@ -776,6 +776,23 @@ async function readGroup($: EngineInterface, group: PlateLaterGroup): Promise<vo
   else await askTheAI($, groupQuestion(group), key)
 }
 
+/**
+ * Refresh: forgets every later group's kept rows, closing the open one if it held them, so the
+ * next Open reads that group again; then reads the plate the way any read the person starts does.
+ */
+async function refreshPlate($: EngineInterface): Promise<void> {
+  const kept = Object.entries(await read($, groups))
+    .filter(([, state]) => state.kind === 'rows')
+    .map(([key]) => key)
+  if (kept.length > 0) {
+    await update($, groups, (current): Record<string, PlateGroupView> =>
+      Object.fromEntries(Object.entries(current).filter(([key, state]) => !(kept.includes(key) && state.kind === 'rows'))),
+    )
+    await update($, openGroup, current => (current !== null && kept.includes(current) ? null : current))
+  }
+  await readPlate($, 'person')
+}
+
 /** Opens a later group, closing any other, and reads it unless its rows are kept or on their way. */
 async function pressGroup($: EngineInterface, group: PlateLaterGroup): Promise<void> {
   const key = keyOf(group)
@@ -962,7 +979,7 @@ export const register: Register = (on, options) => {
 
     const refresh = (
       <Box key="actions" marginTop={1}>
-        <Button key="refresh" label="Refresh" onPress={() => readPlate($, 'person')} />
+        <Button key="refresh" label="Refresh" onPress={() => refreshPlate($)} />
       </Box>
     )
 
