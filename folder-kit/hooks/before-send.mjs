@@ -5,8 +5,9 @@
  * says which, so Dazzer puts that right before sending again.
  *
  * It never blocks for good. Each reason is given at most once a session for the same thread, or
- * for the same send when it answers no thread, and the stop is written to the session's log before
- * it is said; the identical send tried again goes through. Nothing is checked until the log holds a
+ * once a session for all the sends that answer no thread, however they are worded, and the stop is
+ * written to the session's log before it is said; the send tried again goes through, so a Dazzer
+ * that cannot meet a check is never stuck rewording. Nothing is checked until the log holds a
  * message, so a log that cannot be written stops nothing. A thread counts as read when any tool of
  * the same connector named it, or the read tool listed for that kind of send did. The person is
  * never stuck behind a check Dazzer cannot meet.
@@ -113,8 +114,8 @@ trigger(({ input, defaults, words }) => {
     }
   }
 
-  // Once a session for the same thread, or for the same send when it answers none.
-  const subject = thread !== undefined ? `thread\u0000${thread}` : `send\u0000${tool}\u0000${JSON.stringify(args)}`;
+  // Once a session for the same thread, or once a session for every send that answers none.
+  const subject = thread !== undefined ? `thread\u0000${thread}` : "no thread";
   const given = new Set(log.flatMap((line) => (Array.isArray(line.denied) ? line.denied : [])));
   const due = reasons.map((reason) => ({ ...reason, mark: markOf(reason.why, subject) })).filter((reason) => !given.has(reason.mark));
   if (due.length === 0) return "";

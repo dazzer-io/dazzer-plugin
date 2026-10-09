@@ -127,7 +127,8 @@ function observe(sb, input, spawn) {
   const after = snapshot(sb);
   const touched = [...[...after].filter(([path, stamp]) => before.get(path) !== stamp).map(([path]) => path), ...[...before.keys()].filter((path) => !after.has(path))];
   const strays = touched.filter((path) => !(own !== null && path.startsWith(own))).map((path) => relative(sb.root, path));
-  return { status: result.status, stdout: result.stdout ?? "", stderr: result.stderr ?? "", strays };
+  // A trigger that walks away from its input leaves the host writing into a closed pipe.
+  return { status: result.status, stdout: result.stdout ?? "", stderr: result.stderr ?? "", strays, pipe: result.error?.code };
 }
 
 const env = (sb, path = dirname(process.execPath)) => ({ PATH: path, TMPDIR: sb.tmp, HOME: sb.home, CLAUDE_PROJECT_DIR: sb.project });
@@ -149,6 +150,7 @@ const run = (sb, name, input) => runScript(sb, join(HOOKS, name), input);
 function holds(what, result, expected) {
   assert.equal(result.status, 0, `${what}: the trigger must exit 0, and it exited ${result.status} saying ${result.stderr.slice(0, 300)}`);
   assert.equal(result.stderr, "", `${what}: the trigger must say nothing on stderr`);
+  assert.equal(result.pipe, undefined, `${what}: the trigger must read its whole input, and the host met ${result.pipe}`);
   assert.equal(result.stdout, expected(), `${what}: the trigger must print exactly what is expected`);
   assert.deepEqual(result.strays, [], `${what}: the trigger must write nothing outside the session's temporary folder`);
 }
@@ -217,6 +219,52 @@ test("the message trigger adds the catch line to a correction", (t) => {
   const sb = sandbox(t);
   const result = run(sb, "prompt.mjs", recorded(sb, "UserPromptSubmit", "s-correction", { prompt: CORRECTION }));
   holds("a correction message gets the catch line", result, () => said("UserPromptSubmit", words().catch));
+});
+
+test("the catch phrases hear short corrections in English and Hebrew, and not plain requests", (t) => {
+  const catches = defaults().catch_phrases.map((source) => new RegExp(source, "iu"));
+  const caught = (message) => catches.some((phrase) => phrase.test(message));
+  for (const message of [
+    "That's not it",
+    "Not that one, the other deck.",
+    "Try again",
+    "Shorter",
+    "Less formal please",
+    "I prefer bullet points",
+    "His name is Dana, not Diana",
+    "It should be addressed to Maya",
+    "Did you even read the thread?",
+    "Not like this",
+    "לא, תכתוב לו בעברית",
+    "זה לא נכון",
+    "אמרתי לך שזה ביום שלישי",
+    "תנסה שוב",
+    "קצר יותר בבקשה",
+  ]) {
+    assert.equal(caught(message), true, `"${message}" may be a correction`);
+  }
+  for (const message of [PLAIN, "Thanks, looks good.", "Can you summarise the deck?", "Send it to Maya and copy Ben.", "שלום, מה שלומך?", "תכין לי טיוטה לדן", "מלא את הטופס"]) {
+    assert.equal(caught(message), false, `"${message}" is a plain request`);
+  }
+  const sb = sandbox(t);
+  holds("a correction in Hebrew", run(sb, "prompt.mjs", recorded(sb, "UserPromptSubmit", "s-hebrew", { prompt: "לא, תכתוב לו בעברית" })), () =>
+    said("UserPromptSubmit", words().catch),
+  );
+});
+
+test("every pattern in the defaults compiles under the flags its trigger uses", () => {
+  const kit = defaults();
+  const compiles = (source, flags, what) => assert.doesNotThrow(() => new RegExp(source, flags), `${what} compiles`);
+  for (const source of kit.catch_phrases) compiles(source, "iu", `the catch phrase ${source}`);
+  for (const source of kit.claimed_save_phrases) compiles(source, "i", `the claimed-save phrase ${source}`);
+  compiles(kit.time_pattern, "i", "the time pattern");
+  compiles(kit.send.pattern, "", "the send pattern");
+  compiles(kit.calendar_read_pattern, "", "the calendar-read pattern");
+  compiles(kit.brain_write_pattern, "", "the Brain-write pattern");
+  for (const entry of kit.send.tools) {
+    compiles(entry.tool, "", `the send tool ${entry.tool}`);
+    compiles(entry.read_tool, "", `the read tool ${entry.read_tool}`);
+  }
 });
 
 test("a plain message prints nothing", (t) => {
@@ -331,6 +379,19 @@ test("nothing is checked before the session's log holds a message", (t) => {
   );
 });
 
+test("a log that cannot be appended to stops nothing, and never the same send twice", (t) => {
+  if (typeof process.getuid === "function" && process.getuid() === 0) {
+    t.skip("a superuser writes through a read-only file");
+    return;
+  }
+  const sb = sandbox(t);
+  const session = "s-read-only";
+  begin(sb, session);
+  chmodSync(join(sb.tmp, NOTES, session, "log.jsonl"), 0o400);
+  holds("a reply to an unread thread, its stop unrecordable", run(sb, "before-send.mjs", recorded(sb, "PreToolUse", session, REPLY)), nothing);
+  holds("the identical reply again", run(sb, "before-send.mjs", recorded(sb, "PreToolUse", session, REPLY)), nothing);
+});
+
 test("a send naming a time with no calendar read is denied", (t) => {
   const sb = sandbox(t);
   begin(sb, "s-time");
@@ -355,8 +416,10 @@ test("a repeat deny is let through", (t) => {
   holds("the identical reply tried again", run(sb, "before-send.mjs", recorded(sb, "PreToolUse", session, REPLY)), nothing);
   holds("a send naming a time", run(sb, "before-send.mjs", recorded(sb, "PreToolUse", session, PROPOSE_TIME)), () => denied(words().no_calendar));
   holds("the identical send tried again", run(sb, "before-send.mjs", recorded(sb, "PreToolUse", session, PROPOSE_TIME)), nothing);
-  holds("a different send naming a time", run(sb, "before-send.mjs", recorded(sb, "PreToolUse", session, PROPOSE_OTHER_TIME)), () =>
-    denied(words().no_calendar),
+  holds("the same reason in other words, answering no thread", run(sb, "before-send.mjs", recorded(sb, "PreToolUse", session, PROPOSE_OTHER_TIME)), nothing);
+  const otherThread = { ...REPLY, tool_input: { ...REPLY.tool_input, threadId: "77aa66bb55cc44dd" } };
+  holds("a reply to another thread never read", run(sb, "before-send.mjs", recorded(sb, "PreToolUse", session, otherThread)), () =>
+    denied(words().unread_thread),
   );
   const log = logOf(sb, session);
   assert.equal(log.entries.filter((entry) => Array.isArray(entry.denied)).length, 3, "each stop is written to the session's log");
@@ -382,40 +445,89 @@ test("a tool outside the send pattern is let through", (t) => {
     tool_input: { threadId: THREAD, text: "Real Synergy, Thursday at 3pm" },
   };
   holds("a read that carries a thread, a time and a banned word", run(sb, "before-send.mjs", recorded(sb, "PreToolUse", "s-read-tool", reading)), nothing);
-  // The pattern itself, as Claude Code's matcher tests it: reads are never sends.
-  const send = new RegExp(defaults().send.pattern);
-  for (const name of [
-    "mcp__claude_ai_LinkedIn__get_posts",
-    "mcp__claude_ai_Gmail__get_thread",
-    "mcp__claude_ai_Gmail__list_drafts",
-    "mcp__claude_ai_Gmail__search_threads",
-    "mcp__claude_ai_Slack__slack_read_thread",
-    "mcp__claude_ai_Google_Calendar__gcal_list_events",
-    "mcp__db__postgres_query",
-    "mcp__x__fetch_messages",
-    "mcp__x__view_post",
-    "mcp__claude_ai_Dazzer__remember",
-    "Write",
+  // The pattern itself, as a host tests a matcher: unanchored, or wrapped whole. Both agree.
+  const source = defaults().send.pattern;
+  const loose = new RegExp(source);
+  const whole = new RegExp(`^(?:${source})$`);
+  const isSend = (name) => {
+    assert.equal(loose.test(name), whole.test(name), `${name} reads the same whether or not the host anchors the pattern`);
+    return loose.test(name);
+  };
+  for (const op of [
+    "get_posts",
+    "get_thread",
+    "list_drafts",
+    "search_threads",
+    "slack_read_thread",
+    "gcal_list_events",
+    "postgres_query",
+    "fetch_messages",
+    "view_post",
+    "remember",
+    "port_forward",
+    "publish",
+    "schedule_job",
+    "create_note",
+    "post_analytics",
+    "comment_count",
+    "email_draft_list",
+    "blog_post_get",
   ]) {
-    assert.equal(send.test(name), false, `${name} is not a send`);
+    assert.equal(isSend(`mcp__x__${op}`), false, `${op} is not a send`);
   }
-  for (const name of [REPLY.tool_name, PROPOSE_TIME.tool_name, "mcp__claude_ai_Google_Calendar__gcal_create_event", "mcp__x__reply_all", "mcp__x__forward_email"]) {
-    assert.equal(send.test(name), true, `${name} is a send`);
+  for (const name of ["mcp__fetch__post", "mcp__npm__publish", "Write"]) assert.equal(isSend(name), false, `${name} is not a send`);
+  for (const op of [
+    "create_draft",
+    "slack_send_message",
+    "gcal_create_event",
+    "reply_all",
+    "forward_email",
+    "send-email",
+    "addCommentToJiraIssue",
+    "add_issue_comment",
+    "google_calendar_create_event",
+    "microsoft_outlook_send_email",
+    "create_message",
+    "compose_email",
+  ]) {
+    assert.equal(isSend(`mcp__x__${op}`), true, `${op} is a send`);
   }
 });
 
-test("ordinary words are not a time, and a save made elsewhere is not a claimed save", (t) => {
+test("ordinary words are not a time", (t) => {
   const sb = sandbox(t);
   const session = "s-ordinary";
   begin(sb, session);
-  const update = { tool_name: "mcp__claude_ai_Slack__slack_send_message", tool_input: { channel_id: "C04DAN", text: "Decision 2 is in: 3 marketing hires, support 24/7." } };
-  holds("a send whose numbers name no time", run(sb, "before-send.mjs", recorded(sb, "PreToolUse", session, update)), nothing);
-  holds(
-    "the end of a turn that saved a draft in the mail",
-    run(sb, "stop.mjs", recorded(sb, "Stop", session, { stop_hook_active: false, last_assistant_message: "I've saved the draft in Gmail." })),
-    nothing,
-  );
-  holds("the next message", run(sb, "prompt.mjs", recorded(sb, "UserPromptSubmit", session, { prompt: PLAIN })), nothing);
+  const update = {
+    tool_name: "mcp__claude_ai_Slack__slack_send_message",
+    tool_input: { channel_id: "C04DAN", text: "Decision 2 is in: 3 marketing hires, support 24/7. Option 2 may be cheaper. Happy Friday!" },
+  };
+  holds("a send whose numbers and weekdays name no time", run(sb, "before-send.mjs", recorded(sb, "PreToolUse", session, update)), nothing);
+});
+
+test("the time pattern names times and dates, never bare numbers, ratios or weekday words", () => {
+  const time = new RegExp(defaults().time_pattern, "i");
+  for (const said of ["today", "Can we meet at 3?", "9.30am", "half past three", "12.10.2026", "Thursday at 3pm", "Or Friday at 10:30, if that suits better?", "Oct 14", "the 3rd of May", "2026-10-14", "next Tuesday"]) {
+    assert.equal(time.test(said), true, `"${said}" names a time`);
+  }
+  for (const said of [
+    "Option 2 may be cheaper",
+    "70/20/10",
+    "1:10 mentor ratio",
+    "12:45 in the recording",
+    "2 PM roles",
+    "Order 1234-56-78",
+    "Happy Friday",
+    "this week",
+    "Black Friday",
+    "The Sunday Times",
+    "The Monday report is attached",
+    "Decision 2",
+    "3 marketing hires",
+    "24/7",
+  ]) {
+    assert.equal(time.test(said), false, `"${said}" names no time`);
+  }
 });
 
 test("a send holding a word on the banned list is denied, naming it", (t) => {
@@ -424,6 +536,18 @@ test("a send holding a word on the banned list is denied, naming it", (t) => {
   begin(sb, "s-banned");
   const result = run(sb, "before-send.mjs", recorded(sb, "PreToolUse", "s-banned", BANNED_SEND));
   holds("a send holding their banned word", result, () => denied(`${words().banned_word} synergy`));
+});
+
+test("a banned phrase of two words is matched across its space, and stopped once", (t) => {
+  const sb = sandbox(t);
+  bans(sb, ["circle back"]);
+  const session = "s-phrase";
+  begin(sb, session);
+  const send = { tool_name: "mcp__claude_ai_Slack__slack_send_message", tool_input: { channel_id: "C04DAN", text: "Happy to Circle  back on this one." } };
+  holds("a send holding their banned phrase", run(sb, "before-send.mjs", recorded(sb, "PreToolUse", session, send)), () =>
+    denied(`${words().banned_word} circle back`),
+  );
+  holds("the same send tried again", run(sb, "before-send.mjs", recorded(sb, "PreToolUse", session, send)), nothing);
 });
 
 test("a banned word is matched whole, so a longer word holding it passes", (t) => {
@@ -456,10 +580,6 @@ test("the same send is allowed when the banned list is absent or unreadable", (t
 test("the run line follows the Skill tool", (t) => {
   const sb = sandbox(t);
   holds("the Skill tool", run(sb, "after-tool.mjs", recorded(sb, "PostToolUse", "s-skill", SKILL_RAN)), () => said("PostToolUse", words().run));
-  // A typed command's expansion is no longer registered; handed one anyway, the trigger stays out of it.
-  const typed = recorded(sb, "UserPromptExpansion", "s-typed", { expansion_type: "slash_command", command_name: "follow-up", prompt: "/follow-up Dan" });
-  holds("a typed command's expansion", run(sb, "after-tool.mjs", typed), nothing);
-  assert.equal(logOf(sb, "s-typed").entries.length, 0, "a typed command's expansion leaves nothing in the log");
 });
 
 test("a Brain write is logged as a save, by its identifiers only", (t) => {
@@ -476,6 +596,39 @@ test("a Brain write is logged as a save, by its identifiers only", (t) => {
   assert.equal(read.save, undefined, "a read is not a save");
   assert.deepEqual(read.ids, [THREAD], "a read keeps the thread it names");
   assert.ok(!/first name|follow-up|Dan|saved/.test(log.text), "no content of a tool's input or result reaches the log");
+});
+
+test("a sentence in an identifier's field is never logged", (t) => {
+  const sb = sandbox(t);
+  const session = "s-sentence-id";
+  const odd = { tool_name: "mcp__claude_ai_Notion__lookup", tool_input: { id: "Always open with the first name", threadId: THREAD }, tool_response: {} };
+  holds("a tool whose id field holds a sentence", run(sb, "after-tool.mjs", recorded(sb, "PostToolUse", session, odd)), nothing);
+  const log = logOf(sb, session);
+  assert.deepEqual(log.entries[0].ids, [THREAD], "only the identifier is kept");
+  assert.ok(!/first name|Always/.test(log.text), "the sentence never reaches the log");
+});
+
+test("a long tool result is still read, up to the after-tool trigger's own cap", (t) => {
+  const sb = sandbox(t);
+  const kit = defaults();
+  assert.ok(kit.after_tool_input_max_bytes > kit.input_max_bytes, "the after-tool trigger reads more than the others");
+  const long = { ...BRAIN_WRITE, tool_response: { echoed: "x".repeat(kit.input_max_bytes) } };
+  holds("a Brain write with a long result", run(sb, "after-tool.mjs", recorded(sb, "PostToolUse", "s-long", long)), nothing);
+  assert.equal(logOf(sb, "s-long").entries[0]?.save, true, "the long save is logged as a save");
+  const huge = { ...BRAIN_WRITE, tool_response: { echoed: "x".repeat(kit.after_tool_input_max_bytes) } };
+  holds("a Brain write over even that cap", run(sb, "after-tool.mjs", recorded(sb, "PostToolUse", "s-huge", huge)), nothing);
+  assert.equal(logOf(sb, "s-huge").entries.length, 0, "input over the cap is read as no input");
+});
+
+test("an input cap that is not a whole number still reads the input to its end", (t) => {
+  const sb = sandbox(t);
+  const copy = join(sb.root, "kit-copy");
+  mkdirSync(copy);
+  for (const name of FOLDER_FILES) copyFileSync(join(HOOKS, name), join(copy, name));
+  const kit = defaults();
+  writeFileSync(join(copy, "kit.defaults.json"), JSON.stringify({ ...kit, input_max_bytes: String(kit.input_max_bytes) }));
+  const long = recorded(sb, "UserPromptSubmit", "s-odd-cap", { prompt: `${CORRECTION} ${"x".repeat(kit.input_max_bytes)}` });
+  holds("a correction under a cap written as words", runScript(sb, join(copy, "prompt.mjs"), long), nothing);
 });
 
 test("the end-of-turn trigger never prints, and leaves a note when a catch had no save", (t) => {
@@ -510,18 +663,41 @@ test("a catch that was saved leaves no note", (t) => {
   holds("the next message", run(sb, "prompt.mjs", recorded(sb, "UserPromptSubmit", session, { prompt: PLAIN })), nothing);
 });
 
-test("a save claimed in the reply with none made leaves a note", (t) => {
+/** A turn with no catch whose reply says this, ended, then the next message: what it carries. */
+function afterReply(sb, session, reply) {
+  begin(sb, session);
+  holds(`the end of a turn saying "${reply}"`, run(sb, "stop.mjs", recorded(sb, "Stop", session, { stop_hook_active: false, last_assistant_message: reply })), nothing);
+  return run(sb, "prompt.mjs", recorded(sb, "UserPromptSubmit", session, { prompt: PLAIN }));
+}
+
+test("a save claimed to their Brain, memory or Dazzer, with none made, leaves a note", (t) => {
   const sb = sandbox(t);
-  const session = "s-claimed";
-  holds("a plain message", run(sb, "prompt.mjs", recorded(sb, "UserPromptSubmit", session, { prompt: PLAIN })), nothing);
-  holds(
-    "the end of a turn claiming a save it never made",
-    run(sb, "stop.mjs", recorded(sb, "Stop", session, { stop_hook_active: false, last_assistant_message: "Got it, I've saved that to your Brain." })),
-    nothing,
-  );
-  holds("the next message", run(sb, "prompt.mjs", recorded(sb, "UserPromptSubmit", session, { prompt: PLAIN })), () =>
+  for (const [at, reply] of ["Saved to Dazzer Memory.", "I've saved that in Dazzer.", "Got it, I've saved that to your Brain."].entries()) {
+    holds(`the message after "${reply}"`, afterReply(sb, `s-claimed-${at}`, reply), () => said("UserPromptSubmit", words().note));
+  }
+});
+
+test("a claimed update of their Brain, with none made, leaves a note", (t) => {
+  const sb = sandbox(t);
+  holds("the message after an update claimed", afterReply(sb, "s-updated", "Updated your Brain with his new title."), () =>
     said("UserPromptSubmit", words().note),
   );
+});
+
+test("the Brain as a subject, an offer, tech talk or a save elsewhere is no claimed save", (t) => {
+  const sb = sandbox(t);
+  const replies = [
+    "Your Brain has nothing on Dan yet.",
+    "The Brain knows his title is CFO.",
+    "Sign-ups are up and the memory keeps climbing.",
+    "Want me to keep this in your Brain?",
+    "Shall I store that in your memory?",
+    "Redis keeps sessions in memory.",
+    "I added a section on the memory leak.",
+    "I've put it in the brain-dump doc.",
+    "I've saved the draft in Gmail.",
+  ];
+  for (const [at, reply] of replies.entries()) holds(`the message after "${reply}"`, afterReply(sb, `s-not-claimed-${at}`, reply), nothing);
 });
 
 test("the note is carried once, by the next message only", (t) => {
@@ -535,6 +711,8 @@ test("the note is carried once, by the next message only", (t) => {
     said("UserPromptSubmit", `${words().catch}\n${words().note}`),
   );
   holds("the message after that", run(sb, "prompt.mjs", recorded(sb, "UserPromptSubmit", session, { prompt: PLAIN })), nothing);
+  // The end of a turn cannot know a correction went unsaved, only that it may have: the note says so.
+  assert.match(words().note, /^\[Dazzer\] If .+; otherwise ignore this\.$/, "the note is conditional, never asserting what it does not know");
 });
 
 test("the session start line, and the plugin's resume line after a compact", (t) => {
@@ -559,7 +737,7 @@ test("a file deleted outside the session folder is caught", (t) => {
   // A stand-in for a trigger gone wrong, so the check itself is seen catching what it is for.
   writeFileSync(join(sb.project, "theirs.txt"), "the person's own file");
   const deleter = join(sb.root, "deleter.mjs");
-  writeFileSync(deleter, `import { rmSync } from "node:fs";\nrmSync(${JSON.stringify(join(sb.project, "theirs.txt"))});\n`);
+  writeFileSync(deleter, `import { rmSync } from "node:fs";\nfor await (const chunk of process.stdin) void chunk;\nrmSync(${JSON.stringify(join(sb.project, "theirs.txt"))});\n`);
   const result = runScript(sb, deleter, recorded(sb, "Stop", "s-deleter", { stop_hook_active: false }));
   assert.deepEqual(result.strays, [join("project", "theirs.txt")], "the deleted file comes back as a stray");
   assert.throws(() => holds("a trigger that deletes the person's file", result, nothing), /must write nothing outside the session's temporary folder/);

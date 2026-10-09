@@ -51,7 +51,9 @@ import { REPO_ROOT, read, rel, runGate } from "./lib/gate.mjs";
  * JSON string writes a line break as two characters, so a numbered list grown inside a sentence
  * would sit on one line of the file and every shape below, drawn line by line, would miss it. The
  * budget is what the eight sentences cost when written, 888 characters, and 224 of those are the
- * plugin's own resume line, held word for word. A sentence that starts teaching grows past it.
+ * plugin's own resume line, held word for word. A sentence that starts teaching grows past it. When
+ * the note grew a condition, so that it never asserts what it does not know, the start and catch
+ * lines were cut to make room (896 characters) rather than the budget raised.
  */
 const SHIPPED = [
   { file: join(REPO_ROOT, "plugins", "dazzer", "skills", "dazzer", "SKILL.md") },

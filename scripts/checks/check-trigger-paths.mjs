@@ -31,10 +31,10 @@ const KIT_SETTINGS = join(KIT, "settings.hooks.json");
 const KIT_HOOKS = join(KIT, "hooks");
 /** Either spelling a shell reads, `$VAR` or `${VAR}`, and the path it addresses after it. */
 const FROM_PROJECT = new RegExp(`\\$(?:\\{${PROJECT_VAR}\\}|${PROJECT_VAR}(?![A-Za-z0-9_]))(/[^\\s"']*)`);
-/** Where a kit script sits in a person's folder. Node scripts and shell scripts both count. */
-const IN_FOLDER = /^\/\.claude\/hooks\/([A-Za-z0-9._-]+\.(?:mjs|sh))$/;
+/** Where a kit script sits in a person's folder. Node scripts of every kind and shell scripts all count. */
+const IN_FOLDER = /^\/\.claude\/hooks\/([A-Za-z0-9._-]+\.(?:mjs|cjs|js|sh))$/;
 /** A command that runs a script at all, rather than only printing words. */
-const RUNS_SCRIPT = /\.(?:mjs|sh)\b/;
+const RUNS_SCRIPT = /\.(?:mjs|cjs|js|sh)\b/;
 
 /** Every command string declared anywhere in a trigger file. */
 function commands(node, out = []) {
@@ -50,15 +50,16 @@ function commands(node, out = []) {
 
 /**
  * The folder kit's triggers, read from the one file the creator merges into a person's settings.
- * Present or absent with the kit itself: a kit with no registrations would ship five scripts that
- * never run, and nothing else here would notice.
+ * The kit must be here: a release without it would leave every folder the creator makes from it
+ * with nothing to copy, and a kit with no registrations would ship five scripts that never run.
  */
 function checkKit(findings) {
   let entries;
   try {
     entries = readdirSync(KIT);
   } catch {
-    return; // no kit in this tree
+    findings.push({ file: rel(KIT), message: "the folder kit is missing, so no person's folder could receive its triggers" });
+    return;
   }
   if (!entries.includes("settings.hooks.json")) {
     findings.push({ file: rel(KIT_SETTINGS), message: "the folder kit registers no triggers: its settings file is missing" });

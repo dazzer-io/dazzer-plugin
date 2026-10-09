@@ -40,16 +40,20 @@ const SESSION_SHAPE = /^[A-Za-z0-9_-]{1,128}$/;
 
 const kitFile = (name) => JSON.parse(readFileSync(join(HERE, name), "utf8"));
 
-/** Reads all of stdin, but keeps none of it once it passes the cap, so an oversized input reads as no input. */
+/**
+ * Reads all of stdin, but keeps none of it once it passes the cap, so an oversized input reads as
+ * no input. Drained to the end whatever the cap, even one that is not a whole number: a trigger
+ * that walks away from its input leaves the host writing into a closed pipe.
+ */
 async function readStdin(cap) {
-  if (!Number.isInteger(cap) || cap <= 0) return null;
+  const usable = Number.isInteger(cap) && cap > 0;
   const parts = [];
   let total = 0;
   for await (const chunk of process.stdin) {
     total += chunk.length;
-    if (total <= cap) parts.push(chunk);
+    if (usable && total <= cap) parts.push(chunk);
   }
-  return total > cap ? null : Buffer.concat(parts).toString("utf8");
+  return !usable || total > cap ? null : Buffer.concat(parts).toString("utf8");
 }
 
 /** The input as an object, or null when it is empty, over the cap, or not an object. */
@@ -188,17 +192,18 @@ export const deny = (reason) =>
  * Runs one trigger. The handler gets the input, the defaults and the words, and returns what to
  * print, or `{ out, after }` where `after` lists writes to make once the line is out. Whatever goes
  * wrong before printing, the trigger exits 0 having printed nothing at all; whatever goes wrong in
- * one write after printing loses that write alone.
+ * one write after printing loses that write alone. `cap` names the default holding this trigger's
+ * input cap; the input is read to its end even when the defaults themselves cannot be read.
  */
-export async function trigger(handler) {
+export async function trigger(handler, cap = "input_max_bytes") {
   process.exitCode = 0;
   process.stdout.on("error", () => {});
   let after = [];
   try {
-    const defaults = kitFile("kit.defaults.json");
+    const defaults = guarded(() => kitFile("kit.defaults.json"), null);
+    const input = await readInput(defaults?.[cap]);
+    if (input === null || defaults === null) return;
     const words = kitFile("kit.words.json");
-    const input = await readInput(defaults.input_max_bytes);
-    if (input === null) return;
     const result = handler({ input, defaults, words });
     const out = typeof result === "string" ? result : result?.out;
     if (Array.isArray(result?.after)) after = result.after;
