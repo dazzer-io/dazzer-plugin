@@ -1,13 +1,13 @@
 {
   "kit": 1,
   "files": {
-    "lib.mjs": "f333df53fc2994adc7dceec2a32dbb6cbc3df79a",
+    "lib.mjs": "1819300d06d9f58547af8f1f7effc432dfc78246",
     "start.mjs": "80958ccc12871f8c9882ca32bfe0787742095884",
-    "prompt.mjs": "b2f5f51ff27b162fd063dd736a1575862bb6a378",
-    "before-send.mjs": "457776140429020b485ef2e4211d70107c5bf547",
-    "after-tool.mjs": "94474e09b01586c959c78494ef5c238c7b9d423c",
-    "stop.mjs": "78c421cdb0d4562755a454268e69ba4cc6f4473d",
-    "kit.defaults.json": "ce341f90ccb987402ec070a4b77e9fed9f353da0",
+    "prompt.mjs": "80b25a4a20c0b20095cc341b225290a42dad481c",
+    "before-send.mjs": "4abd61318144bf190f7d107a31da0fc29bbf4b29",
+    "after-tool.mjs": "1910e63d15e34b392e6be432d29135d21c777961",
+    "stop.mjs": "e379a57b52bdfbe0ec7458467f97f5f079a01493",
+    "kit.defaults.json": "734e95e43634b25e67c7d52c32c4c33a09e2c6aa",
     "kit.words.json": "af6ff38ab61471edab603ab51c9a28480b31d3f2"
   }
 }

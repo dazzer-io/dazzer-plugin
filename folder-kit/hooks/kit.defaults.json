@@ -18,7 +18,7 @@
     "\\b(please|pls|plz) (don['’]?t|stop|never|always|use|keep)\\b"
   ],
   "send": {
-    "pattern": "^mcp__.+__.*(send|reply|forward|draft|post|publish|schedule|create_event|update_event|comment|create_note|create_engagement)",
+    "pattern": "^mcp__.+__(?!(?:[A-Za-z0-9]+_)?(?:get|list|read|search|fetch|view)(?:_|$))(?:[A-Za-z0-9]+_)?(?:send|reply|forward|draft|post|publish|schedule|comment|create_(?:draft|event|post|note|comment|engagement)|update_event|add_comment)(?:_|$)",
     "text_fields": ["subject", "body", "text", "message", "content", "title", "description", "summary", "comment", "caption", "html", "markdown", "notes"],
     "tools": [
       { "tool": "[Gg]mail|[Ee]mail|[Oo]utlook", "thread_field": "threadId", "read_tool": "(get|read|fetch|view|open)_?(thread|conversation)" },
@@ -27,16 +27,13 @@
       { "tool": ".", "thread_field": "conversationId", "read_tool": "(get|read|fetch|view|open)_?(thread|conversation)" }
     ]
   },
-  "time_pattern": "\\b([01]?\\d|2[0-3]):[0-5]\\d\\b|\\b(1[0-2]|0?[1-9]) ?(am|pm|a\\.m\\.|p\\.m\\.)(?![a-z])|\\b(noon|midnight|tomorrow|tonight|o['’]?clock|monday|tuesday|wednesday|thursday|friday|saturday|sunday|next week|this week|next month)\\b|\\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\\.? \\d{1,2}(st|nd|rd|th)?\\b|\\b\\d{1,2}(st|nd|rd|th)? (of )?(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\\b|\\b\\d{4}-\\d{2}-\\d{2}\\b|\\b\\d{1,2}/\\d{1,2}(/\\d{2,4})?\\b",
+  "time_pattern": "\\b([01]?\\d|2[0-3]):[0-5]\\d\\b|\\b(1[0-2]|0?[1-9]) ?(am|pm|a\\.m\\.|p\\.m\\.)(?![a-z])|\\b(noon|midnight|tomorrow|tonight|o['’]?clock|monday|tuesday|wednesday|thursday|friday|saturday|sunday|next week|this week|next month)\\b|\\b(jan(uary)?|feb(ruary)?|mar(ch)?|apr(il)?|may|june?|july?|aug(ust)?|sep(t(ember)?)?|oct(ober)?|nov(ember)?|dec(ember)?)\\b\\.? \\d{1,2}(st|nd|rd|th)?\\b|\\b\\d{1,2}(st|nd|rd|th)? (of )?(jan(uary)?|feb(ruary)?|mar(ch)?|apr(il)?|may|june?|july?|aug(ust)?|sep(t(ember)?)?|oct(ober)?|nov(ember)?|dec(ember)?)\\b|\\b\\d{4}-\\d{2}-\\d{2}\\b|\\b\\d{1,2}/\\d{1,2}/\\d{2,4}\\b",
   "calendar_read_pattern": "[Cc]alendar|gcal|list_events|get_events|free_?time|free_?busy|availability",
   "bans_path": ".dazzer/bans.json",
   "claimed_save_phrases": [
-    "\\b(i['’]?ve|i have|i) (now )?(saved|noted|recorded|stored|remembered|logged|captured)\\b",
-    "\\b(i['’]?ll|i will|will) remember\\b",
-    "\\b(saved|noted|recorded|stored|added|captured)\\b[^.!?\\n]{0,40}\\b(brain|memory|rules?|rulebook|preferences?)\\b",
-    "^\\s*(noted|saved|got it|understood)\\b",
-    "\\b(from now on|going forward|next time|in future),? i['’]?ll\\b",
-    "\\bwon['’]?t (happen|do that) again\\b"
+    "\\b(saved|noted|recorded|stored|added|captured|logged|put|kept|written|filed)\\b[^.!?\\n]{0,40}\\b(to|in|into|on)\\s+(your|the|my)\\s+(dazzer\\s+)?(brain|memory)\\b",
+    "\\b(remember|keep|kept|hold|store|stored)\\w*\\b[^.!?\\n]{0,40}\\bin\\s+(your\\s+|the\\s+|my\\s+)?(dazzer\\s+)?(brain|memory)\\b",
+    "\\b(your|the)\\s+(dazzer\\s+)?(brain|memory)\\s+(now\\s+)?(has|holds|knows|keeps|remembers)\\b"
   ],
   "brain_write_pattern": "(^|__)(remember|remember_many|forget|track|repair)$",
   "skill_tool": "Skill",

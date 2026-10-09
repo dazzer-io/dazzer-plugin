@@ -1,17 +1,25 @@
 /**
  * @purpose Before anything leaves for the person (a reply, a message, a post, an invite), stops it
- * when the thread it answers was never read in this session, when it names a time and no calendar
- * was read in this session, or when it holds a word on the person's own banned list, and says
- * which, so Dazzer puts that right and sends again. Anything else, and any doubt, lets it through.
+ * once when the thread it answers was never read in this session, when it names a time and no
+ * calendar was read in this session, or when it holds a word on the person's own banned list, and
+ * says which, so Dazzer puts that right before sending again.
+ *
+ * It never blocks for good. Each reason is given at most once a session for the same thread, or
+ * for the same send when it answers no thread, and the stop is written to the session's log before
+ * it is said; the identical send tried again goes through. Nothing is checked until the log holds a
+ * message, so a log that cannot be written stops nothing. A thread counts as read when any tool of
+ * the same connector named it, or the read tool listed for that kind of send did. The person is
+ * never stuck behind a check Dazzer cannot meet.
  *
  * Which tools send, which field names a thread, which tool reads it, what names a time and where
  * the banned list sits are all in kit.defaults.json. The banned list is the person's own file in
  * their folder: Dazzer adds to it, and no update of the kit ever touches it.
  */
 
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { deny, object, pattern, readLog, sessionFolder, text, trigger } from "./lib.mjs";
+import { appendLog, deny, logWorks, object, pattern, readLog, sessionFolder, text, trigger } from "./lib.mjs";
 
 /** Every string held under one of the named fields, at any depth of the tool's input. */
 function textsUnder(node, fields, out = []) {
@@ -43,10 +51,25 @@ function holdsWord(said, word) {
   return new RegExp(`(?<![\\p{L}\\p{N}_])${literal}(?![\\p{L}\\p{N}_])`, "iu").test(said);
 }
 
-/** Whether the session's log shows a tool matching this pattern that named this id. */
-const readIn = (log, reader, id) =>
-  reader !== null &&
-  log.some((line) => typeof line.tool === "string" && reader.test(line.tool) && Array.isArray(line.ids) && line.ids.includes(id));
+/** The connector a tool belongs to: everything up to its operation's name, as `mcp__<server>__`. */
+function connectorOf(tool) {
+  const end = tool.lastIndexOf("__");
+  return tool.startsWith("mcp__") && end > "mcp_".length ? tool.slice(0, end + 2) : null;
+}
+
+/** Whether the session's log shows the thread read: named by the listed read tool, or by any tool of the same connector. */
+function threadRead(log, reader, connector, id) {
+  return log.some(
+    (line) =>
+      typeof line.tool === "string" &&
+      Array.isArray(line.ids) &&
+      line.ids.includes(id) &&
+      ((reader !== null && reader.test(line.tool)) || (connector !== null && line.tool.startsWith(connector))),
+  );
+}
+
+/** A stop's mark in the log: which reason, for which thread or send, as a digest that holds no content. */
+const markOf = (reason, subject) => createHash("sha256").update(`${reason}\u0000${subject}`).digest("hex").slice(0, 32);
 
 trigger(({ input, defaults, words }) => {
   const send = object(defaults, "send");
@@ -55,34 +78,48 @@ trigger(({ input, defaults, words }) => {
   if (send === undefined || tool === undefined || args === undefined) return "";
   if (pattern(send.pattern)?.test(tool) !== true) return "";
 
-  // The two checks that read the session's log need a session; without one they stay quiet.
+  // Nothing is enforced until the session's log is known to be written.
   const folder = sessionFolder(input);
-  const log = folder === null ? null : readLog(folder);
+  if (folder === null) return "";
+  const log = readLog(folder);
+  if (!logWorks(log)) return "";
+
   const said = textsUnder(args, new Set(Array.isArray(send.text_fields) ? send.text_fields : [])).join("\n");
   const reasons = [];
+  let thread;
 
-  if (log !== null) {
-    for (const entry of Array.isArray(send.tools) ? send.tools : []) {
-      if (pattern(entry?.tool)?.test(tool) !== true) continue;
-      const thread = args[entry.thread_field];
-      if ((typeof thread !== "string" && typeof thread !== "number") || String(thread) === "") continue;
-      if (!readIn(log, pattern(entry.read_tool), String(thread))) {
-        reasons.push(words.unread_thread);
-        break;
-      }
+  for (const entry of Array.isArray(send.tools) ? send.tools : []) {
+    if (pattern(entry?.tool)?.test(tool) !== true) continue;
+    const named = args[entry.thread_field];
+    if ((typeof named !== "string" && typeof named !== "number") || String(named) === "") continue;
+    thread ??= String(named);
+    if (!threadRead(log, pattern(entry.read_tool), connectorOf(tool), String(named))) {
+      reasons.push({ why: "unread_thread", say: words.unread_thread });
+      break;
     }
-    if (said !== "" && pattern(defaults.time_pattern, "i")?.test(said) === true) {
-      const calendar = pattern(defaults.calendar_read_pattern);
-      if (!log.some((line) => typeof line.tool === "string" && calendar?.test(line.tool) === true)) reasons.push(words.no_calendar);
+  }
+
+  if (said !== "" && pattern(defaults.time_pattern, "i")?.test(said) === true) {
+    const calendar = pattern(defaults.calendar_read_pattern);
+    if (!log.some((line) => typeof line.tool === "string" && calendar?.test(line.tool) === true)) {
+      reasons.push({ why: "no_calendar", say: words.no_calendar });
     }
   }
 
   const project = process.env.CLAUDE_PROJECT_DIR;
   if (said !== "" && typeof project === "string" && project !== "" && typeof defaults.bans_path === "string") {
     for (const word of bannedWords(join(project, defaults.bans_path))) {
-      if (holdsWord(said, word)) reasons.push(`${words.banned_word} ${word}`);
+      if (holdsWord(said, word)) reasons.push({ why: `banned_word\u0000${word.toLowerCase()}`, say: `${words.banned_word} ${word}` });
     }
   }
 
-  return reasons.length > 0 ? deny(reasons.join("\n")) : "";
+  // Once a session for the same thread, or for the same send when it answers none.
+  const subject = thread !== undefined ? `thread\u0000${thread}` : `send\u0000${tool}\u0000${JSON.stringify(args)}`;
+  const given = new Set(log.flatMap((line) => (Array.isArray(line.denied) ? line.denied : [])));
+  const due = reasons.map((reason) => ({ ...reason, mark: markOf(reason.why, subject) })).filter((reason) => !given.has(reason.mark));
+  if (due.length === 0) return "";
+
+  // Written before it is said: a stop that cannot be recorded is not made.
+  appendLog(folder, { denied: due.map((reason) => reason.mark) });
+  return deny(due.map((reason) => reason.say).join("\n"));
 });
