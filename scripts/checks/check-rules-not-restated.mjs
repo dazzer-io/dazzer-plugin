@@ -45,11 +45,52 @@ import { REPO_ROOT, read, rel, runGate } from "./lib/gate.mjs";
  * A length is a blunt instrument and is used here deliberately: this file has no headings and no
  * lists for the shapes above to catch, so length is the only structural thing left, and it is the
  * one that actually moves when prose turns into a rule.
+ *
+ * THE FOLDER KIT'S WORDS are held the same way, from the one file that carries every sentence its
+ * triggers print, keyed, and nothing else. They are read as SENTENCES, not as the file's text: a
+ * JSON string writes a line break as two characters, so a numbered list grown inside a sentence
+ * would sit on one line of the file and every shape below, drawn line by line, would miss it. The
+ * budget is what the eight sentences cost when written, 888 characters, and 224 of those are the
+ * plugin's own resume line, held word for word. A sentence that starts teaching grows past it.
  */
 const SHIPPED = [
   { file: join(REPO_ROOT, "plugins", "dazzer", "skills", "dazzer", "SKILL.md") },
   { file: join(REPO_ROOT, "plugins", "dazzer", "prompts", "capture-tap.txt"), budget: 420 },
+  { file: join(REPO_ROOT, "folder-kit", "hooks", "kit.words.json"), budget: 900, sentences: true },
 ];
+
+/**
+ * What one shipped file says, as the parts the shapes are looked for in: the whole text of an
+ * ordinary file, or each sentence of a words file by its key. Null when there is nothing to read,
+ * with the reason already recorded.
+ */
+function partsOf(file, sentences, findings) {
+  let text;
+  try {
+    text = read(file);
+  } catch {
+    findings.push({ file: rel(file), message: "shipped file is missing" });
+    return null;
+  }
+  if (!sentences) return [{ text }];
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch (err) {
+    findings.push({ file: rel(file), message: `not valid JSON: ${err.message}` });
+    return null;
+  }
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    findings.push({ file: rel(file), message: "holds no sentences: it must be one object of keyed sentences" });
+    return null;
+  }
+  const parts = [];
+  for (const [key, value] of Object.entries(parsed)) {
+    if (typeof value === "string") parts.push({ key, text: value });
+    else findings.push({ file: rel(file), message: `"${key}" is not a sentence: this file holds the words the kit prints, and nothing else` });
+  }
+  return parts;
+}
 
 /**
  * The shapes teaching takes. Each names what it catches so a failure reads as a reason rather
@@ -85,15 +126,10 @@ runGate({
   purpose: "Everything shipped here is a trigger. The rules are served live and never written down here.",
   rule: "a shipped file may say WHEN to reach for the memory and WHERE the rules are, and nothing about what they say",
   assert(findings) {
-    for (const { file, budget } of SHIPPED) {
-      let text;
-      try {
-        text = read(file);
-      } catch {
-        findings.push({ file: rel(file), message: "shipped file is missing" });
-        continue;
-      }
-      const length = text.trim().length;
+    for (const { file, budget, sentences } of SHIPPED) {
+      const parts = partsOf(file, sentences, findings);
+      if (parts === null) continue;
+      const length = parts.map((part) => part.text).join("\n").trim().length;
       if (budget !== undefined && length > budget) {
         findings.push({
           file: rel(file),
@@ -102,15 +138,18 @@ runGate({
             `${budget}. Instead: name the moment and the record that holds the rule, and let it be read there`,
         });
       }
-      for (const shape of TEACHING) {
-        const hit = shape.find.exec(text);
-        if (!hit) continue;
-        const line = text.slice(0, hit.index).split("\n").length;
-        findings.push({
-          file: rel(file),
-          line,
-          message: `restates a rule the live rulebook holds — ${shape.what}. Instead: ${shape.instead}`,
-        });
+      for (const { key, text } of parts) {
+        for (const shape of TEACHING) {
+          const hit = shape.find.exec(text);
+          if (!hit) continue;
+          const where = key === undefined ? { line: text.slice(0, hit.index).split("\n").length } : {};
+          const which = key === undefined ? "" : `its sentence "${key}" `;
+          findings.push({
+            file: rel(file),
+            ...where,
+            message: `${which}restates a rule the live rulebook holds — ${shape.what}. Instead: ${shape.instead}`,
+          });
+        }
       }
     }
   },

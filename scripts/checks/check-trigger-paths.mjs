@@ -6,7 +6,7 @@
  * else's machine, which is the one place we cannot see it.
  */
 
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { REPO_ROOT, readJson, rel, runGate, walk } from "./lib/gate.mjs";
 
@@ -16,6 +16,25 @@ import { REPO_ROOT, readJson, rel, runGate, walk } from "./lib/gate.mjs";
  * pointing at an unset variable fails silently on somebody else's machine.
  */
 const PLUGIN_ROOT_VARS = ["${CLAUDE_PLUGIN_ROOT}", "${CURSOR_PLUGIN_ROOT}"];
+
+/**
+ * The folder kit is not a plugin and has no folder variable of its own. The creator copies its
+ * triggers into a person's folder, under `.claude/hooks/`, and registers them in that folder's
+ * settings, where the host hands the folder over as CLAUDE_PROJECT_DIR. So that variable, and only
+ * for the kit, addresses a script, and `.claude/hooks/<name>` there is `folder-kit/hooks/<name>`
+ * here. A plugin's own trigger may not use it: a plugin runs what it ships, never whatever sits in
+ * the project somebody happens to have open.
+ */
+const PROJECT_VAR = "CLAUDE_PROJECT_DIR";
+const KIT = join(REPO_ROOT, "folder-kit");
+const KIT_SETTINGS = join(KIT, "settings.hooks.json");
+const KIT_HOOKS = join(KIT, "hooks");
+/** Either spelling a shell reads, `$VAR` or `${VAR}`, and the path it addresses after it. */
+const FROM_PROJECT = new RegExp(`\\$(?:\\{${PROJECT_VAR}\\}|${PROJECT_VAR}(?![A-Za-z0-9_]))(/[^\\s"']*)`);
+/** Where a kit script sits in a person's folder. Node scripts and shell scripts both count. */
+const IN_FOLDER = /^\/\.claude\/hooks\/([A-Za-z0-9._-]+\.(?:mjs|sh))$/;
+/** A command that runs a script at all, rather than only printing words. */
+const RUNS_SCRIPT = /\.(?:mjs|sh)\b/;
 
 /** Every command string declared anywhere in a trigger file. */
 function commands(node, out = []) {
@@ -29,11 +48,61 @@ function commands(node, out = []) {
   return out;
 }
 
+/**
+ * The folder kit's triggers, read from the one file the creator merges into a person's settings.
+ * Present or absent with the kit itself: a kit with no registrations would ship five scripts that
+ * never run, and nothing else here would notice.
+ */
+function checkKit(findings) {
+  let entries;
+  try {
+    entries = readdirSync(KIT);
+  } catch {
+    return; // no kit in this tree
+  }
+  if (!entries.includes("settings.hooks.json")) {
+    findings.push({ file: rel(KIT_SETTINGS), message: "the folder kit registers no triggers: its settings file is missing" });
+    return;
+  }
+  const parsed = readJson(KIT_SETTINGS, findings);
+  if (parsed === undefined) return;
+  const declared = commands(parsed);
+  if (declared.length === 0) {
+    findings.push({ file: rel(KIT_SETTINGS), message: "the folder kit registers no triggers at all" });
+    return;
+  }
+  for (const command of declared) {
+    if (!RUNS_SCRIPT.test(command)) continue; // a trigger that just prints text runs no script
+    const path = command.match(FROM_PROJECT)?.[1];
+    if (path === undefined) {
+      findings.push({
+        file: rel(KIT_SETTINGS),
+        message:
+          `runs a script from somewhere other than the person's folder: ${command.trim()}. ` +
+          `Address it as "$${PROJECT_VAR}/.claude/hooks/<name>", where the creator puts it.`,
+      });
+      continue;
+    }
+    const script = path.match(IN_FOLDER)?.[1];
+    if (script === undefined) {
+      findings.push({ file: rel(KIT_SETTINGS), message: `names ${path}, which is not a script in the folder's .claude/hooks/` });
+      continue;
+    }
+    if (!existsSync(join(KIT_HOOKS, script))) {
+      findings.push({ file: rel(KIT_SETTINGS), message: `names .claude/hooks/${script}, which the kit does not carry: ${rel(join(KIT_HOOKS, script))} does not exist` });
+    }
+  }
+}
+
 runGate({
   id: "trigger-paths",
   purpose: "Every trigger runs a script that is really there.",
-  rule: "a trigger that runs a script must address it from a folder variable its tool sets, and the script must exist",
+  rule:
+    "a trigger that runs a script must address it from a folder variable its tool sets, and the script must exist: " +
+    "a plugin's from its own folder, the folder kit's from the person's",
   assert(findings) {
+    checkKit(findings);
+
     const triggerFiles = walk(join(REPO_ROOT, "plugins")).filter((f) => /(^|\/)hooks\.json$/.test(f) || /\/hooks\/[^/]+\.json$/.test(f));
 
     if (triggerFiles.length === 0) {
@@ -46,6 +115,15 @@ runGate({
       if (parsed === undefined) continue;
 
       for (const command of commands(parsed)) {
+        if (command.includes(PROJECT_VAR)) {
+          findings.push({
+            file: rel(file),
+            message:
+              `addresses the person's project folder: ${command.trim()}. Only the folder kit may; ` +
+              `a plugin's trigger runs what the plugin ships, from ${PLUGIN_ROOT_VARS.join(" / ")}.`,
+          });
+          continue;
+        }
         if (!command.includes(".sh")) continue; // a trigger that just prints text runs no script
 
         // A command must address its script from a variable holding the plugin's own

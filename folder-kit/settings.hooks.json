@@ -1,0 +1,70 @@
+{
+  "SessionStart": [
+    {
+      "matcher": "startup|resume|clear|fork|compact",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "command -v node >/dev/null 2>&1 && node \"$CLAUDE_PROJECT_DIR/.claude/hooks/start.mjs\" || true",
+          "timeout": 5
+        }
+      ]
+    }
+  ],
+  "UserPromptSubmit": [
+    {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "command -v node >/dev/null 2>&1 && node \"$CLAUDE_PROJECT_DIR/.claude/hooks/prompt.mjs\" || true",
+          "timeout": 5
+        }
+      ]
+    }
+  ],
+  "PreToolUse": [
+    {
+      "matcher": "^mcp__.+__.*(send|reply|forward|draft|post|publish|schedule|create_event|update_event|comment|create_note|create_engagement)",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "command -v node >/dev/null 2>&1 && node \"$CLAUDE_PROJECT_DIR/.claude/hooks/before-send.mjs\" || true",
+          "timeout": 5
+        }
+      ]
+    }
+  ],
+  "PostToolUse": [
+    {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "command -v node >/dev/null 2>&1 && node \"$CLAUDE_PROJECT_DIR/.claude/hooks/after-tool.mjs\" || true",
+          "timeout": 5
+        }
+      ]
+    }
+  ],
+  "UserPromptExpansion": [
+    {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "command -v node >/dev/null 2>&1 && node \"$CLAUDE_PROJECT_DIR/.claude/hooks/after-tool.mjs\" || true",
+          "timeout": 5
+        }
+      ]
+    }
+  ],
+  "Stop": [
+    {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "command -v node >/dev/null 2>&1 && node \"$CLAUDE_PROJECT_DIR/.claude/hooks/stop.mjs\" || true",
+          "timeout": 5
+        }
+      ]
+    }
+  ]
+}
