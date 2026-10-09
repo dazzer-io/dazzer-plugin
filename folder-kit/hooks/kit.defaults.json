@@ -1,0 +1,46 @@
+{
+  "input_max_bytes": 100000,
+  "hook_timeout_seconds": 5,
+  "catch_phrases": [
+    "^\\s*(no|nope|nah|wrong|stop|wait|hold on|actually|hmm+|ugh|not quite|not really|not like that)\\b",
+    "\\b(that['’]?s|that is|this is|it['’]?s|it is|you['’]?re|you are|u r|ur) (wrong|incorrect|not right|not what|not how|off|bad|worse|too)\\b",
+    "\\bnot what (i|we)\\b",
+    "\\b(i|we) (said|told|asked|meant|wanted|already)\\b",
+    "\\b(don['’]?t|do not|never|always|stop|quit|instead|rather|from now on|next time|going forward|in future|remember to|make sure)\\b",
+    "\\b(should have|should['’]?ve|shouldn['’]?t have|supposed to|meant to)\\b",
+    "\\bwhy (did|do|does|would|are|is|didn['’]?t|don['’]?t|doesn['’]?t|won['’]?t|wouldn['’]?t|isn['’]?t|aren['’]?t) (you|u|it|this|that)\\b",
+    "\\b(you|u) (forgot|missed|ignored|keep|kept|always|never|didn['’]?t|did not|got|messed|broke|misread|misunderstood|skipped|left out)\\b",
+    "\\bis (that|this|it) (right|correct|true|his|her|their|really)\\b",
+    "\\b(wrong|incorrect|mistake|mistaken|typo|error|broken|terrible|awful|annoying|frustrat\\w*|useless|seriously|wtf|hate)\\b",
+    "\\b(fix|change|redo|re-do|undo|revert|rewrite|redraft|shorten|tighten|soften) (it|this|that|the)\\b",
+    "\\btoo (long|short|formal|casual|much|many|wordy|stiff|vague|generic|salesy|pushy)\\b",
+    "\\?\\s*\\?|\\?!|!\\?",
+    "\\b(please|pls|plz) (don['’]?t|stop|never|always|use|keep)\\b"
+  ],
+  "send": {
+    "pattern": "^mcp__.+__.*(send|reply|forward|draft|post|publish|schedule|create_event|update_event|comment|create_note|create_engagement)",
+    "text_fields": ["subject", "body", "text", "message", "content", "title", "description", "summary", "comment", "caption", "html", "markdown", "notes"],
+    "tools": [
+      { "tool": "[Gg]mail|[Ee]mail|[Oo]utlook", "thread_field": "threadId", "read_tool": "(get|read|fetch|view|open)_?(thread|conversation)" },
+      { "tool": "[Ss]lack", "thread_field": "thread_ts", "read_tool": "(get|read|fetch)_?(thread|replies)|conversations_replies" },
+      { "tool": ".", "thread_field": "thread_id", "read_tool": "(get|read|fetch|view|open)_?(thread|conversation)" },
+      { "tool": ".", "thread_field": "conversationId", "read_tool": "(get|read|fetch|view|open)_?(thread|conversation)" }
+    ]
+  },
+  "time_pattern": "\\b([01]?\\d|2[0-3]):[0-5]\\d\\b|\\b(1[0-2]|0?[1-9]) ?(am|pm|a\\.m\\.|p\\.m\\.)(?![a-z])|\\b(noon|midnight|tomorrow|tonight|o['’]?clock|monday|tuesday|wednesday|thursday|friday|saturday|sunday|next week|this week|next month)\\b|\\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\\.? \\d{1,2}(st|nd|rd|th)?\\b|\\b\\d{1,2}(st|nd|rd|th)? (of )?(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\\b|\\b\\d{4}-\\d{2}-\\d{2}\\b|\\b\\d{1,2}/\\d{1,2}(/\\d{2,4})?\\b",
+  "calendar_read_pattern": "[Cc]alendar|gcal|list_events|get_events|free_?time|free_?busy|availability",
+  "bans_path": ".dazzer/bans.json",
+  "claimed_save_phrases": [
+    "\\b(i['’]?ve|i have|i) (now )?(saved|noted|recorded|stored|remembered|logged|captured)\\b",
+    "\\b(i['’]?ll|i will|will) remember\\b",
+    "\\b(saved|noted|recorded|stored|added|captured)\\b[^.!?\\n]{0,40}\\b(brain|memory|rules?|rulebook|preferences?)\\b",
+    "^\\s*(noted|saved|got it|understood)\\b",
+    "\\b(from now on|going forward|next time|in future),? i['’]?ll\\b",
+    "\\bwon['’]?t (happen|do that) again\\b"
+  ],
+  "brain_write_pattern": "(^|__)(remember|remember_many|forget|track|repair)$",
+  "skill_tool": "Skill",
+  "id_fields": ["threadId", "thread_id", "thread_ts", "message_ts", "messageId", "message_id", "conversationId", "conversation_id", "record", "record_id", "id"],
+  "id_max_length": 200,
+  "ids_max": 20
+}
