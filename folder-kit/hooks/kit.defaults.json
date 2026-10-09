@@ -1,43 +1,92 @@
 {
   "input_max_bytes": 100000,
+  "after_tool_input_max_bytes": 1000000,
   "hook_timeout_seconds": 5,
   "catch_phrases": [
-    "^\\s*(no|nope|nah|wrong|stop|wait|hold on|actually|hmm+|ugh|not quite|not really|not like that)\\b",
-    "\\b(that['’]?s|that is|this is|it['’]?s|it is|you['’]?re|you are|u r|ur) (wrong|incorrect|not right|not what|not how|off|bad|worse|too)\\b",
-    "\\bnot what (i|we)\\b",
-    "\\b(i|we) (said|told|asked|meant|wanted|already)\\b",
-    "\\b(don['’]?t|do not|never|always|stop|quit|instead|rather|from now on|next time|going forward|in future|remember to|make sure)\\b",
-    "\\b(should have|should['’]?ve|shouldn['’]?t have|supposed to|meant to)\\b",
-    "\\bwhy (did|do|does|would|are|is|didn['’]?t|don['’]?t|doesn['’]?t|won['’]?t|wouldn['’]?t|isn['’]?t|aren['’]?t) (you|u|it|this|that)\\b",
-    "\\b(you|u) (forgot|missed|ignored|keep|kept|always|never|didn['’]?t|did not|got|messed|broke|misread|misunderstood|skipped|left out)\\b",
-    "\\bis (that|this|it) (right|correct|true|his|her|their|really)\\b",
-    "\\b(wrong|incorrect|mistake|mistaken|typo|error|broken|terrible|awful|annoying|frustrat\\w*|useless|seriously|wtf|hate)\\b",
-    "\\b(fix|change|redo|re-do|undo|revert|rewrite|redraft|shorten|tighten|soften) (it|this|that|the)\\b",
-    "\\btoo (long|short|formal|casual|much|many|wordy|stiff|vague|generic|salesy|pushy)\\b",
+    "^\\s*(?:no|nope|nah|wrong|stop|wait|hold on|actually|hmm+|ugh|not quite|not really|not like that|not that|try again)\\b",
+    "\\b(?:that['’]?s|that is|this is|it['’]?s|it is|you['’]?re|you are|u r|ur)\\s+(?:wrong|incorrect|not right|not it|not the one|not correct|not what|not how|off|bad|worse|too)\\b",
+    "\\bnot what (?:i|we)\\b",
+    "\\bnot (?:like (?:this|that)|that one|this one)\\b",
+    "\\b(?:i|we) (?:said|told|asked|meant|wanted|already)\\b",
+    "\\b(?:i|we) (?:prefer|['’]?d prefer|['’]?d rather|would rather|like it when)\\b",
+    "\\b(?:don['’]?t|do not|never|always|stop|quit|instead|rather|from now on|next time|going forward|in future|remember to|make sure)\\b",
+    "\\b(?:should have|should['’]?ve|shouldn['’]?t have|supposed to|meant to|should (?:be|say|read|start|open|end))\\b",
+    "\\bwhy (?:did|do|does|would|are|is|didn['’]?t|don['’]?t|doesn['’]?t|won['’]?t|wouldn['’]?t|isn['’]?t|aren['’]?t) (?:you|u|it|this|that)\\b",
+    "\\bdid (?:you|u) (?:even )?(?:read|check|look|see|listen|open)\\b",
+    "\\b(?:you|u) (?:forgot|missed|ignored|keep|kept|always|never|didn['’]?t|did not|got|messed|broke|misread|misunderstood|skipped|left out)\\b",
+    "\\bis (?:that|this|it) (?:right|correct|true|his|her|their|really)\\b",
+    "\\b(?:wrong|incorrect|mistake|mistaken|typo|error|broken|terrible|awful|annoying|frustrat\\w*|useless|seriously|wtf|hate)\\b",
+    "\\b(?:fix|change|redo|re-do|undo|revert|rewrite|redraft|shorten|tighten|soften) (?:it|this|that|the)\\b|\\btry again\\b",
+    "\\btoo (?:long|short|formal|casual|much|many|wordy|stiff|vague|generic|salesy|pushy)\\b",
+    "^\\s*(?:shorter|longer|simpler|warmer|friendlier|punchier|tighter|clearer|less \\w+|more \\w+)\\b",
+    "\\w,\\s*not\\s+(?!only\\b|just\\b|now\\b|yet\\b|sure\\b|bad\\b)\\w",
     "\\?\\s*\\?|\\?!|!\\?",
-    "\\b(please|pls|plz) (don['’]?t|stop|never|always|use|keep)\\b"
+    "\\b(?:please|pls|plz) (?:don['’]?t|stop|never|always|use|keep)\\b",
+    "^\\s*לא(?!\\p{L})",
+    "(?<!\\p{L})(?:לא נכון|לא ככה|לא זה|לא מה ש\\p{L}+|טעות|טעית|שכחת|פספסת|אמרתי|ביקשתי|תתקן|תקן|תשנה|תנסה שוב|נסה שוב|קצר יותר|יותר קצר|פחות רשמי|תמיד|אף פעם|במקום|אני מעדיפ(?:ה)?|עדיף|צריך להיות|אל ת\\p{L}+|למה (?:עשית|כתבת|שלחת|לא))(?!\\p{L})"
   ],
   "send": {
-    "pattern": "^mcp__.+__(?!(?:[A-Za-z0-9]+_)?(?:get|list|read|search|fetch|view)(?:_|$))(?:[A-Za-z0-9]+_)?(?:send|reply|forward|draft|post|publish|schedule|comment|create_(?:draft|event|post|note|comment|engagement)|update_event|add_comment)(?:_|$)",
-    "text_fields": ["subject", "body", "text", "message", "content", "title", "description", "summary", "comment", "caption", "html", "markdown", "notes"],
+    "pattern": "^mcp__.+?__(?!(?:[A-Za-z0-9]+[_-])?(?:get|list|read|search|fetch|view|count|status|history)(?:[_-]|$|(?=[A-Z])))(?!.*[_-](?:get|list|read|search|fetch|view|count|status|history)$)(?:[A-Za-z][A-Za-z0-9]*[_-]){0,3}(?:(?:[Ss]end)|(?:[Rr]eply)|(?:[Cc]ompose)|(?:[Ff]orward)(?:[_-]|(?=[A-Z]))(?:[Ee]mail|[Mm]essage|[Mm]ail|[Tt]hread)|(?:[Cc]reate|[Aa]dd|[Pp]ost|[Ii]nsert)(?:[_-]|(?=[A-Z]))(?:[A-Za-z][a-z0-9]*(?:[_-]|(?=[A-Z])))?(?:[Cc]omment|[Rr]eply)|(?:[Cc]reate)(?:[_-]|(?=[A-Z]))(?:[Mm]essage|[Dd]raft|[Ee]vent|[Pp]ost|[Rr]eply|[Ii]nvite|[Mm]eeting)|(?:[Cc]reate)(?:[_-]|(?=[A-Z]))(?:[Cc]alendar)(?:[_-]|(?=[A-Z]))(?:[Ee]vent)|(?:[Uu]pdate)(?:[_-]|(?=[A-Z]))(?:[Ee]vent|[Mm]eeting)|(?:[Dd]raft)(?:[_-]|(?=[A-Z]))(?:[Ee]mail|[Rr]eply|[Mm]essage|[Rr]esponse)|(?:[Pp]ost)(?:[_-]|(?=[A-Z]))(?:[Mm]essage|[Cc]omment|[Rr]eply|[Uu]pdate|[Tt]weet|[Ss]tatus|[Tt]o)|(?:[Pp]ublish)(?:[_-]|(?=[A-Z]))(?:[Pp]ost|[Aa]rticle|[Tt]weet|[Uu]pdate|[Mm]essage)|(?:[Ss]chedule)(?:[_-]|(?=[A-Z]))(?:[Mm]essage|[Ee]mail|[Pp]ost|[Mm]eeting|[Ee]vent|[Ss]end|[Tt]weet))(?:(?:[_-]|(?=[A-Z]))[A-Za-z0-9_-]*)?$",
+    "text_fields": [
+      "subject",
+      "body",
+      "text",
+      "message",
+      "content",
+      "title",
+      "description",
+      "summary",
+      "comment",
+      "caption",
+      "html",
+      "markdown",
+      "notes"
+    ],
     "tools": [
-      { "tool": "[Gg]mail|[Ee]mail|[Oo]utlook", "thread_field": "threadId", "read_tool": "(get|read|fetch|view|open)_?(thread|conversation)" },
-      { "tool": "[Ss]lack", "thread_field": "thread_ts", "read_tool": "(get|read|fetch)_?(thread|replies)|conversations_replies" },
-      { "tool": ".", "thread_field": "thread_id", "read_tool": "(get|read|fetch|view|open)_?(thread|conversation)" },
-      { "tool": ".", "thread_field": "conversationId", "read_tool": "(get|read|fetch|view|open)_?(thread|conversation)" }
+      {
+        "tool": "[Gg]mail|[Ee]mail|[Oo]utlook",
+        "thread_field": "threadId",
+        "read_tool": "(get|read|fetch|view|open)_?(thread|conversation)"
+      },
+      {
+        "tool": "[Ss]lack",
+        "thread_field": "thread_ts",
+        "read_tool": "(get|read|fetch)_?(thread|replies)|conversations_replies"
+      },
+      {
+        "tool": ".",
+        "thread_field": "thread_id",
+        "read_tool": "(get|read|fetch|view|open)_?(thread|conversation)"
+      },
+      {
+        "tool": ".",
+        "thread_field": "conversationId",
+        "read_tool": "(get|read|fetch|view|open)_?(thread|conversation)"
+      }
     ]
   },
-  "time_pattern": "\\b([01]?\\d|2[0-3]):[0-5]\\d\\b|\\b(1[0-2]|0?[1-9]) ?(am|pm|a\\.m\\.|p\\.m\\.)(?![a-z])|\\b(noon|midnight|tomorrow|tonight|o['’]?clock|monday|tuesday|wednesday|thursday|friday|saturday|sunday|next week|this week|next month)\\b|\\b(jan(uary)?|feb(ruary)?|mar(ch)?|apr(il)?|may|june?|july?|aug(ust)?|sep(t(ember)?)?|oct(ober)?|nov(ember)?|dec(ember)?)\\b\\.? \\d{1,2}(st|nd|rd|th)?\\b|\\b\\d{1,2}(st|nd|rd|th)? (of )?(jan(uary)?|feb(ruary)?|mar(ch)?|apr(il)?|may|june?|july?|aug(ust)?|sep(t(ember)?)?|oct(ober)?|nov(ember)?|dec(ember)?)\\b|\\b\\d{4}-\\d{2}-\\d{2}\\b|\\b\\d{1,2}/\\d{1,2}/\\d{2,4}\\b",
+  "time_pattern": "\\b(?:today|tomorrow|tonight|noon|midnight)\\b|\\bo['’]?clock\\b|\\b(?:half|quarter)\\s+(?:past|to)\\s+(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|\\d{1,2})\\b|\\b(?:1[0-2]|0?[1-9])(?:[:.][0-5]\\d)?(?:am|pm|a\\.m\\.|p\\.m\\.)(?![a-z])|\\b(?:at|from|until|till|around|before|after|between)\\s+(?:2[0-3]|[01]?\\d)(?:[:.][0-5]\\d)?(?=\\s*(?:(?:am|pm|a\\.m\\.|p\\.m\\.)|o['’]?clock|[?.!,;)]|$|on\\b|this\\b|next\\b|tomorrow\\b|today\\b|tonight\\b|or\\b|and\\b|to\\b|-))|\\b(?:on|this|next|last|by|until|till|before|after|from|every|coming)\\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\\b|\\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\\s+(?:morning|afternoon|evening|night|at)\\b|\\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|may)\\.?\\s+(?:3[01]|[12]\\d|0?[1-9])(?:st|nd|rd|th)?\\b(?![:.,]?\\d)|\\b(?:3[01]|[12]\\d|0?[1-9])(?:st|nd|rd|th)?\\s+(?:of\\s+)?(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\b|\\b(?:3[01]|[12]\\d|0?[1-9])(?:st|nd|rd|th)\\s+(?:of\\s+)?may\\b|\\b\\d{4}-(?:1[0-2]|0[1-9])-(?:3[01]|[12]\\d|0[1-9])\\b|\\b(?:3[01]|[12]\\d|0?[1-9])[./](?:1[0-2]|0?[1-9])[./]\\d{4}\\b|\\b(?:1[0-2]|0?[1-9])[./](?:3[01]|[12]\\d|0?[1-9])[./]\\d{4}\\b|\\b(?:3[01]|[12]\\d|0?[1-9])/(?:3[01]|[12]\\d|0?[1-9])/\\d{2}\\b",
   "calendar_read_pattern": "[Cc]alendar|gcal|list_events|get_events|free_?time|free_?busy|availability",
   "bans_path": ".dazzer/bans.json",
   "claimed_save_phrases": [
-    "\\b(saved|noted|recorded|stored|added|captured|logged|put|kept|written|filed)\\b[^.!?\\n]{0,40}\\b(to|in|into|on)\\s+(your|the|my)\\s+(dazzer\\s+)?(brain|memory)\\b",
-    "\\b(remember|keep|kept|hold|store|stored)\\w*\\b[^.!?\\n]{0,40}\\bin\\s+(your\\s+|the\\s+|my\\s+)?(dazzer\\s+)?(brain|memory)\\b",
-    "\\b(your|the)\\s+(dazzer\\s+)?(brain|memory)\\s+(now\\s+)?(has|holds|knows|keeps|remembers)\\b"
+    "\\b(?:saved|stored|recorded|noted|filed|logged|captured|added|kept|put|written|wrote|remembered)\\b[^.!?\\n]{0,40}?\\b(?:to|in|into|on)\\s+(?:(?:your|my)\\s+(?:dazzer\\s+)?(?:brain|memory)|the\\s+(?:dazzer\\s+)?brain|the\\s+dazzer\\s+memory|dazzer(?:\\s+(?:brain|memory))?)(?=\\s*(?:[.!,;:)]|$)|\\s+[-–—]|\\s+(?:so|and|as|for|now|too|already|with|under)\\b)",
+    "\\b(?:updated|replaced|corrected)\\s+(?:(?:your|my)\\s+(?:dazzer\\s+)?(?:brain|memory)|the\\s+(?:dazzer\\s+)?brain|the\\s+dazzer\\s+memory|dazzer(?:\\s+(?:brain|memory))?)(?=\\s*(?:[.!,;:)]|$)|\\s+[-–—]|\\s+(?:so|and|as|for|now|too|already|with|under)\\b)"
   ],
   "brain_write_pattern": "(^|__)(remember|remember_many|forget|track|repair)$",
   "skill_tool": "Skill",
-  "id_fields": ["threadId", "thread_id", "thread_ts", "message_ts", "messageId", "message_id", "conversationId", "conversation_id", "record", "record_id", "id"],
+  "id_fields": [
+    "threadId",
+    "thread_id",
+    "thread_ts",
+    "message_ts",
+    "messageId",
+    "message_id",
+    "conversationId",
+    "conversation_id",
+    "record",
+    "record_id",
+    "id"
+  ],
   "id_max_length": 200,
   "ids_max": 20
 }

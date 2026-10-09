@@ -4,9 +4,11 @@
  * Brain as a save, so the end of the turn can tell a save that landed from one that was only
  * claimed; after the Skill tool, reminds Dazzer to report the run by the skill's name.
  *
- * Claude Code runs this only after a tool succeeded. The reminder goes out first and the log is
- * written after it, so a log that cannot be written never costs the reminder. Which fields hold
- * identifiers and which tools write to the Brain are in kit.defaults.json.
+ * Claude Code runs this only after a tool succeeded. Its input carries the tool's whole result,
+ * so it reads under a larger cap than the other triggers, and a long thread read or a long save is
+ * still noted. The reminder goes out first and the log is written after it, so a log that cannot
+ * be written never costs the reminder. Which fields hold identifiers and which tools write to the
+ * Brain are in kit.defaults.json.
  */
 
 import { appendLog, guarded, object, pattern, say, sessionFolder, text, trigger } from "./lib.mjs";
@@ -48,4 +50,4 @@ trigger(({ input, defaults, words }) => {
     out: tool === defaults.skill_tool ? say("PostToolUse", words.run) : "",
     after: folder === null ? [] : [note],
   };
-});
+}, "after_tool_input_max_bytes");

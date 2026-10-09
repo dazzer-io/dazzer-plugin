@@ -1,13 +1,13 @@
 {
   "kit": 1,
   "files": {
-    "lib.mjs": "1819300d06d9f58547af8f1f7effc432dfc78246",
+    "lib.mjs": "ada72cbb079c043588eb2bfb30273802c290c3f1",
     "start.mjs": "80958ccc12871f8c9882ca32bfe0787742095884",
-    "prompt.mjs": "80b25a4a20c0b20095cc341b225290a42dad481c",
-    "before-send.mjs": "4abd61318144bf190f7d107a31da0fc29bbf4b29",
-    "after-tool.mjs": "1910e63d15e34b392e6be432d29135d21c777961",
+    "prompt.mjs": "b5ac5325ce9cfa5bb68301ccb4d8c078c6205713",
+    "before-send.mjs": "ec88e0920dd5b9aec9720395e948e5a0441d2d18",
+    "after-tool.mjs": "e235d9c6a9e58bf51bc9a039ed3d0e761fb6ddd5",
     "stop.mjs": "e379a57b52bdfbe0ec7458467f97f5f079a01493",
-    "kit.defaults.json": "734e95e43634b25e67c7d52c32c4c33a09e2c6aa",
-    "kit.words.json": "af6ff38ab61471edab603ab51c9a28480b31d3f2"
+    "kit.defaults.json": "aa23c4a3b891e32448e5aa26f295021c422fdc26",
+    "kit.words.json": "634ab2507f969a7d01599acff5edab5bf4948199"
   }
 }

@@ -547,6 +547,23 @@ const CASES = [
   },
   {
     gate: "trigger-paths",
+    what: "a folder kit trigger running a plain .js script the kit does not carry, which a check reading only .mjs never looks at",
+    seed(root) {
+      edit(root, KIT_SETTINGS, (hooks) => {
+        const hook = hooks.Stop[0].hooks[0];
+        hook.command = hook.command.replace("stop.mjs", "stop.js");
+      });
+    },
+  },
+  {
+    gate: "trigger-paths",
+    what: "the folder kit gone from the release, which leaves every folder the creator makes with nothing to copy",
+    seed(root) {
+      rmSync(join(root, ...KIT), { recursive: true, force: true });
+    },
+  },
+  {
+    gate: "trigger-paths",
     what: "a plugin's own trigger falling back to the person's project folder, so it would run whatever sits there",
     seed(root) {
       // The fallback is the whole fault: the plugin's own folder is still named first and its
