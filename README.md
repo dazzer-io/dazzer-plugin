@@ -526,9 +526,10 @@ Like everything here, the triggers hold no rules: each one points Dazzer at its 
 Brain. One starts a session as Dazzer; one adds a line to a message that may correct or steer the
 work; one stops a send once when the thread was not read, when it names a time with no calendar
 checked, or when it holds a word on the person's own banned list (`.dazzer/bans.json` in their
-folder); one asks for a skill's run to be reported; and the last says nothing at the end of a turn,
-leaving a note for the next message when a correction was not saved. They run only where Node is
-installed and stay silent where it is not, and their notes live in the machine's temporary folder,
+folder), and lets the same send through if it is tried again; one asks for a skill's run to be
+reported; and the last says nothing at the end of a turn, leaving a note for the next message when
+a correction was not saved. They run only where Node is installed and stay silent where it is not,
+and their notes live in a folder of the machine's temporary folder that only that user can open,
 never in the person's folder.
 
 If you also have the `dazzer` plugin installed on your computer, the line that restores your place

@@ -24,7 +24,7 @@
   ],
   "PreToolUse": [
     {
-      "matcher": "^mcp__.+__.*(send|reply|forward|draft|post|publish|schedule|create_event|update_event|comment|create_note|create_engagement)",
+      "matcher": "^mcp__.+__(?!(?:[A-Za-z0-9]+_)?(?:get|list|read|search|fetch|view)(?:_|$))(?:[A-Za-z0-9]+_)?(?:send|reply|forward|draft|post|publish|schedule|comment|create_(?:draft|event|post|note|comment|engagement)|update_event|add_comment)(?:_|$)",
       "hooks": [
         {
           "type": "command",
@@ -35,17 +35,6 @@
     }
   ],
   "PostToolUse": [
-    {
-      "hooks": [
-        {
-          "type": "command",
-          "command": "command -v node >/dev/null 2>&1 && node \"$CLAUDE_PROJECT_DIR/.claude/hooks/after-tool.mjs\" || true",
-          "timeout": 5
-        }
-      ]
-    }
-  ],
-  "UserPromptExpansion": [
     {
       "hooks": [
         {
