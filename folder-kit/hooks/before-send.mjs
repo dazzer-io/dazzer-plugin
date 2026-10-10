@@ -4,13 +4,15 @@
  * calendar was read in this session, or when it holds a word on the person's own banned list, and
  * says which, so Dazzer puts that right before sending again.
  *
- * It never blocks for good. Each reason is given at most once a session for the same thread, or
- * once a session for all the sends that answer no thread, however they are worded, and the stop is
- * written to the session's log before it is said; the send tried again goes through, so a Dazzer
- * that cannot meet a check is never stuck rewording. Nothing is checked until the log holds a
- * message, so a log that cannot be written stops nothing. A thread counts as read when any tool of
- * the same connector named it, or the read tool listed for that kind of send did. The person is
- * never stuck behind a check Dazzer cannot meet.
+ * It never blocks for good. An unread thread or an unchecked calendar is given as a reason at most
+ * once a session for the same thread, or once a session for all the sends that answer no thread,
+ * however they are worded, since Dazzer may be unable to meet those and must never be stuck
+ * rewording. A banned word is different: rewording is how it is met, so it is given once for each
+ * exact message, and a new message holding it is stopped again. Every stop is written to the
+ * session's log before it is said, and the very same send tried again goes through. Nothing is
+ * checked until the log holds a message, so a log that cannot be written stops nothing. A thread
+ * counts as read when any tool of the same connector named it, or the read tool listed for that
+ * kind of send did. The person is never stuck behind a check Dazzer cannot meet.
  *
  * Which tools send, which field names a thread, which tool reads it, what names a time and where
  * the banned list sits are all in kit.defaults.json. The banned list is the person's own file in
@@ -110,14 +112,18 @@ trigger(({ input, defaults, words }) => {
   const project = process.env.CLAUDE_PROJECT_DIR;
   if (said !== "" && typeof project === "string" && project !== "" && typeof defaults.bans_path === "string") {
     for (const word of bannedWords(join(project, defaults.bans_path))) {
-      if (holdsWord(said, word)) reasons.push({ why: `banned_word\u0000${word.toLowerCase()}`, say: `${words.banned_word} ${word}` });
+      if (holdsWord(said, word)) reasons.push({ why: `banned_word\u0000${word.toLowerCase()}`, say: `${words.banned_word} ${word}`, each: true });
     }
   }
 
-  // Once a session for the same thread, or once a session for every send that answers none.
+  // Once a session for the same thread, or once a session for every send that answers none;
+  // a banned word once for each exact message, whether or not it answers a thread.
   const subject = thread !== undefined ? `thread\u0000${thread}` : "no thread";
+  const message = `message\u0000${tool}\u0000${JSON.stringify(args)}`;
   const given = new Set(log.flatMap((line) => (Array.isArray(line.denied) ? line.denied : [])));
-  const due = reasons.map((reason) => ({ ...reason, mark: markOf(reason.why, subject) })).filter((reason) => !given.has(reason.mark));
+  const due = reasons
+    .map((reason) => ({ ...reason, mark: markOf(reason.why, reason.each === true ? message : subject) }))
+    .filter((reason) => !given.has(reason.mark));
   if (due.length === 0) return "";
 
   // Written before it is said: a stop that cannot be recorded is not made.

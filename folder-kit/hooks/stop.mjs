@@ -6,8 +6,8 @@
  *
  * A turn starts at the person's last message in the session's log. The reply's own text is read
  * only to look for a claimed save, and only when Claude Code hands it over; without it, a catch
- * is still checked against the saves. A claim counts only when it names the Brain or memory as
- * where the save went; the claim phrases are in kit.defaults.json.
+ * is still checked against the saves. A claim counts only when it names their Brain, memory or
+ * Dazzer as where the save went; the claim phrases are in kit.defaults.json.
  */
 
 import { clearNote, leaveNote, matchesAny, readLog, sessionFolder, text, trigger } from "./lib.mjs";

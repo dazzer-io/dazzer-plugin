@@ -30,6 +30,8 @@ const NOTE = "note";
 /** Owner-only, for the folders and the files in them: a shared machine's temporary folder is never shared. */
 const PRIVATE_FOLDER = 0o700;
 const PRIVATE_FILE = 0o600;
+/** The default every trigger reads its input under, unless it names one of its own. */
+const GENERAL_CAP = "input_max_bytes";
 /** The permission bits that would let anyone but the owner in. */
 const OTHERS = 0o077;
 /**
@@ -193,15 +195,17 @@ export const deny = (reason) =>
  * print, or `{ out, after }` where `after` lists writes to make once the line is out. Whatever goes
  * wrong before printing, the trigger exits 0 having printed nothing at all; whatever goes wrong in
  * one write after printing loses that write alone. `cap` names the default holding this trigger's
- * input cap; the input is read to its end even when the defaults themselves cannot be read.
+ * own input cap; where the defaults do not carry it, the general cap is used, so a folder holding
+ * older defaults still reads its input. The input is read to its end even when the defaults
+ * themselves cannot be read.
  */
-export async function trigger(handler, cap = "input_max_bytes") {
+export async function trigger(handler, cap = GENERAL_CAP) {
   process.exitCode = 0;
   process.stdout.on("error", () => {});
   let after = [];
   try {
     const defaults = guarded(() => kitFile("kit.defaults.json"), null);
-    const input = await readInput(defaults?.[cap]);
+    const input = await readInput(defaults?.[cap] ?? defaults?.[GENERAL_CAP]);
     if (input === null || defaults === null) return;
     const words = kitFile("kit.words.json");
     const result = handler({ input, defaults, words });

@@ -226,6 +226,14 @@ test("the catch phrases hear short corrections in English and Hebrew, and not pl
   const caught = (message) => catches.some((phrase) => phrase.test(message));
   for (const message of [
     "That's not it",
+    "I'd prefer bullet points",
+    "I’d prefer bullet points",
+    "we'd prefer a shorter one",
+    "I would prefer no emoji",
+    "אני מעדיף בלי אימוג'י",
+    "אני מעדיפה קצר יותר",
+    "זה צריך להיות ביום שני",
+    "הכותרת צריכה להיות קצרה",
     "Not that one, the other deck.",
     "Try again",
     "Shorter",
@@ -472,6 +480,8 @@ test("a tool outside the send pattern is let through", (t) => {
     "comment_count",
     "email_draft_list",
     "blog_post_get",
+    "email_send_status",
+    "get_post_status",
   ]) {
     assert.equal(isSend(`mcp__x__${op}`), false, `${op} is not a send`);
   }
@@ -489,6 +499,8 @@ test("a tool outside the send pattern is let through", (t) => {
     "microsoft_outlook_send_email",
     "create_message",
     "compose_email",
+    "post_status",
+    "post_status_update",
   ]) {
     assert.equal(isSend(`mcp__x__${op}`), true, `${op} is a send`);
   }
@@ -507,11 +519,16 @@ test("ordinary words are not a time", (t) => {
 
 test("the time pattern names times and dates, never bare numbers, ratios or weekday words", () => {
   const time = new RegExp(defaults().time_pattern, "i");
-  for (const said of ["today", "Can we meet at 3?", "9.30am", "half past three", "12.10.2026", "Thursday at 3pm", "Or Friday at 10:30, if that suits better?", "Oct 14", "the 3rd of May", "2026-10-14", "next Tuesday"]) {
+  for (const said of ["today", "Can we meet at 3?", "9.30am", "half past three", "12.10.2026", "Thursday at 3pm", "Or Friday at 10:30, if that suits better?", "Oct 14", "the 3rd of May", "2026-10-14", "next Tuesday", "see you at 10, if that works", "around 10:30"]) {
     assert.equal(time.test(said), true, `"${said}" names a time`);
   }
   for (const said of [
     "Option 2 may be cheaper",
+    "priced at 9.99",
+    "around 10,000 users",
+    "grew from 5 to 10 people",
+    "after 2.5 years",
+    "at 5-star hotels",
     "70/20/10",
     "1:10 mentor ratio",
     "12:45 in the recording",
@@ -536,6 +553,28 @@ test("a send holding a word on the banned list is denied, naming it", (t) => {
   begin(sb, "s-banned");
   const result = run(sb, "before-send.mjs", recorded(sb, "PreToolUse", "s-banned", BANNED_SEND));
   holds("a send holding their banned word", result, () => denied(`${words().banned_word} synergy`));
+});
+
+test("a banned word is refused once for each exact message, in a thread or out of one", (t) => {
+  const sb = sandbox(t);
+  bans(sb, ["synergy"]);
+  const session = "s-each-message";
+  begin(sb, session);
+  const refused = () => denied(`${words().banned_word} synergy`);
+  const send = (input) => run(sb, "before-send.mjs", recorded(sb, "PreToolUse", session, input));
+  const reworded = { ...BANNED_SEND, tool_input: { ...BANNED_SEND.tool_input, text: "There is real synergy here, truly." } };
+  holds("a message holding their banned word", send(BANNED_SEND), refused);
+  holds("the identical message again", send(BANNED_SEND), nothing);
+  holds("a different message still holding it", send(reworded), refused);
+  holds("that message again", send(reworded), nothing);
+  holds("a message put right", send({ ...BANNED_SEND, tool_input: { ...BANNED_SEND.tool_input, text: "There is a real fit here." } }), nothing);
+
+  // In a thread already read, so the banned word is the only reason: still once for each message.
+  holds("the thread read", run(sb, "after-tool.mjs", recorded(sb, "PostToolUse", session, READ_THREAD)), nothing);
+  const inThread = (body) => ({ ...REPLY, tool_input: { ...REPLY.tool_input, body } });
+  holds("a reply holding their banned word", send(inThread("The synergy is clear.")), refused);
+  holds("the identical reply again", send(inThread("The synergy is clear.")), nothing);
+  holds("a different reply in the same thread still holding it", send(inThread("Clear synergy, I think.")), refused);
 });
 
 test("a banned phrase of two words is matched across its space, and stopped once", (t) => {
@@ -620,6 +659,18 @@ test("a long tool result is still read, up to the after-tool trigger's own cap",
   assert.equal(logOf(sb, "s-huge").entries.length, 0, "input over the cap is read as no input");
 });
 
+test("the after-tool trigger falls back to the general cap when its own is absent", (t) => {
+  const sb = sandbox(t);
+  const copy = join(sb.root, "kit-copy");
+  mkdirSync(copy);
+  for (const name of FOLDER_FILES) copyFileSync(join(HOOKS, name), join(copy, name));
+  const { after_tool_input_max_bytes: own, ...older } = defaults();
+  assert.ok(Number.isInteger(own), "the defaults carry the after-tool trigger's own cap");
+  writeFileSync(join(copy, "kit.defaults.json"), JSON.stringify(older));
+  holds("a Brain write under defaults without the after-tool cap", runScript(sb, join(copy, "after-tool.mjs"), recorded(sb, "PostToolUse", "s-older", BRAIN_WRITE)), nothing);
+  assert.equal(logOf(sb, "s-older").entries[0]?.save, true, "the save is still logged");
+});
+
 test("an input cap that is not a whole number still reads the input to its end", (t) => {
   const sb = sandbox(t);
   const copy = join(sb.root, "kit-copy");
@@ -672,7 +723,14 @@ function afterReply(sb, session, reply) {
 
 test("a save claimed to their Brain, memory or Dazzer, with none made, leaves a note", (t) => {
   const sb = sandbox(t);
-  for (const [at, reply] of ["Saved to Dazzer Memory.", "I've saved that in Dazzer.", "Got it, I've saved that to your Brain."].entries()) {
+  const claims = [
+    "Saved to Dazzer Memory.",
+    "I've saved that in Dazzer.",
+    "Got it, I've saved that to your Brain.",
+    "Saved to your Brain\nNext, I will draft the reply to Dan.",
+    "Saved to memory.",
+  ];
+  for (const [at, reply] of claims.entries()) {
     holds(`the message after "${reply}"`, afterReply(sb, `s-claimed-${at}`, reply), () => said("UserPromptSubmit", words().note));
   }
 });
@@ -852,7 +910,9 @@ test("each registered command runs its trigger from the folder, and is silent wi
     );
 
   holds(`the message command under ${shell}, Node present`, through(dirname(process.execPath)), () => said("UserPromptSubmit", words().catch));
-  holds(`the message command under ${shell}, no Node`, through(noNode), nothing);
+  // With no Node the command ends at once, never reading its input: whether the host's write
+  // beats that exit is a race between the two, and nothing the kit does. Everything else is held.
+  holds(`the message command under ${shell}, no Node`, { ...through(noNode), pipe: undefined }, nothing);
 });
 
 /** The words the creator's own repository refuses in a comment (its plain-words check). */
