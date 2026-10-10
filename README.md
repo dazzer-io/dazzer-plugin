@@ -513,6 +513,28 @@ card done, or asking to talk about it, is a sentence to your AI, which does the 
 In your Brain, served live — `brain.door.entrance`, `brain.capture.protocol`, and
 `brain.working.memory.contract`. This repository holds triggers, not teaching.
 
+## Folder kit
+
+`folder-kit/` is not something you install. It is the five small triggers every person's Dazzer
+folder carries, so a session working in that folder has them even where no plugin is installed,
+as in a cloud session. The creator copies it into a person's folder, under `.claude/hooks/`, and
+adds its registrations to that folder's settings; `folder-kit/kit.json` names the fingerprint of
+every file it copies, so a folder can be checked against the release it came from. It sits outside
+`plugins/` on purpose, so it is never offered or installed as a plugin.
+
+Like everything here, the triggers hold no rules: each one points Dazzer at its rulebook in the
+Brain. One starts a session as Dazzer; one adds a line to a message that may correct or steer the
+work; one stops a send once when the thread was not read, when it names a time with no calendar
+checked, or when it holds a word on the person's own banned list (`.dazzer/bans.json` in their
+folder), and lets the same send through if it is tried again; one asks for a skill's run to be
+reported; and the last says nothing at the end of a turn, leaving a note for the next message when
+a correction or a claimed save may have gone unsaved. They run only where Node is installed and
+stay silent where it is not, and their notes live in a folder of the machine's temporary folder
+that only that user can open, never in the person's folder.
+
+If you also have the `dazzer` plugin installed on your computer, the line that restores your place
+after a compact is said twice, once by each. Nothing else overlaps.
+
 ## Tuning
 
 Set any of these in your environment to override the shipped value. The shipped values live

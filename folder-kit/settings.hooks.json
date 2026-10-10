@@ -1,0 +1,59 @@
+{
+  "SessionStart": [
+    {
+      "matcher": "startup|resume|clear|fork|compact",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "command -v node >/dev/null 2>&1 && node \"$CLAUDE_PROJECT_DIR/.claude/hooks/start.mjs\" || true",
+          "timeout": 5
+        }
+      ]
+    }
+  ],
+  "UserPromptSubmit": [
+    {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "command -v node >/dev/null 2>&1 && node \"$CLAUDE_PROJECT_DIR/.claude/hooks/prompt.mjs\" || true",
+          "timeout": 5
+        }
+      ]
+    }
+  ],
+  "PreToolUse": [
+    {
+      "matcher": "^mcp__.+?__(?!(?:[A-Za-z0-9]+[_-])?(?:get|list|read|search|fetch|view|count|history)(?:[_-]|$|(?=[A-Z])))(?!.*[_-](?:get|list|read|search|fetch|view|count|history)$)(?!.*(?<![Pp]ost)[_-]status$)(?:[A-Za-z][A-Za-z0-9]*[_-]){0,3}(?:(?:[Ss]end)|(?:[Rr]eply)|(?:[Cc]ompose)|(?:[Ff]orward)(?:[_-]|(?=[A-Z]))(?:[Ee]mail|[Mm]essage|[Mm]ail|[Tt]hread)|(?:[Cc]reate|[Aa]dd|[Pp]ost|[Ii]nsert)(?:[_-]|(?=[A-Z]))(?:[A-Za-z][a-z0-9]*(?:[_-]|(?=[A-Z])))?(?:[Cc]omment|[Rr]eply)|(?:[Cc]reate)(?:[_-]|(?=[A-Z]))(?:[Mm]essage|[Dd]raft|[Ee]vent|[Pp]ost|[Rr]eply|[Ii]nvite|[Mm]eeting)|(?:[Cc]reate)(?:[_-]|(?=[A-Z]))(?:[Cc]alendar)(?:[_-]|(?=[A-Z]))(?:[Ee]vent)|(?:[Uu]pdate)(?:[_-]|(?=[A-Z]))(?:[Ee]vent|[Mm]eeting)|(?:[Dd]raft)(?:[_-]|(?=[A-Z]))(?:[Ee]mail|[Rr]eply|[Mm]essage|[Rr]esponse)|(?:[Pp]ost)(?:[_-]|(?=[A-Z]))(?:[Mm]essage|[Cc]omment|[Rr]eply|[Uu]pdate|[Tt]weet|[Ss]tatus|[Tt]o)|(?:[Pp]ublish)(?:[_-]|(?=[A-Z]))(?:[Pp]ost|[Aa]rticle|[Tt]weet|[Uu]pdate|[Mm]essage)|(?:[Ss]chedule)(?:[_-]|(?=[A-Z]))(?:[Mm]essage|[Ee]mail|[Pp]ost|[Mm]eeting|[Ee]vent|[Ss]end|[Tt]weet))(?:(?:[_-]|(?=[A-Z]))[A-Za-z0-9_-]*)?$",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "command -v node >/dev/null 2>&1 && node \"$CLAUDE_PROJECT_DIR/.claude/hooks/before-send.mjs\" || true",
+          "timeout": 5
+        }
+      ]
+    }
+  ],
+  "PostToolUse": [
+    {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "command -v node >/dev/null 2>&1 && node \"$CLAUDE_PROJECT_DIR/.claude/hooks/after-tool.mjs\" || true",
+          "timeout": 5
+        }
+      ]
+    }
+  ],
+  "Stop": [
+    {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "command -v node >/dev/null 2>&1 && node \"$CLAUDE_PROJECT_DIR/.claude/hooks/stop.mjs\" || true",
+          "timeout": 5
+        }
+      ]
+    }
+  ]
+}

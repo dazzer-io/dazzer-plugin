@@ -1,0 +1,13 @@
+{
+  "kit": 1,
+  "files": {
+    "lib.mjs": "409220611d49e9ba6114d558109b26bb37ffaae3",
+    "start.mjs": "80958ccc12871f8c9882ca32bfe0787742095884",
+    "prompt.mjs": "b5ac5325ce9cfa5bb68301ccb4d8c078c6205713",
+    "before-send.mjs": "f3f51d08327f2211740f7832dd9a655ae454e259",
+    "after-tool.mjs": "e235d9c6a9e58bf51bc9a039ed3d0e761fb6ddd5",
+    "stop.mjs": "6c7503bfcc74bce896d4bd59bc2821c484e34537",
+    "kit.defaults.json": "a4b79084d6c474343617ad0f1a466c0813f60cde",
+    "kit.words.json": "656496a345c9bed8cade79f30ea4c1dd87f0cb67"
+  }
+}

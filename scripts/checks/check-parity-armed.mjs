@@ -40,6 +40,15 @@ const CONNECTION = ["plugins", "dazzer-connect", ".mcp.json"];
 // for `hooks.json` at the plugin root and want different shapes inside it.
 const AGY_HOOKS = ["plugins", "dazzer-antigravity", "hooks.json"];
 const AGY_LISTING = ["plugins", "dazzer-antigravity", "plugin.json"];
+// The words the plugin ships into somebody else's AI, which the rules gate reads. Without them it
+// refuses every copy for a missing file, and no seeded fault in it could be told from that.
+const SKILL = ["plugins", "dazzer", "skills", "dazzer", "SKILL.md"];
+const TAP = ["plugins", "dazzer", "prompts", "capture-tap.txt"];
+// The folder kit, whole: the path gate reads its registrations and looks for the scripts they
+// name, and the rules gate reads its words.
+const KIT = ["folder-kit"];
+const KIT_SETTINGS = ["folder-kit", "settings.hooks.json"];
+const KIT_WORDS = ["folder-kit", "hooks", "kit.words.json"];
 
 /**
  * Everything the fixture holds - EVERY file any parity gate reads, listed in one place.
@@ -61,14 +70,17 @@ const FIXTURE_FILES = [
   AGY_HOOKS,
   AGY_LISTING,
   SWEEP,
+  SKILL,
+  TAP,
+  KIT,
 ];
 
-/** A throwaway copy of the parts of the repo the parity gates read. */
+/** A throwaway copy of the parts of the repo the parity gates read. A folder is copied whole. */
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), "dazzer-parity-"));
   for (const where of FIXTURE_FILES) {
     mkdirSync(dirname(join(root, ...where)), { recursive: true });
-    cpSync(join(REPO_ROOT, ...where), join(root, ...where));
+    cpSync(join(REPO_ROOT, ...where), join(root, ...where), { recursive: true });
   }
   return root;
 }
@@ -520,6 +532,71 @@ const CASES = [
       edit(root, CURSOR_HOOKS, (hooks) => {
         const hook = hooks.hooks.stop[0];
         hook.command = hook.command.replace("capture-sweep.sh", "does-not-exist.sh");
+      });
+    },
+  },
+  {
+    gate: "trigger-paths",
+    what: "a folder kit trigger naming a script the kit does not carry, which every person's folder would run and never find",
+    seed(root) {
+      edit(root, KIT_SETTINGS, (hooks) => {
+        const hook = hooks.Stop[0].hooks[0];
+        hook.command = hook.command.replace("stop.mjs", "does-not-exist.mjs");
+      });
+    },
+  },
+  {
+    gate: "trigger-paths",
+    what: "a folder kit trigger running a plain .js script the kit does not carry, which a check reading only .mjs never looks at",
+    seed(root) {
+      edit(root, KIT_SETTINGS, (hooks) => {
+        const hook = hooks.Stop[0].hooks[0];
+        hook.command = hook.command.replace("stop.mjs", "stop.js");
+      });
+    },
+  },
+  {
+    gate: "trigger-paths",
+    what: "the folder kit gone from the release, which leaves every folder the creator makes with nothing to copy",
+    seed(root) {
+      rmSync(join(root, ...KIT), { recursive: true, force: true });
+    },
+  },
+  {
+    gate: "trigger-paths",
+    what: "a plugin's own trigger falling back to the person's project folder, so it would run whatever sits there",
+    seed(root) {
+      // The fallback is the whole fault: the plugin's own folder is still named first and its
+      // script still exists, so only the rule that a plugin never uses the project folder is left.
+      edit(root, WRAPPED_HOOKS, (hooks) => {
+        for (const hook of hooks.hooks.UserPromptSubmit[0].hooks) {
+          if (hook.command.includes("capture-sweep.sh")) {
+            hook.command = hook.command.replace(/\$\{CLAUDE_PLUGIN_ROOT:-[^}]*\}/, "${CLAUDE_PLUGIN_ROOT:-$CLAUDE_PROJECT_DIR/.claude/plugins/dazzer}");
+          }
+        }
+      });
+    },
+  },
+  {
+    gate: "rules-not-restated",
+    what: "a folder kit sentence grown into a numbered list of habits, which teaches the rule from inside the trigger",
+    seed(root) {
+      // Replaced rather than appended, so the sentences stay inside their budget and only the
+      // shape is left to catch. The list sits inside a JSON string, where a line break is two
+      // characters, which is exactly where a gate reading the file as text would miss it.
+      edit(root, KIT_WORDS, (words) => {
+        words.catch = "1. **Save the correction.**\n2. **Never ask how to work.**";
+      });
+    },
+  },
+  {
+    gate: "rules-not-restated",
+    what: "a folder kit sentence grown long enough to be the rule itself rather than a pointer to it",
+    seed(root) {
+      edit(root, KIT_WORDS, (words) => {
+        words.catch +=
+          " Save it as their rule with remember, narrow to the case it came from, then carry on. If it comes back," +
+          " move the rule into the record the skill reads at that step. A complaint after a change undoes it at once.";
       });
     },
   },

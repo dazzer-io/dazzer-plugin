@@ -63,6 +63,7 @@ session's start.
 | `plugins/dazzer/` | The behaviour: triggers, the checkpoint script, the skill. **Carries no connection.** |
 | `plugins/dazzer-connect/` | The connection, and nothing else, for people who have not already got one. |
 | `plugins/dazzer-plate/` | The plate pane: a Claude Code mod (`hooks/plate.tsx`) that draws the person's plate when they ask. Reads through the connection the person already has; **carries none.** Its `hooks/hooks.json` holds only `modules`, which is why it is a plugin of its own: Codex refuses the shared file over that key. |
+| `folder-kit/` | The five triggers every person's Dazzer folder carries, copied by the creator into the folder's `.claude/hooks/` with `settings.hooks.json` merged into its settings; `kit.json` pins each copied file's git blob sha. **Never a plugin**, which is why it sits outside `plugins/`. Proven by `node --test folder-kit/hooks/kit.test.mjs`. |
 | `scripts/kept-states.mjs` | Writes the pages a plugin test prints, since `claude plugin test` gives a test no file system; the words check reads them. |
 | `.claude-plugin/marketplace.json` | The list people install from. |
 | `README.md` | How to install it, written for a person. **The authority for the install steps.** |
