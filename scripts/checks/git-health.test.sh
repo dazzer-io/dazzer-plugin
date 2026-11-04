@@ -1,15 +1,14 @@
 #!/bin/sh
-# git-health.test.sh — bench test for the guards that keep this repository clean.
+# git-health.test.sh — bench test for the tool that keeps this repository clean.
 # No network, no touching the real repository: every case builds a throwaway repository in a
-# temp directory and asserts what the guards actually did.
+# temp directory and asserts what the tool actually did.
 #
 # WHY THESE CASES AND NOT OTHERS. Each one is a way live work was really written off during
-# development of these guards, found by review after the first version looked correct:
+# development of this tool, found by review after the first version looked correct:
 #   - work in the tool's own folder reported as disposable because of where the folder sat
 #   - work made only of never-committed files, hidden by a setting, treated as nothing to save
 #   - a working copy that could not be read treated the same as one with nothing in it
-#   - a refusal that named a command the creator itself rejects, so an agent works around it
-# A guard is only worth having if it fails loudly, so every assertion here is about the
+# A tool like this is only worth having if it fails loudly, so every assertion here is about the
 # direction of failure: uncertainty must keep work, never discard it.
 #
 # Run: sh scripts/checks/git-health.test.sh
@@ -18,8 +17,6 @@ set -u
 
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 SCRIPT="$ROOT/scripts/git-health.mjs"
-GUARD="$ROOT/.claude/hooks/reference-copy-guard.sh"
-SHELL_UNDER_TEST="${SHELL_UNDER_TEST:-sh}"
 PASS=0
 FAIL=0
 FAILED=""
@@ -58,7 +55,7 @@ assert_lacks() {
 
 # Runs the thing under test and keeps BOTH channels. Throwing away the error channel is the
 # habit this repository's harness rule exists to stop — it hid three real defects once, and a
-# guard that prints a shell error on every turn would otherwise pass every case here.
+# tool that prints a shell error on every turn would otherwise pass every case here.
 subject() { # <cwd> <args...>
   sub_cwd=$1
   shift
@@ -81,71 +78,12 @@ new_repo() {
   git -C "$MAIN" config user.email t@t.t
   git -C "$MAIN" config user.name t
   echo x > "$MAIN/kept.txt"
-  # The sandbox carries its OWN copy of the guard and the creator it points at. The guard
-  # polices only the repository it is installed in, so pointing this repository's copy at a
-  # sandbox would correctly refuse to judge it — and prove nothing.
-  mkdir -p "$MAIN/.claude/hooks" "$MAIN/scripts"
-  cp "$GUARD" "$MAIN/.claude/hooks/"
+  mkdir -p "$MAIN/scripts"
   cp "$SCRIPT" "$MAIN/scripts/"
   git -C "$MAIN" add -A
   git -C "$MAIN" commit -q -m root
-  SANDBOX_GUARD="$MAIN/.claude/hooks/reference-copy-guard.sh"
 }
 
-# -> deny | allow | broken. "broken" matters: a guard that crashed prints nothing, which is
-# indistinguishable from a deliberate allow unless the error channel is read. Three cases here
-# went green against a dead guard before this told them apart.
-decision() {
-  : > "$SANDBOX/.guard-err"
-  out=$(printf '{"hook_event_name":"PreToolUse","tool_name":"Write","tool_input":{"file_path":"%s"}}' "$1" \
-    | "$SHELL_UNDER_TEST" "$SANDBOX_GUARD" 2>"$SANDBOX/.guard-err")
-  [ -s "$SANDBOX/.guard-err" ] && { echo broken; return; }
-  [ -z "$out" ] && { echo allow; return; }
-  case "$out" in *'"deny"'*) echo deny ;; *) echo allow ;; esac
-}
-
-echo "the main checkout is read-only"
-
-new_repo
-[ "$(decision "$MAIN/kept.txt")" = deny ] && ok "refuses a write into the reference copy" \
-  || no "refuses a write into the reference copy" "allowed"
-[ "$(decision "$MAIN/a/b/new.ts")" = deny ] && ok "refuses a new file whose folders do not exist" \
-  || no "refuses a new file whose folders do not exist" "allowed"
-
-git -C "$MAIN" worktree add -q -b work/beside "$SANDBOX/beside" >/dev/null 2>&1
-[ "$(decision "$SANDBOX/beside/kept.txt")" = allow ] && ok "allows a working copy beside it" \
-  || no "allows a working copy beside it" "refused"
-
-# Some tools put their copies INSIDE the checkout. A guard comparing path prefixes refuses
-# these and wedges every helper the tool starts.
-git -C "$MAIN" worktree add -q -b work/nested "$MAIN/.claude/worktrees/agent-1" >/dev/null 2>&1
-[ "$(decision "$MAIN/.claude/worktrees/agent-1/kept.txt")" = allow ] \
-  && ok "allows a working copy nested inside the reference copy" \
-  || no "allows a working copy nested inside the reference copy" "refused"
-
-# Being a main checkout is true of every clone on the machine; only this one is ours.
-git init -q -b main "$SANDBOX/someone-else"
-echo x > "$SANDBOX/someone-else/theirs.ts"
-[ "$(decision "$SANDBOX/someone-else/theirs.ts")" = allow ] \
-  && ok "leaves every other repository alone" || no "leaves every other repository alone" "refused"
-
-# The refusal has to name a remedy the creator accepts, or the agent concludes it is broken
-# and goes looking for a way around the guard.
-REASON=$(printf '{"hook_event_name":"PreToolUse","tool_name":"Write","tool_input":{"file_path":"%s"}}' \
-  "$MAIN/kept.txt" | "$SHELL_UNDER_TEST" "$SANDBOX_GUARD" 2>"$SANDBOX/.err")
-[ -s "$SANDBOX/.err" ] && no "the guard refuses without complaining" "$(head -1 "$SANDBOX/.err")" \
-  || ok "the guard refuses without complaining"
-assert_has "the refusal says how to get a working copy" "$REASON" "git-health.mjs new "
-SUGGESTED=$(printf '%s' "$REASON" | sed -n 's/.*git-health\.mjs new \([^ \\"]*\).*/\1/p' | head -1)
-if [ -n "$SUGGESTED" ] && (cd "$MAIN" && node "$MAIN/scripts/git-health.mjs" new "$SUGGESTED" \
-  >"$SANDBOX/.out" 2>"$SANDBOX/.err") && [ ! -s "$SANDBOX/.err" ]; then
-  ok "the name it suggests is one the creator accepts"
-else
-  no "the name it suggests is one the creator accepts" "creator rejected: $SUGGESTED"
-fi
-rm -rf "$SANDBOX"
-
-echo ""
 echo "open work is never written off"
 
 new_repo
