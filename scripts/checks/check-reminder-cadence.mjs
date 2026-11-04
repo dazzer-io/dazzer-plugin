@@ -42,8 +42,11 @@ const CADENCE_OF_EVENT = {
  * a `hooks` field names a file, and its absence means the folder's own hooks.json.
  */
 const SHIPS = {
-  "claude-code": { config: "plugins/dazzer/hooks.json", event: "UserPromptSubmit" },
-  codex: { config: "plugins/dazzer/hooks.json", event: "UserPromptSubmit" },
+  // Claude Code and Codex read hooks/hooks.json, never the root file (README, "Why the reminders
+  // live in three files"). Mapped to the root file, this gate checked Devin's file for them and
+  // would have passed a change it should have caught.
+  "claude-code": { config: "plugins/dazzer/hooks/hooks.json", event: "SessionStart" },
+  codex: { config: "plugins/dazzer/hooks/hooks.json", event: "SessionStart" },
   devin: { config: "plugins/dazzer/hooks.json", event: "UserPromptSubmit" },
   antigravity: { config: "plugins/dazzer-antigravity/hooks.json", event: "PreInvocation" },
   cursor: { config: "plugins/dazzer/hooks/cursor.json", event: "sessionStart" },

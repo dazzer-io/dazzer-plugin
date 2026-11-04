@@ -295,13 +295,13 @@ const HOMES = [
       [
         "UserPromptSubmit",
         {
-          // The one moment that carries both: a sentence AND the script. These hosts print
-          // whatever a script says at the END of a reply straight onto the person's screen,
-          // in full, under a word of their own choosing - so the checkpoint was moved here,
-          // where nothing is drawn and nothing is forced to speak. Both are owed, and both
-          // are checked: the sentence by wording, the script by name.
+          // The script, and no sentence. These hosts print whatever a script says at the END
+          // of a reply straight onto the person's screen, in full, under a word of their own
+          // choosing - so the checkpoint was moved here, where nothing is drawn and nothing is
+          // forced to speak. The check-first words used to ride here too, on every message;
+          // measured over a week of real chats they changed nothing the model did, while every
+          // message carried them, so they moved to the start of a chat (4 Nov 2026).
           who: "Claude Code and Codex, on every message",
-          says: "recall",
           shape: claudeShaped("UserPromptSubmit"),
           runs: true,
           runsWhere: "with every message a person sends",
@@ -310,8 +310,13 @@ const HOMES = [
       [
         "SessionStart",
         {
-          who: "Claude Code and Codex, after a reset",
-          says: "resume",
+          // Two sentences at one moment, told apart by the matcher: the check-first words
+          // whenever a chat starts (a reset included, since the reset is what loses them),
+          // and the resume words only after a reset.
+          bySource: {
+            "": { says: "recall", who: "Claude Code and Codex, when a chat starts" },
+            compact: { says: "resume", who: "Claude Code and Codex, after a reset" },
+          },
           shape: claudeShaped("SessionStart"),
         },
       ],
@@ -421,6 +426,18 @@ const tailOf = (home) => join(folderOf(home), ...home.at);
  * against the raw file: a hook is structured, and reading it as text is how the first
  * defect in this repository happened.
  */
+/**
+ * Where a sentence is kept: its moment, and the matcher when its group has one. Keyed by moment
+ * alone, a second sentence at the same moment overwrote the first, and the cross-file wording
+ * rule read the check-first and resume words at one moment as one reminder worded two ways.
+ */
+const momentKey = (trigger, group) =>
+  typeof group?.matcher === "string" && group.matcher.length > 0 ? `${trigger}:${group.matcher}` : trigger;
+
+/** A moment's one sentence, whichever matcher its group carries. */
+const spokenAt = (spoke, trigger) =>
+  spoke.get(trigger) ?? [...spoke].find(([key]) => key.startsWith(`${trigger}:`))?.[1];
+
 function spokenByHooks(findings, declaredById) {
   const out = [];
 
@@ -541,8 +558,8 @@ function spokenByHooks(findings, declaredById) {
             // No host here reads structure, so the words themselves are the reminder. A
             // hook that says nothing is simply not one, and is left alone.
             if (said !== undefined && said.spoken.startsWith(SPOKEN_MARK)) {
-              spoke.set(trigger, said.spoken);
-              out.push({ file: where, trigger, text: said.spoken });
+              spoke.set(momentKey(trigger, group), said.spoken);
+              out.push({ file: where, trigger: momentKey(trigger, group), text: said.spoken });
             }
             continue;
           }
@@ -568,8 +585,8 @@ function spokenByHooks(findings, declaredById) {
             });
             continue;
           }
-          spoke.set(trigger, text);
-          out.push({ file: where, trigger, text });
+          spoke.set(momentKey(trigger, group), text);
+          out.push({ file: where, trigger: momentKey(trigger, group), text });
         }
       }
     }
@@ -579,7 +596,7 @@ function spokenByHooks(findings, declaredById) {
     // so one tool's reminder can be deleted outright and the run stays green as long as
     // another tool still says the same words. Not a hypothetical: a reminder was removed from
     // one of these files on the strength of a tool's documentation, and nothing objected.
-    for (const [trigger, { who, says, runs, runsWhere }] of home.moments) {
+    for (const [trigger, { who, says, runs, runsWhere, bySource }] of home.moments) {
       // The end-of-reply prompt runs a file rather than saying one of our sentences, so
       // "did anyone speak here" cannot see it go. Every wording rule was blind to it, and
       // it could be deleted from every file at once with nothing objecting.
@@ -609,31 +626,39 @@ function spokenByHooks(findings, declaredById) {
         }
         // No `continue`: a moment may owe a sentence as well, and stopping here is how the
         // one that owes both would have had its wording checked by nothing at all.
-        if (says === undefined) continue;
+        if (says === undefined && bySource === undefined) continue;
       }
 
-      const said = spoke.get(trigger);
-      if (said === undefined) {
-        findings.push({
-          file: where,
-          message:
-            `nothing here speaks to ${who}. The ${trigger} reminder is missing or silent, and ` +
-            "because the other rules only ask whether a sentence is said somewhere, losing a " +
-            "whole tool this way is invisible to them.",
-        });
-        continue;
-      }
-      // WHICH words, not merely some words. Both declared sentences are always said
-      // somewhere, so one standing in for the other satisfies every rule that only pools
-      // them - and the words onboarding looks for are the ones that went missing.
-      const owed = declaredById.get(says);
-      if (owed !== undefined && said !== owed) {
-        findings.push({
-          file: where,
-          message:
-            `${who} is given the wrong reminder: this is where the "${says}" words belong, ` +
-            "and it says different ones. Anything looking for them here finds nothing.",
-        });
+      // A moment owes one sentence, or - where its groups are told apart by a matcher - one per
+      // matcher, each looked up exactly. A single sentence is found under any matcher, as before.
+      const owedHere = bySource
+        ? Object.entries(bySource).map(([matcher, o]) => ({ key: matcher ? `${trigger}:${matcher}` : trigger, ...o }))
+        : [{ key: null, says, who }];
+      for (const { key, says: id, who: whom } of owedHere) {
+        const label = key ?? trigger;
+        const said = key !== null ? spoke.get(key) : spokenAt(spoke, trigger);
+        if (said === undefined) {
+          findings.push({
+            file: where,
+            message:
+              `nothing here speaks to ${whom}. The ${label} reminder is missing or silent, and ` +
+              "because the other rules only ask whether a sentence is said somewhere, losing a " +
+              "whole tool this way is invisible to them.",
+          });
+          continue;
+        }
+        // WHICH words, not merely some words. Both declared sentences are always said
+        // somewhere, so one standing in for the other satisfies every rule that only pools
+        // them - and the words onboarding looks for are the ones that went missing.
+        const owed = declaredById.get(id);
+        if (owed !== undefined && said !== owed) {
+          findings.push({
+            file: where,
+            message:
+              `${whom} is given the wrong reminder: this is where the "${id}" words belong, ` +
+              "and it says different ones. Anything looking for them here finds nothing.",
+          });
+        }
       }
     }
   }
