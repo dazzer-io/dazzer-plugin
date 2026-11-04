@@ -364,8 +364,14 @@ receipt fired "threshold-reached"
 MESSAGE="$(tr -d '\n' < "$HERE/prompts/capture-tap.txt" 2>/dev/null)"
 [ -z "$MESSAGE" ] && exit 0
 
+# THE PLACE IS THIS CHAT'S OWN. A checkpoint with no thread lands in one slot every chat
+# shares, so the next chat to save overwrote it and a restore could bring back somebody
+# else's work; a resume with no thread hands back a list of every saved place. The host's
+# own id for the chat stays the same through a reset, so it is the label at both ends: here,
+# and in the line the start of the chat and the reset are given. Flattened like any
+# filename, which also keeps it from opening with the "@" the Brain reserves.
 if [ "$MOMENT" = "with-next-message" ]; then
-  printf '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"%s Then answer what was asked, and nothing else."}}' "$MESSAGE"
+  printf '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"%s Checkpoint under thread \\"%s\\". Then answer what was asked, and nothing else."}}' "$MESSAGE" "$(fence_name "$SESSION")"
   exit 0
 fi
 
