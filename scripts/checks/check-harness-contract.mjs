@@ -44,7 +44,7 @@ runGate({
 
       // Only the SUBJECT's error channel matters. The suite's own housekeeping may quiet
       // itself; throwing away what the thing under test said is the habit that hid defects.
-      const invokesSubject = /\$\{?(SUBJECT|SWEEP|DAZZER_SWEEP_BIN|SCRIPT|GUARD|SANDBOX_GUARD)\b/;
+      const invokesSubject = /\$\{?(SUBJECT|SWEEP|DAZZER_SWEEP_BIN|SCRIPT)\b/;
 
       for (const { n, text } of code) {
         if (invokesSubject.test(text) && /2>\s*(\/dev\/null|&1)/.test(text)) {
@@ -70,7 +70,11 @@ runGate({
         }
       }
 
-      if (!/\bSHELL_UNDER_TEST\b|\bDAZZER_TEST_SHELL\b/.test(body)) {
+      // Asked only of a suite that hands a shell script to a shell. A suite whose subject is a
+      // Node script has no interpreter to choose, and a variable it never used would only
+      // satisfy this rule on paper.
+      const runsShellScript = code.some(({ text }) => /\.sh\b/.test(text));
+      if (runsShellScript && !/\bSHELL_UNDER_TEST\b|\bDAZZER_TEST_SHELL\b/.test(body)) {
         findings.push({
           file: where,
           id: "hardcoded-shell",
