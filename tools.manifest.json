@@ -88,7 +88,7 @@
           "note": "Install it from a terminal with the same two lines. The app and the terminal share one set of settings, so it appears in the app on your next conversation. The install command does not exist inside the app, so this genuinely needs a terminal once — even if you never otherwise open one."
         }
       ],
-      "recallArrives": "every message"
+      "recallArrives": "once a session"
     },
     {
       "id": "codex",
@@ -116,7 +116,7 @@
         ],
         "note": "Codex asks you to approve a plugin's reminders before it will run them. If nothing appears in the run history, that approval is the first thing to check."
       },
-      "recallArrives": "every message"
+      "recallArrives": "once a session"
     },
     {
       "id": "copilot",

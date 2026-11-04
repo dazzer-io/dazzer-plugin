@@ -473,8 +473,11 @@ shared reminders file over the one line a pane needs, so it cannot live in `dazz
 
 ## What it does
 
-**Tells the AI to check before answering.** Every prompt carries a short reminder to look in your
-Brain first rather than answering from assumption.
+**Tells the AI to check before answering.** A short reminder to look in your Brain first rather
+than answering from assumption. In Claude Code and Codex it arrives once when a chat starts, and
+again after a context reset, which is when the AI has lost what it was told. It used to ride on
+every message, and a measured week found no difference the repeats made, while the same words
+sat in a long chat dozens of times over. Each tool's own listing says how often it arrives there.
 
 **Tells it to save what settled.** Once enough real work has accumulated, your next message
 quietly carries a prompt to save it, and the AI tells you in one line what it saved. What
