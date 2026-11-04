@@ -121,6 +121,14 @@ const rewrap = (doc) => `printf %s ${quoted(JSON.stringify(doc))}`;
 /** Say the same thing a different way - correct, and deliberately not the shape we ship. */
 const echoSingleQuoted = (sentence) => `echo ${quoted(sentence)}`;
 
+/**
+ * Which hook in Claude Code and Codex's file says which words: the check-first words whenever a
+ * chat starts (the SessionStart group with no matcher), the resume words after a reset (the one
+ * matching "compact"). The per-message moment carries the saving script and no sentence.
+ */
+const sayingRecall = (hooks) => hooks.hooks.SessionStart.find((group) => !group.matcher).hooks[0];
+const sayingResume = (hooks) => hooks.hooks.SessionStart.find((group) => group.matcher === "compact").hooks[0];
+
 /** Each case names the real mistake it stands for, so a failure here reads as a warning. */
 const CASES = [
   {
@@ -132,7 +140,7 @@ const CASES = [
       // quietly became a duplicate of the plain-words case below.
       const reworded = "[Dazzer] Reworded and told nobody.";
       edit(root, WRAPPED_HOOKS, (hooks) => {
-        const hook = hooks.hooks.UserPromptSubmit[0].hooks[0];
+        const hook = sayingRecall(hooks);
         const doc = unwrap(hook.command);
         doc.hookSpecificOutput.additionalContext = reworded;
         hook.command = rewrap(doc);
@@ -156,7 +164,7 @@ const CASES = [
     what: "a reminder handed to a host that reads replies as data, but written as plain words - which that host discards while showing the person an error on every message",
     seed(root) {
       edit(root, WRAPPED_HOOKS, (hooks) => {
-        const hook = hooks.hooks.UserPromptSubmit[0].hooks[0];
+        const hook = sayingRecall(hooks);
         hook.command = `echo "${unwrap(hook.command).hookSpecificOutput.additionalContext}"`;
       });
     },
@@ -166,7 +174,7 @@ const CASES = [
     what: "the same mistake spelled another way, which a gate that recognised only the spellings we happened to write let straight through",
     seed(root) {
       edit(root, WRAPPED_HOOKS, (hooks) => {
-        const hook = hooks.hooks.UserPromptSubmit[0].hooks[0];
+        const hook = sayingRecall(hooks);
         hook.command = echoSingleQuoted(unwrap(hook.command).hookSpecificOutput.additionalContext);
       });
     },
@@ -176,9 +184,9 @@ const CASES = [
     what: "the right words wrapped under the wrong event name, which that host refuses just as flatly",
     seed(root) {
       edit(root, WRAPPED_HOOKS, (hooks) => {
-        const hook = hooks.hooks.UserPromptSubmit[0].hooks[0];
+        const hook = sayingRecall(hooks);
         const doc = unwrap(hook.command);
-        doc.hookSpecificOutput.hookEventName = "SessionStart";
+        doc.hookSpecificOutput.hookEventName = "UserPromptSubmit";
         hook.command = rewrap(doc);
       });
     },
@@ -193,7 +201,7 @@ const CASES = [
       // only thing left that can object.
       const withApostrophe = "[Dazzer] Restore what you were doing before the session's reset.";
       edit(root, WRAPPED_HOOKS, (hooks) => {
-        const hook = hooks.hooks.SessionStart[0].hooks[0];
+        const hook = sayingResume(hooks);
         const doc = unwrap(hook.command);
         doc.hookSpecificOutput.additionalContext = withApostrophe;
         // Written out by hand, the way a person rewording this file would - straight into
@@ -216,7 +224,7 @@ const CASES = [
       // Both wordings declared, so only the disagreement itself is left to catch.
       const theirs = "[Dazzer] Restored session - carry on where you left off.";
       edit(root, WRAPPED_HOOKS, (hooks) => {
-        const hook = hooks.hooks.SessionStart[0].hooks[0];
+        const hook = sayingResume(hooks);
         const doc = unwrap(hook.command);
         doc.hookSpecificOutput.additionalContext = theirs;
         hook.command = rewrap(doc);
@@ -231,7 +239,7 @@ const CASES = [
     what: "a reminder that runs something instead of saying something, so the host it answers hears nothing at all",
     seed(root) {
       edit(root, WRAPPED_HOOKS, (hooks) => {
-        hooks.hooks.SessionStart[0].hooks[0].command = 'sh "${CLAUDE_PLUGIN_ROOT}/scripts/capture-sweep.sh"';
+        sayingResume(hooks).command = 'sh "${CLAUDE_PLUGIN_ROOT}/scripts/capture-sweep.sh"';
       });
     },
   },
@@ -262,7 +270,7 @@ const CASES = [
       // nothing that pools sentences objects - only knowing WHICH words belong here does.
       let resume;
       edit(root, WRAPPED_HOOKS, (hooks) => {
-        resume = unwrap(hooks.hooks.SessionStart[0].hooks[0].command)
+        resume = unwrap(sayingResume(hooks).command)
           .hookSpecificOutput.additionalContext;
       });
       edit(root, CURSOR_HOOKS, (hooks) => {
@@ -298,7 +306,18 @@ const CASES = [
     what: "a reminder that prints nothing at all, which arrives as silence",
     seed(root) {
       edit(root, WRAPPED_HOOKS, (hooks) => {
-        hooks.hooks.UserPromptSubmit[0].hooks[0].command = "printf %s ''";
+        sayingRecall(hooks).command = "printf %s ''";
+      });
+    },
+  },
+  {
+    gate: "reminder-parity",
+    what: "the check-first words dropped from the start of a chat, while the resume words still stand at the same moment",
+    seed(root) {
+      // The moment survives and still speaks, so a test that asks only whether SessionStart
+      // says something passes. Only owing one sentence per matcher sees the check-first words go.
+      edit(root, WRAPPED_HOOKS, (hooks) => {
+        hooks.hooks.SessionStart = hooks.hooks.SessionStart.filter((group) => group.matcher);
       });
     },
   },
@@ -307,7 +326,7 @@ const CASES = [
     what: "correctly shaped words that are not ours, so nothing downstream can tell the reminders arrived",
     seed(root) {
       edit(root, WRAPPED_HOOKS, (hooks) => {
-        const hook = hooks.hooks.UserPromptSubmit[0].hooks[0];
+        const hook = sayingRecall(hooks);
         const doc = unwrap(hook.command);
         doc.hookSpecificOutput.additionalContext = "Something else entirely.";
         hook.command = rewrap(doc);
@@ -388,7 +407,7 @@ const CASES = [
     what: "an unquoted payload, which some shells tear in half before the command ever sees it",
     seed(root) {
       edit(root, WRAPPED_HOOKS, (hooks) => {
-        const hook = hooks.hooks.UserPromptSubmit[0].hooks[0];
+        const hook = sayingRecall(hooks);
         hook.command = `printf %s ${JSON.stringify(unwrap(hook.command))}`;
       });
     },
@@ -505,9 +524,9 @@ const CASES = [
     gate: "reminder-parity",
     what: "the checkpoint deleted, which says none of our sentences so no wording rule can miss it",
     seed(root) {
-      // Only the checkpoint, leaving the reminder that shares its moment untouched. Deleting
-      // the whole moment would fail this gate on the missing SENTENCE and prove nothing about
-      // the script - and the script is the half no wording rule can see go.
+      // Only the checkpoint, leaving every reminder untouched. Deleting a whole moment would
+      // fail this gate on a missing SENTENCE and prove nothing about the script - and the
+      // script is the half no wording rule can see go.
       edit(root, WRAPPED_HOOKS, (hooks) => {
         for (const group of Object.values(hooks.hooks).flat()) {
           if (!Array.isArray(group.hooks)) continue;
@@ -604,8 +623,7 @@ const CASES = [
     gate: "reminder-parity",
     what: "the checkpoint silenced rather than deleted, which any presence test would accept",
     seed(root) {
-      // It sits beside the recall reminder now, at the person's next message rather than at
-      // the end of a reply - the whole point of moving it being that a host prints anything
+      // It sits at the person's next message now, rather than at the end of a reply - the whole point of moving it being that a host prints anything
       // said at the end of a reply onto the person's own screen. Found by what it runs, not
       // by where it sits, so moving it again cannot quietly disarm this.
       edit(root, WRAPPED_HOOKS, (hooks) => {
