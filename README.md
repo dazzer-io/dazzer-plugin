@@ -540,8 +540,12 @@ a correction or a claimed save may have gone unsaved. They run only where Node i
 stay silent where it is not, and their notes live in a folder of the machine's temporary folder
 that only that user can open, never in the person's folder.
 
+The start line, and the line after a compact, also name the session's own saved place, the same
+way the plugin does, so a restore in a Dazzer folder brings back that session's work and not a list.
+
 If you also have the `dazzer` plugin installed on your computer, the line that restores your place
-after a compact is said twice, once by each. Nothing else overlaps.
+after a compact, and the line naming the session's own place, are said twice, once by each.
+Nothing else overlaps.
 
 ## Tuning
 

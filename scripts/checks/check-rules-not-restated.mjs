@@ -54,11 +54,16 @@ import { REPO_ROOT, read, rel, runGate } from "./lib/gate.mjs";
  * plugin's own resume line, held word for word. A sentence that starts teaching grows past it. When
  * the note grew a condition, so that it never asserts what it does not know, the other lines were
  * cut to make room (897 characters) rather than the budget raised.
+ *
+ * It WAS raised once, by exactly one sentence, and for the same reason the resume line was counted
+ * in the first place: the plugin's own line naming a session's own saved place, held word for word
+ * (a test holds it to what the plugin prints). It is a fact about the session, not a rule, and
+ * cutting other lines to fit it would have changed what they say. 1,028 characters, cap 1,030.
  */
 const SHIPPED = [
   { file: join(REPO_ROOT, "plugins", "dazzer", "skills", "dazzer", "SKILL.md") },
   { file: join(REPO_ROOT, "plugins", "dazzer", "prompts", "capture-tap.txt"), budget: 420 },
-  { file: join(REPO_ROOT, "folder-kit", "hooks", "kit.words.json"), budget: 900, sentences: true },
+  { file: join(REPO_ROOT, "folder-kit", "hooks", "kit.words.json"), budget: 1030, sentences: true },
 ];
 
 /**
