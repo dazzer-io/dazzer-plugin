@@ -773,21 +773,56 @@ test("the note is carried once, by the next message only", (t) => {
   assert.match(words().note, /^\[Dazzer\] If .+; otherwise ignore this\.$/, "the note is conditional, never asserting what it does not know");
 });
 
+/** The kit's line naming a session's own place, for that session's thread. */
+const place = (thread) => words().place.replace("{thread}", thread);
+
 test("the session start line, and the plugin's resume line after a compact", (t) => {
   const sb = sandbox(t);
   for (const source of ["startup", "resume", "clear", "fork"]) {
     holds(`a session's ${source}`, run(sb, "start.mjs", recorded(sb, "SessionStart", `s-start-${source}`, { source })), () =>
-      said("SessionStart", words().start),
+      said("SessionStart", `${words().start}\n${place(`s-start-${source}`)}`),
     );
   }
   holds("a compact", run(sb, "start.mjs", recorded(sb, "SessionStart", "s-compact", { source: "compact" })), () =>
-    said("SessionStart", words().resume),
+    said("SessionStart", `${words().resume}\n${place("s-compact")}`),
   );
   // Word for word the sentence the plugin says at the same moment, read from where it says it.
   const hooks = JSON.parse(readFileSync(join(REPO, "plugins", "dazzer", "hooks", "hooks.json"), "utf8"));
   const command = hooks.hooks.SessionStart.find((group) => group.matcher === "compact").hooks[0].command;
   const payload = JSON.parse(command.slice(command.indexOf("'") + 1, command.lastIndexOf("'")).replaceAll("'\\''", "'"));
   assert.equal(words().resume, payload.hookSpecificOutput.additionalContext, "the kit's resume line is the plugin's, word for word");
+});
+
+test("each session is told its own place, by the id it keeps through a compact", (t) => {
+  const sb = sandbox(t);
+  // Without a label every session saves to one shared slot, and a restore with none hands back a
+  // list of every saved place. The id is the same at the start and after the compact, so both
+  // name the same thread.
+  const id = "3f2b8c1e-9a4d-4b7e-8c21-5d6e7f8a9b0c";
+  for (const source of ["startup", "compact"]) {
+    holds(`a ${source} names the session's own thread`, run(sb, "start.mjs", recorded(sb, "SessionStart", id, { source })), () =>
+      said("SessionStart", `${source === "compact" ? words().resume : words().start}\n${place(id)}`),
+    );
+  }
+  // An id that could close the quoting, or open with the "@" the Brain reserves, is flattened.
+  holds("an id that could break the line", run(sb, "start.mjs", { ...recorded(sb, "SessionStart", "x", { source: "compact" }), session_id: '@a"b/c' }), () =>
+    said("SessionStart", `${words().resume}\n${place("_a_b_c")}`),
+  );
+  // No id, no place line: the session still gets the line it always had.
+  const { session_id: _gone, ...noId } = recorded(sb, "SessionStart", "x", { source: "compact" });
+  holds("no session id", run(sb, "start.mjs", noId), () => said("SessionStart", words().resume));
+  holds("an empty session id", run(sb, "start.mjs", { ...noId, session_id: "" }), () => said("SessionStart", words().resume));
+});
+
+test("the kit's place line is the plugin's, word for word", () => {
+  // Read from what the plugin's own script prints for the same id, so a reworded line on either
+  // side fails here rather than leaving a session told two different things.
+  const id = "3f2b8c1e-9a4d-4b7e-8c21-5d6e7f8a9b0c";
+  const printed = execFileSync("sh", [join(REPO, "plugins", "dazzer", "scripts", "own-place.sh")], {
+    input: JSON.stringify({ session_id: id, source: "compact" }),
+    encoding: "utf8",
+  });
+  assert.equal(place(id), JSON.parse(printed).hookSpecificOutput.additionalContext, "the kit's place line is the plugin's, word for word");
 });
 
 test("a file deleted outside the session folder is caught", (t) => {
