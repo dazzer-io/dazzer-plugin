@@ -284,6 +284,12 @@ case_run "envelope:with-next-message-reaches-codex-too" fire "$(payload e2 "$BIG
 EXPECT_ENVELOPE='Then answer what was asked' FORBID_ENVELOPE='Then stop.'
 case_run "envelope:with-next-message-hands-the-turn-back" fire "$(payload e3 "$BIG")" DAZZER_TOOL=claude-code
 
+# The checkpoint names this chat's own place, by the id the host gave it - the same label
+# the start of the chat and the reset are told. Without it every chat saves to one shared
+# slot, and a restore can bring back another chat's work.
+EXPECT_ENVELOPE='Checkpoint under thread \"e3a\"' FORBID_ENVELOPE=""
+case_run "envelope:with-next-message-names-the-chats-own-place" fire "$(payload e3a "$BIG")" DAZZER_TOOL=claude-code
+
 # The clause that keeps a checkpoint which saved nothing from announcing itself. Measured:
 # without these words the model reported the absence in every trial, with them in none. It
 # is pinned here because it reads like ordinary wording and is not.

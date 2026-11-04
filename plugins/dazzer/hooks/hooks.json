@@ -16,6 +16,10 @@
           {
             "type": "command",
             "command": "printf %s '{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":\"[Dazzer] Before answering anything your Brain may already know, recall it - answer from what is recorded, not from assumption. If you cannot reach the Brain, say so plainly - never present files, transcripts or guesses as what it holds. As real decisions accumulate in this session, checkpoint your progress so a context reset cannot lose your place.\"}}'"
+          },
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT:-$HOME/.gemini/config/plugins/dazzer}/scripts/own-place.sh\""
           }
         ]
       },

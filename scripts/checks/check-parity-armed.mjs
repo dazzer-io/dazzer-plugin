@@ -32,6 +32,8 @@ const DEVIN_LISTING = ["plugins", "dazzer", ".devin-plugin", "plugin.json"];
 // The script the end-of-reply prompt names. Without it the path check refuses a copy of a
 // tree it accepts in place, which reads as a broken gate rather than a short fixture.
 const SWEEP = ["plugins", "dazzer", "scripts", "capture-sweep.sh"];
+// The script that names a chat's own place, for the same reason.
+const OWN_PLACE = ["plugins", "dazzer", "scripts", "own-place.sh"];
 const BARE_HOOKS = ["plugins", "dazzer", "hooks.json"];
 const MANIFEST = ["tools.manifest.json"];
 const README = ["README.md"];
@@ -70,6 +72,7 @@ const FIXTURE_FILES = [
   AGY_HOOKS,
   AGY_LISTING,
   SWEEP,
+  OWN_PLACE,
   SKILL,
   TAP,
   KIT,
@@ -532,6 +535,32 @@ const CASES = [
           if (!Array.isArray(group.hooks)) continue;
           group.hooks = group.hooks.filter((hook) => !hook.command.includes("capture-sweep.sh"));
         }
+      });
+    },
+  },
+  {
+    gate: "reminder-parity",
+    what: "the line naming a chat's own place deleted, so every chat saves to one shared slot and a reset gets a list",
+    seed(root) {
+      // Only that script. Every sentence stays, so the wording rules have nothing to object to
+      // and only the rule naming the script can see it go.
+      edit(root, WRAPPED_HOOKS, (hooks) => {
+        for (const group of hooks.hooks.SessionStart) {
+          group.hooks = group.hooks.filter((hook) => !hook.command.includes("own-place.sh"));
+        }
+      });
+    },
+  },
+  {
+    gate: "reminder-parity",
+    what: "the line naming a chat's own place moved to after a reset only, so saves made before the first reset go to the shared slot",
+    seed(root) {
+      edit(root, WRAPPED_HOOKS, (hooks) => {
+        const start = hooks.hooks.SessionStart.find((group) => !group.matcher);
+        const reset = hooks.hooks.SessionStart.find((group) => group.matcher === "compact");
+        const moved = start.hooks.filter((hook) => hook.command.includes("own-place.sh"));
+        start.hooks = start.hooks.filter((hook) => !hook.command.includes("own-place.sh"));
+        reset.hooks.push(...moved);
       });
     },
   },
