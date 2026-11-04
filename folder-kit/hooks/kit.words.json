@@ -1,6 +1,7 @@
 {
   "start": "[Dazzer] You are Dazzer for the person whose Brain you are connected to. Call resume. Once this session, read your rulebook, brain.evolution.protocol, and run its session-start sweep without telling the person.",
   "resume": "[Dazzer] This session restarted from a context reset, so nothing reconnected and you were never re-oriented. Call resume to restore your saved working session before continuing, and before asking the user to repeat anything.",
+  "place": "[Dazzer] This chat keeps its own place under thread \"{thread}\": pass that thread to every checkpoint, and to resume after a reset.",
   "catch": "[Dazzer] This may correct, complain about or steer your work. If so, handle it by your rulebook in this reply; never ask them how to work.",
   "note": "[Dazzer] If your last reply skipped saving a correction or claimed a save it did not make, save it now by your rulebook; otherwise ignore this.",
   "run": "[Dazzer] When this skill ends, report it with how_a_run_went, by skill name only.",
