@@ -31,6 +31,22 @@ const SPOKEN_MARK = "[Dazzer]";
  * the only way to tell a working checkpoint from one somebody silenced without removing. */
 const RUNS_THE_SWEEP = "capture-sweep.sh";
 
+/** The script that tells a chat which saved place is its own. It says one line built from
+ * the chat's id, so it cannot be a fixed sentence - and like the sweep, a silenced or deleted
+ * copy says none of our sentences, so only naming it can tell that it has gone. */
+const NAMES_THE_PLACE = "own-place.sh";
+
+/** Every script a hook here may run instead of saying a sentence. */
+const OUR_SCRIPTS = [RUNS_THE_SWEEP, NAMES_THE_PLACE];
+
+/** Why each script is owed, said when one has gone. */
+const WHY_IT_IS_OWED = {
+  [RUNS_THE_SWEEP]: "That is what gets settled work saved",
+  [NAMES_THE_PLACE]:
+    "That is how a chat knows which saved place is its own - without it, a restore after a " +
+    "reset gets a list of every place, or one shared slot another chat may have overwritten",
+};
+
 /**
  * Does this command actually run the script, rather than merely mention it?
  *
@@ -318,6 +334,14 @@ const HOMES = [
             compact: { says: "resume", who: "Claude Code and Codex, after a reset" },
           },
           shape: claudeShaped("SessionStart"),
+          // And beside the check-first words, the line naming this chat's own place. In the
+          // group with no matcher, because that one fires at the start of a chat AND after a
+          // reset: moved under the reset's matcher, saves made before the first reset would go
+          // to the shared slot and the reset would look for them somewhere else.
+          who: "Claude Code and Codex",
+          runs: NAMES_THE_PLACE,
+          runsUnmatched: true,
+          runsWhere: "when a chat starts and after every reset",
         },
       ],
     ]),
@@ -550,9 +574,9 @@ function spokenByHooks(findings, declaredById) {
           // its own rule below checks it by name. Without this the moment cannot hold both,
           // which is what forced the checkpoint to live at the end of a reply in the first
           // place, where every person could see it.
-          const isTheSweep = runsAScript(hook.command) && hook.command.includes(RUNS_THE_SWEEP);
-          const said = saidBy(hook.command, trigger, where, findings, shape !== undefined && !isTheSweep);
-          if (isTheSweep) continue;
+          const isOurScript = runsAScript(hook.command) && OUR_SCRIPTS.some((name) => hook.command.includes(name));
+          const said = saidBy(hook.command, trigger, where, findings, shape !== undefined && !isOurScript);
+          if (isOurScript) continue;
 
           if (shape === undefined) {
             // No host here reads structure, so the words themselves are the reminder. A
@@ -596,11 +620,12 @@ function spokenByHooks(findings, declaredById) {
     // so one tool's reminder can be deleted outright and the run stays green as long as
     // another tool still says the same words. Not a hypothetical: a reminder was removed from
     // one of these files on the strength of a tool's documentation, and nothing objected.
-    for (const [trigger, { who, says, runs, runsWhere, bySource }] of home.moments) {
+    for (const [trigger, { who, says, runs, runsUnmatched, runsWhere, bySource }] of home.moments) {
       // The end-of-reply prompt runs a file rather than saying one of our sentences, so
       // "did anyone speak here" cannot see it go. Every wording rule was blind to it, and
       // it could be deleted from every file at once with nothing objecting.
       if (runs) {
+        const script = runs === true ? RUNS_THE_SWEEP : runs;
         // Named, not merely present. `: # disabled for now` is a command, and it would
         // satisfy a non-empty test while the end-of-reply prompt quietly stopped running -
         // a likelier edit than deleting the entry outright. Also guards the shape: a
@@ -610,17 +635,18 @@ function spokenByHooks(findings, declaredById) {
         const present =
           Array.isArray(groups) &&
           groups.some((group) =>
+            (!runsUnmatched || !(typeof group?.matcher === "string" && group.matcher.length > 0)) &&
             (Array.isArray(group?.hooks) ? group.hooks : [group]).some(
               (hook) => typeof hook?.command === "string" && runsAScript(hook.command) &&
-                hook.command.includes(RUNS_THE_SWEEP),
+                hook.command.includes(script),
             ),
           );
         if (!present) {
           findings.push({
             file: where,
             message:
-              `nothing runs ${RUNS_THE_SWEEP} ${runsWhere} for ${who}. That is what gets ` +
-              "settled work saved, and it says none of our sentences - so no rule about " +
+              `nothing runs ${script} ${runsWhere} for ${who}${runsUnmatched ? " (in the group with no matcher)" : ""}. ` +
+              `${WHY_IT_IS_OWED[script]}, and it says none of our sentences - so no rule about ` +
               "wording can notice it has gone, whether deleted or quietly replaced.",
           });
         }

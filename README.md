@@ -496,6 +496,11 @@ The one thing you will still see is the save itself, which is the part you shoul
 and the AI is never re-oriented. This is the one moment your Brain cannot reach on its own, so
 the plugin covers it.
 
+Each chat gets its own place back, not a list of every place you have saved and not the place
+another chat saved last. In Claude Code and Codex, the start of a chat, every reset and the
+prompt to save all name the same label, the id your tool already gives that chat, so the AI
+saves under it and restores from it.
+
 ## What it never does
 
 It never talks to Dazzer directly, never holds credentials, and never decides what is worth
