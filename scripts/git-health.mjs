@@ -127,7 +127,7 @@ const referenceCopy = () => {
   return dirname(common);
 };
 
-const worktreeHome = (main) => join(dirname(main), `${basename(main)}-worktrees`);
+const worktreeHome = (main) => join(main, ".claude", "worktrees");
 
 // The shared main line to measure work against — asked rather than assumed, so a repository
 // that calls it something else still works. Prefers the shared copy, because a local main
@@ -163,6 +163,9 @@ const isToolScratch = (copy, main, base) => {
   const inToolFolder =
     copy.path.includes("/.claude/worktrees/") || /^worktree-agent-/.test(copy.branch);
   if (!inToolFolder) return false;
+  // `new` puts every copy in the same folder, named after its branch: a copy made for a piece
+  // of work is that work from the moment it exists, even before anything is written in it.
+  if (copy.branch && basename(copy.path) === copy.branch.split("/").pop()) return false;
   // Unsaved files exist in exactly one place, so any of them makes a copy real work — and a
   // copy we could not read might hold some, which is not the same as holding none.
   if (copy.unsaved || copy.unreadable) return false;

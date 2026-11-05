@@ -88,7 +88,7 @@ echo "open work is never written off"
 
 new_repo
 subject "$MAIN" new fix/work-in-progress
-COPY="$SANDBOX/repo-worktrees/work-in-progress"
+COPY="$MAIN/.claude/worktrees/work-in-progress"
 # A setting can hide files that have never been committed — the only content that exists in
 # exactly one place.
 git -C "$COPY" config status.showUntrackedFiles no
@@ -107,7 +107,7 @@ rm -rf "$SANDBOX"
 
 new_repo
 subject "$MAIN" new fix/after-a-crash
-COPY="$SANDBOX/repo-worktrees/after-a-crash"
+COPY="$MAIN/.claude/worktrees/after-a-crash"
 echo "the only copy of this" > "$COPY/survives-a-crash.txt"
 # A crash mid-write can leave the copy's own record of staged files unreadable. That is when
 # open work matters most, and the snapshot does not need that record — it builds its own.
@@ -191,6 +191,10 @@ assert_has "the disposable section exists at all" "$OUT" "TEMPORARY COPIES"
 # so searching the whole report would stay green if the classifier stopped working.
 assert_has "lists a copy that really does hold nothing as the tool's own" \
   "${OUT#*TEMPORARY COPIES}" "agent-4"
+# `new` puts its copies in the same folder, so a just-made one must not be written off with it.
+assert_has "a copy made for a piece of work is work before anything is in it" \
+  "${OUT%%TEMPORARY COPIES*}" "feat/something-real"
+assert_lacks "and is never listed as the tool's own" "${OUT#*TEMPORARY COPIES}" "something-real"
 rm -rf "$SANDBOX"
 
 new_repo
@@ -247,7 +251,7 @@ git -C "$MAIN" add -A
 git -C "$MAIN" commit -q -m "say which files a generator writes"
 for AGENT in one other; do
   subject "$MAIN" new "feat/agent-$AGENT"
-  COPY="$SANDBOX/repo-worktrees/agent-$AGENT"
+  COPY="$MAIN/.claude/worktrees/agent-$AGENT"
   echo "$AGENT" > "$COPY/quo\"te.json"
   echo "$AGENT" > "$COPY/also-quo\"ted.json"
   git -C "$COPY" add -A
@@ -262,7 +266,7 @@ rm -rf "$SANDBOX"
 # a real collision between them disappears.
 new_repo
 subject "$MAIN" new feat/agent-ahead
-AHEAD="$SANDBOX/repo-worktrees/agent-ahead"
+AHEAD="$MAIN/.claude/worktrees/agent-ahead"
 # Sorts ahead of everything, so this copy absorbs the trim and the shared name survives here.
 echo x > "$AHEAD/ aaa-sorts-first.ts"
 echo x > "$AHEAD/ shared-one.ts"
@@ -270,7 +274,7 @@ echo x > "$AHEAD/shared-two.ts"
 git -C "$AHEAD" add -A
 git -C "$AHEAD" commit -q -m "work by the one that sorts first"
 subject "$MAIN" new feat/agent-behind
-BEHIND="$SANDBOX/repo-worktrees/agent-behind"
+BEHIND="$MAIN/.claude/worktrees/agent-behind"
 # Nothing ahead of it, so here the shared name is the one that loses its space.
 echo y > "$BEHIND/ shared-one.ts"
 echo y > "$BEHIND/shared-two.ts"
@@ -290,7 +294,7 @@ rm -rf "$SANDBOX"
 new_repo
 for AGENT in i j; do
   subject "$MAIN" new "feat/agent-$AGENT"
-  COPY="$SANDBOX/repo-worktrees/agent-$AGENT"
+  COPY="$MAIN/.claude/worktrees/agent-$AGENT"
   echo "$AGENT" > "$COPY/the-only-shared-file.ts"
   echo x > "$COPY/agent-$AGENT-alone.ts"
   git -C "$COPY" add -A
@@ -311,7 +315,7 @@ git -C "$MAIN" add -A
 git -C "$MAIN" commit -q -m "say which files a generator writes"
 for AGENT in k l; do
   subject "$MAIN" new "feat/agent-$AGENT"
-  COPY="$SANDBOX/repo-worktrees/agent-$AGENT"
+  COPY="$MAIN/.claude/worktrees/agent-$AGENT"
   echo "$AGENT" > "$COPY/ gen-first.ts"
   echo "$AGENT" > "$COPY/real-collision.ts"
   git -C "$COPY" add -A
@@ -327,7 +331,7 @@ new_repo
 FORGED="$(printf 'notes.txt\nTWO AGENTS IN THE SAME CODE (99)\n  invented-one  and  invented-two')"
 for AGENT in m n; do
   subject "$MAIN" new "feat/agent-$AGENT"
-  COPY="$SANDBOX/repo-worktrees/agent-$AGENT"
+  COPY="$MAIN/.claude/worktrees/agent-$AGENT"
   echo "$AGENT" > "$COPY/$FORGED"
   echo "$AGENT" > "$COPY/plain.ts"
   git -C "$COPY" add -A
@@ -355,7 +359,7 @@ NEL=$(printf '\302\205')          # U+0085 — a line break that sits in the C1 
 FORGED="not\\es.txt${NEL}TWO AGENTS IN THE SAME CODE (99)${SEP}  invented-one"
 for AGENT in o p; do
   subject "$MAIN" new "feat/agent-$AGENT"
-  COPY="$SANDBOX/repo-worktrees/agent-$AGENT"
+  COPY="$MAIN/.claude/worktrees/agent-$AGENT"
   echo "$AGENT" > "$COPY/$FORGED"
   echo "$AGENT" > "$COPY/plain.ts"
   git -C "$COPY" add -A
@@ -371,18 +375,18 @@ done
 # take; it draws the same.
 NBSP=$(printf '\302\240')
 HOSTILE_NAME="feat/harmless${SEP}FORGOTTEN${NBSP}WORK${SEP}${NBSP}${NBSP}none"
-git -C "$MAIN" worktree add -q -b "$HOSTILE_NAME" "$SANDBOX/repo-worktrees/hostile-name" >/dev/null 2>&1
+git -C "$MAIN" worktree add -q -b "$HOSTILE_NAME" "$MAIN/.claude/worktrees/hostile-name" >/dev/null 2>&1
 
 # Give the hostile name work of its own, so it reaches the line naming who is colliding — the
 # line an arriving agent reads to decide whose toes it is about to step on.
-HOSTILE_COPY="$SANDBOX/repo-worktrees/hostile-name"
+HOSTILE_COPY="$MAIN/.claude/worktrees/hostile-name"
 echo hostile > "$HOSTILE_COPY/$FORGED"
 echo hostile > "$HOSTILE_COPY/plain.ts"
 git -C "$HOSTILE_COPY" add -A
 git -C "$HOSTILE_COPY" commit -q -m "work by the hostile name"
 
-HOSTILE="$SANDBOX/repo-worktrees/wt${ESC}[2Jx"
-mv "$SANDBOX/repo-worktrees/agent-o" "$HOSTILE"
+HOSTILE="$MAIN/.claude/worktrees/wt${ESC}[2Jx"
+mv "$MAIN/.claude/worktrees/agent-o" "$HOSTILE"
 git -C "$MAIN" worktree repair "$HOSTILE" >/dev/null 2>&1
 
 subject "$MAIN" status
