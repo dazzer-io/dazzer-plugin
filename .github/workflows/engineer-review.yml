@@ -6,7 +6,8 @@
 # and refuses a commit that is not on the shared workflow repository's main branch.
 # The calling job holds uses and permissions alone, the shape the organisation's machine rule
 # admits in a call (machine-rule/README.md, "Calls"): its own permissions are what it hands the
-# called workflow, and the top grants reading the code alone. It needs no if: of its own: the
+# called workflow (contents: read, which a private repository's activity needs, statuses: write
+# and pull-requests: read), and the top grants reading the code alone. It needs no if: of its own: the
 # called workflow's job skips a comment on an issue that is not a pull request, reading this
 # run's event. A repository machine-rule/strict.json names (dazzer-app) takes no call asking a
 # grant but codeql.yml's job codeql, so the rule refuses this caller there (decision 184).
@@ -25,7 +26,8 @@ permissions:
 
 jobs:
   engineer-review:
-    uses: dazzer-io/.github/.github/workflows/engineer-review.yml@f613857b686ea2c2d24f8c73bf646ac6e56a7edd # dazzer-io/.github main, 15 Nov 2026
+    uses: dazzer-io/.github/.github/workflows/engineer-review.yml@d55b0f394ef10806897274710cdb7ffa3017161e # dazzer-io/.github main, 15 Nov 2026
     permissions:
+      contents: read
       statuses: write
       pull-requests: read
