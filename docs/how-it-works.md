@@ -25,7 +25,7 @@ holds: your AI reads from your Brain and saves to it there.
 | Piece | What it is | Who needs it |
 | --- | --- | --- |
 | `dazzer` | The reminders, the prompt to save and a skill. Carries no connection. | Everyone |
-| `dazzer-connect` | The connection to your Brain, at `https://graph.dazzer.io/mcp`, and nothing else. | Everyone, unless your AI already reaches your Brain another way |
+| `dazzer-connect` | The connection to your Brain, at `https://graph.dazzer.io/mcp`, and nothing else. | Everyone: the reminders need it to reach your Brain |
 | `dazzer-antigravity` | The same reminders in Antigravity's format. | Antigravity only |
 | `dazzer-plate` | The plate pane. Reads through the connection you already have. | Claude Code only, optional |
 

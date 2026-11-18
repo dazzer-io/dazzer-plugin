@@ -99,7 +99,7 @@ codex plugin add dazzer-connect@dazzer
 ```
 
 Codex asks you to approve a plugin's reminders before it runs them. Approve them, or nothing runs;
-if [the run log](#check-it-worked) stays empty, check this first.
+if [the checks](#check-it-worked) show no note reached your AI, check this first.
 
 **Sign in.** Nothing asks on its own. Sign in straight away:
 
@@ -232,16 +232,15 @@ about how long the chat has grown, so the plugin cannot tell when to prompt.
    tool, which version, and what it decided and why, never what was said. The check-before-answering
    note writes nothing.
 
-   In Claude Code the log is `~/.claude/plugins/data/dazzer-dazzer/capture/receipts.jsonl`, the
-   folder Claude Code gives the plugin. In tools that give the plugin no folder of its own, it is
-   `~/.dazzer/capture/receipts.jsonl`, which this command reads from a terminal:
+   In Claude Code, read the last lines of the log in a terminal. This is the folder Claude Code
+   gives the plugin:
 
    ```sh
-   cat "${CLAUDE_PLUGIN_DATA:-$HOME/.dazzer}/capture/receipts.jsonl" | tail
+   tail ~/.claude/plugins/data/dazzer-dazzer/capture/receipts.jsonl
    ```
 
-   Which folder each tool other than Claude Code uses is not yet confirmed. A log with lines means
-   the prompt to save ran; a missing log in the right folder means it never has.
+   Lines there mean the prompt to save ran; no file means it never has. Which folder other tools
+   use for the log is not yet confirmed.
 
 ## Remove
 

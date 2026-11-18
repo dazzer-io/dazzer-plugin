@@ -22,10 +22,12 @@ flowchart LR
 
 ## What you install
 
-- **`dazzer-connect`, the connection.** Signs your tool in to your Dazzer Brain, so your AI can read
-  from it and save to it. Without a connection nothing reaches your Brain.
-- **`dazzer`, the reminders.** Short notes added to what your AI reads at set points in a chat,
-  telling it when to check your Brain and when to save. They carry no connection of their own.
+- **`dazzer`, the reminders.** Short notes added to what your AI reads at set points in a chat, so
+  it checks your Dazzer Brain before it answers and saves decisions and facts to it as they come up.
+  They add no connection of their own, so they are safe beside one you already have.
+- **`dazzer-connect`, the connection**, which the reminders need to reach your Brain. It signs your
+  tool in to your Brain, so your AI can read from it and save to it. Install it alongside them;
+  signing in is a separate step, described in the [install guide](docs/install.md).
 - **`dazzer-plate`, the plate pane.** Optional, Claude Code only: a pane listing your open items
   from your Brain.
 
