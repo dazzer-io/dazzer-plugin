@@ -81,10 +81,13 @@ jobs:
       # Audits the workflows and dependabot.yml for the known ways a workflow is turned against
       # its repository: dangerous triggers, token grants, credentials left behind, injected
       # expressions. .github/zizmor.yml makes it refuse any action not pinned to a full commit.
-      # zizmor's own version is the one this action's commit pins by hash.
+      # zizmor itself is held at 1.32.0, the version this audit was proven with: the action
+      # installs that version from a wheel whose hash its pinned commit holds, and a newer
+      # zizmor changes nothing here until the version line below does.
       - name: Workflow audit
         if: ${{ !cancelled() }}
         uses: zizmorcore/zizmor-action@45d7276c9ca790aabd705e31ca99c6185c3e76dd # v0.8.1
         with:
+          version: 1.32.0
           advanced-security: false
           annotations: true
