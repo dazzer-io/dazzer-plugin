@@ -328,15 +328,19 @@ const valuesIn = (node, key) =>
   node === null || typeof node !== "object" ? [] : [...(typeof node[key] === "string" ? [node[key]] : []), ...Object.values(node).flatMap((child) => valuesIn(child, key))];
 const stringsIn = (node) => (typeof node === "string" ? [node] : node !== null && typeof node === "object" ? Object.values(node).flatMap(stringsIn) : []);
 
-/** The top-level keys each host accepts: Codex drops a whole file over one more, Cursor one with no "version". */
+/**
+ * The top-level keys each host accepts, and the moments each file is for one level down: Codex drops
+ * a whole file over one key more, Cursor one with no "version", and Claude Code one moment it does
+ * not know, which is how it once loaded none of this.
+ */
 const HOST_KEYS = {
-  "plugins/dazzer/hooks/hooks.json": { may: ["hooks"], must: ["hooks"] },
-  "plugins/dazzer/hooks/cursor.json": { may: ["version", "hooks"], must: ["version", "hooks"] },
+  "plugins/dazzer/hooks/hooks.json": { may: ["hooks"], must: ["hooks"], under: "hooks", moments: ["UserPromptSubmit", "SessionStart"] },
+  "plugins/dazzer/hooks/cursor.json": { may: ["version", "hooks"], must: ["version", "hooks"], under: "hooks", moments: ["stop", "sessionStart"] },
   "plugins/dazzer/hooks.json": { may: ["UserPromptSubmit", "SessionStart"], must: [] },
-  "plugins/dazzer-antigravity/hooks.json": { may: ["dazzer"], must: ["dazzer"] },
+  "plugins/dazzer-antigravity/hooks.json": { may: ["dazzer"], must: ["dazzer"], under: "dazzer", moments: ["PreInvocation", "Stop"] },
   "plugins/dazzer-plate/hooks/hooks.json": { may: ["modules"], must: ["modules"] },
 };
-for (const [path, { may, must }] of Object.entries(HOST_KEYS)) {
+for (const [path, { may, must, under, moments = [] }] of Object.entries(HOST_KEYS)) {
   const text = textOf(path);
   if (text === undefined) {
     problems.push(`${path} is missing, and its host reads no other file`);
@@ -345,6 +349,9 @@ for (const [path, { may, must }] of Object.entries(HOST_KEYS)) {
   const doc = parse(path, text);
   for (const key of Object.keys(doc)) if (!may.includes(key)) problems.push(`${path} holds "${key}", which its host does not accept, so it drops the whole file`);
   for (const key of must) if (!(key in doc)) problems.push(`${path} has no "${key}", which its host needs`);
+  for (const moment of under ? Object.keys(doc[under] ?? {}) : []) {
+    if (!moments.includes(moment)) problems.push(`${path} answers "${moment}", a moment this file is not for, and its host drops the whole file over one it does not know`);
+  }
   for (const command of valuesIn(doc, "command")) {
     if (command.includes("/scripts/") || command.includes("[Dazzer] ")) continue;
     const said = Object.keys(words).find((key) => typeof words[key] === "string" && command.includes(words[key]));
