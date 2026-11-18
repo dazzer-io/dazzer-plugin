@@ -1,0 +1,7 @@
+# Every action, GitHub's own included, is pinned to a full commit. Said here rather than left to
+# zizmor's default, which has changed before (until v1.20 it let actions/* and github/* use a tag).
+rules:
+  unpinned-uses:
+    config:
+      policies:
+        "*": hash-pin

@@ -3,7 +3,8 @@
 #
 # The checks are plain Node scripts and shell suites. The one dependency is the Claude Code
 # that runs the plate pane's tests, pinned with its hash in package-lock.json and installed
-# with its install scripts off.
+# with its install scripts off. Everything runs in the one job named Gates, because that is
+# the only check the main branch's rules require.
 
 name: Gates
 
@@ -72,20 +73,13 @@ jobs:
         if: ${{ !cancelled() }}
         run: shellcheck -s sh plugins/dazzer/scripts/*.sh tests/*.sh
 
-  # Audits every workflow. Its default policy refuses any action not pinned by its full commit.
-  zizmor:
-    name: Workflow audit
-    # GitHub's machine: a public repository's jobs never run on our own machines.
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - uses: zizmorcore/zizmor-action@45d7276c9ca790aabd705e31ca99c6185c3e76dd # v0.8.1
+      # Audits the workflows and dependabot.yml for the known ways a workflow is turned against
+      # its repository: dangerous triggers, token grants, credentials left behind, injected
+      # expressions. .github/zizmor.yml makes it refuse any action not pinned to a full commit.
+      # zizmor's own version is the one this action's commit pins by hash.
+      - name: Workflow audit
+        if: ${{ !cancelled() }}
+        uses: zizmorcore/zizmor-action@45d7276c9ca790aabd705e31ca99c6185c3e76dd # v0.8.1
         with:
           advanced-security: false
           annotations: true
