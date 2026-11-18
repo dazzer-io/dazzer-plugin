@@ -27,7 +27,7 @@
  */
 
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(process.env.DAZZER_REPO_ROOT ?? join(dirname(fileURLToPath(import.meta.url)), ".."));
@@ -278,6 +278,28 @@ for (const entry of readdirSync(join(ROOT, "plugins"), { withFileTypes: true }))
 }
 for (const name of listed) {
   if (!existsSync(join(ROOT, "plugins", name))) problems.push(`source/manifest.json lists ${name}, and plugins/${name} does not exist`);
+}
+
+/**
+ * The files under plugins/ written by hand. Every other file there must be one this generator
+ * writes, so a hook, manifest, connection or instruction file added by hand cannot ship words
+ * nothing keeps current.
+ */
+const HAND_WRITTEN = new Set([
+  "plugins/dazzer/scripts/capture-sweep.sh",
+  "plugins/dazzer/scripts/own-place.sh",
+  "plugins/dazzer/config/capture.defaults",
+  "plugins/dazzer/skills/dazzer/SKILL.md",
+  "plugins/dazzer-plate/hooks/hooks.json",
+  "plugins/dazzer-plate/hooks/plate.tsx",
+  "plugins/dazzer-plate/types/index.d.ts",
+]);
+for (const entry of readdirSync(join(ROOT, "plugins"), { recursive: true, withFileTypes: true })) {
+  if (entry.isDirectory() || entry.name === ".DS_Store") continue;
+  const path = relative(ROOT, join(entry.parentPath, entry.name)).split(sep).join("/");
+  if (!files.has(path) && !HAND_WRITTEN.has(path)) {
+    problems.push(`${path} is not written by the generator nor on its hand-written list in scripts/generate.mjs, so nothing keeps it right`);
+  }
 }
 
 for (const [path, text] of files) {
