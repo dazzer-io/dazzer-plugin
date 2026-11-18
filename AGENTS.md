@@ -1,142 +1,65 @@
----
-type: kernel
-tier: 0
-audience: both
-tags: [conventions, plugin, constraints]
----
+# AGENTS.md
 
-<!-- @purpose: Canonical orientation for any agent editing this repository; carries the two constraints that exist because something broke in the field, each naming the check that enforces it. -->
+The Dazzer plugin: reminders that make an AI check a person's Dazzer Brain before answering, save
+what settles, and pick up after a reset, packaged for six AI tools. How it behaves is in
+[docs/how-it-works.md](docs/how-it-works.md); why it is shaped this way is in
+[docs/decisions/](docs/decisions/). Read the decisions before changing how reminders reach a tool.
 
-# Dazzer plugin
+This repository is public. Every file, commit message and branch name is public.
 
-## Purpose
+## Test
 
-What people install so their AI actually uses their Dazzer memory. It adds three nudges:
-check the memory before answering, save what settled once enough has accumulated, and get
-re-oriented after a context reset.
+```sh
+node scripts/baseline.mjs
+SHELL_UNDER_TEST=bash node scripts/baseline.mjs
+```
 
-**The behaviour plugin never talks to Dazzer.** It has no credentials and no reliable moment
-at which a connection is up. All it does is tap the model at the right instant; the model then
-acts through the connection it already owns and reads the current rules from the Brain at the
-moment it acts. That is why the shipped script is near-static: **change the rules in the
-Brain, not here.**
+- Run both. The shipped scripts are POSIX shell and run under whatever the person's system shell
+  is: bash in POSIX mode on a Mac, dash on Linux. They disagree on comparisons a past defect lived
+  on. CI runs both lines and `shellcheck -s sh` on the shipped scripts.
+- Never name a shell inside the suite. It takes its interpreter from `SHELL_UNDER_TEST`.
+- The known-defects ledger is shrink-only in both directions: an unlisted failure fails the run,
+  and a listed entry that starts passing also fails it. When you fix one, delete its line.
+- Checks are plain Node with no dependencies, and there is no package manifest. Keep it that way. A
+  check that validates structured data parses it; it never pattern-matches it.
 
-**The plate pane is the one piece that reads from Dazzer**, and it is its own plugin
-(`plugins/dazzer-plate`, Claude Code only, optional). Only once the person asks (`/plate`, or the
-pane's Refresh), it calls the board's `recall` for the plate view through the connection the
-person's Claude Code already has (`$.mcp.call`, the engine's own connection and credentials). It
-also re-reads after the AI's own track, except in a session where its own read was refused. It
-holds no credentials and no connection of its own, finds the board among the tools already
-connected rather than by a name written into it (only a server offering both `recall` and `track`
-is ever asked), and never writes: a card's Done ("Mark item <n> done.") and Talk about it ("Tell
-me about item <n>.") are sentences carrying the item's number alone, to the person's AI, which does
-the writing. Opening a later group reads that group (`recall` with `part`) from the board the plate
-came from: the board lists the 30 largest groups and counts the rest (`later_groups_more`). Tags
-come from each row's own fields, never from `plain`; an answer without `part`, `moved`, `about` or
-`later_groups` still draws, with later as a count. Talk about it sends once per item until the next
-plate arrives, as Done sends once until the item leaves it. It keeps the last plate, and each later
-group it read (until Refresh, or until a plate arrives with that group's count changed), in the
-session's own state and nowhere else: nothing on disk, nothing shared between sessions.
+## Release
 
-In auto mode, `/plate`, Refresh and opening a later group put one question and the AI's answer in
-the chat: each tries the direct read first and, when the auto mode classifier refuses it, sends the
-person's AI, as the person's own words, "What is on my plate? My time zone is <zone>." for the plate
-or "Show my later items in plate group <part>." for a group (its number alone: a group's name is
-someone else's words, as a title is), then draws what the AI's own
-`recall` returns through `tool.call`; a group's read never replaces the plate. One question at a
-time, across the plate and its groups; it ends with its own turn, or the first turn to end after it
-was taken. A question put while another main-loop turn runs is queued behind that turn: that turn's
-end leaves it out. The turn opening with the question's own words is its turn, even after another
-turn held it; a later turn opening with other words (the question reworded, or a message or task
-notification queued ahead of it) holds it only tentatively, and the question ends after such a turn
-only once no turn has started for 10 seconds. A question that never runs (its queued turn cancelled)
-is lost once the session has been idle for 10 seconds since the turn it waited behind ended, and
-the person's next press may ask again.
-Done is marked by the AI, and the pane updates on the next plate it sees. Nothing else
-ever posts in the person's name: not the AI's track or reads, a subagent's, a timer, or the
-session's start.
+- People install from `main`. An installed copy changes only when the version changes, so any
+  change meant to reach people bumps the version, in every place it is declared. The version check
+  names any place left behind.
+- Merging to `main` tags `v<version>` automatically. Nothing else publishes.
+- Without a version bump, a fix reaches nobody who already installed it.
 
-## Layout
+## Never edit by hand
 
-| Path | What it is |
-| --- | --- |
-| `plugins/dazzer/` | The behaviour: triggers, the checkpoint script, the skill. **Carries no connection.** |
-| `plugins/dazzer-connect/` | The connection, and nothing else, for people who have not already got one. |
-| `plugins/dazzer-plate/` | The plate pane: a Claude Code mod (`hooks/plate.tsx`) that draws the person's plate when they ask. Reads through the connection the person already has; **carries none.** Its `hooks/hooks.json` holds only `modules`, which is why it is a plugin of its own: Codex refuses the shared file over that key. |
-| `folder-kit/` | The five triggers every person's Dazzer folder carries, copied by the creator into the folder's `.claude/hooks/` with `settings.hooks.json` merged into its settings; `kit.json` pins each copied file's git blob sha. **Never a plugin**, which is why it sits outside `plugins/`. Proven by `node --test folder-kit/hooks/kit.test.mjs`. |
-| `scripts/kept-states.mjs` | Writes the pages a plugin test prints, since `claude plugin test` gives a test no file system; the words check reads them. |
-| `.claude-plugin/marketplace.json` | The list people install from. |
-| `README.md` | How to install it, written for a person. **The authority for the install steps.** |
-| `tools.manifest.json` | The same install steps in a shape a screen can render. **Mirrors the README; never leads it.** |
-| `scripts/baseline.mjs` | Runs every check. One command: `node scripts/baseline.mjs`. |
+- **Generated files.** A file a generator writes is never edited directly: change its source, run
+  the generator, and commit both. If a file says it is generated, treat it as generated.
+- **Install steps live in two places**: `docs/install.md` for people and `tools.manifest.json` for
+  screens. Change both together, or change their shared source if they are generated.
+- **Reminder sentences.** Onboarding confirms an install by finding a reminder sentence in what the
+  AI could see. Reword one only together with every place that declares it.
 
-**Everything shipped here is a TRIGGER, never a rule.** A file in `plugins/` may say WHEN to reach for the memory and WHERE the rules are served, and nothing about what they say. A rule written here survives a deploy — correcting it means editing the file, publishing a version, and waiting for every person to update — which is the second copy this repository's own Boundaries already warn about. Gate `rules-not-restated` refuses the shape of teaching: a list defining a verb, a numbered habit list, a boundaries section, or a prompt long enough to be a rule rather than a moment. It sees structure, not prose, so a rule written as one flowing paragraph with no heading walks past it — the shipped files are small enough to read whole in review, and the gate is what stops the shape growing back while nobody is looking.
-| `scripts/checks/` | The checks themselves. Plain Node, no dependencies. |
-| `scripts/known-defects.txt` | Things broken right now, each with a test proving it. Shrink-only. |
+## Rules that exist because something broke
 
-## Key patterns
+1. **`plugins/dazzer` never contains a connection**, at any depth, in any file, not even for
+   telemetry. A bundled connection replaced people's signed-in connections with unsigned ones.
+2. **A shipped connection points at an address Dazzer owns** (`graph.dazzer.io`), never a hostname
+   a hosting provider generated, so moving providers never breaks installed copies.
+3. **Shipped files are triggers, never rules.** A file in `plugins/` may say when to reach for the
+   Brain and where the rules are served, never what they say. Rules live in the Brain; a copy here
+   would survive a deploy and drift.
+4. **The save-prompt script fails open.** Doing nothing is the default branch; only a comparison
+   that succeeded turns it on. Never restructure it so that staying quiet is the branch someone has
+   to remember to take.
+5. **Everything a tool hands a script is untrusted input.** Read named fields, check their shape,
+   and confine anything that becomes a file name to the folder the plugin owns.
+6. **Test data and examples are invented.** Never put a real person's name, work, or ids in a
+   fixture, a doc or a commit message.
 
-- **Checks are Node, never shell.** A check that validates a structured message must parse
-  it. Writing checks in the same language as the thing they guard is how the first defect
-  happened - a shell pattern mistaken for a parse.
-- **No package manifest, no dependencies.** Nothing here is built or published to a package
-  registry; it is installed by copying files. Keep it that way.
-- **Every tunable value is named and lives outside the code.** A number written into the
-  script is a number nobody can find or change.
-- **Changing an install step means changing it twice.** The README is what a person reads;
-  `tools.manifest.json` is what a screen renders. Edit one without the other and
-  `install-parity` refuses the run, naming both files. Adding a tool means a README block
-  and a manifest entry, together.
-- **The reminders' wording is not cosmetic.** Onboarding proves the reminders are installed
-  by looking for one of those sentences in what the AI could see — nothing else puts them
-  there. Reword one without updating `spokenSentences` and `reminder-parity` refuses. The
-  direction that matters is the quiet one: words declared that nothing says would report
-  every correctly installed person as not set up.
+## Docs
 
-## Where work happens
-The main checkout is kept **read-only**, and open work is snapshotted, by shared hooks set up on the Mac in `~/.claude/hooks`. All work happens in a linked worktree under `.claude/worktrees/<what-it-does>` (inside the project, hidden), created by `node scripts/git-health.mjs new <kind>/<what-it-does>` so its folder name matches its branch. `status` reports every worktree, what is unsaved, what is unpushed, what has gone cold, and where two branches touch the same files; `sweep --apply` retires branches untouched for 14 days to `archive/<name>` (`scripts/git-health.mjs`). Some tools place their own worktrees inside this checkout — those are judged by what they hold, never by where they sit. Proven by gate `git-health`.
-
-## Testing
-
-`node scripts/baseline.mjs` runs everything. It stays green while listed defects fail, and
-prints what is still outstanding by name.
-
-The ledger is shrink-only **in both directions**: an unlisted failure fails the run, and a
-listed entry that starts passing *also* fails it. That second rule is deliberate — it makes
-a fix prove itself to the runner instead of being announced in a commit message. When you
-fix something, delete its line.
-
-The suite takes its interpreter from `SHELL_UNDER_TEST`. Never name a shell inside the
-suite: the system shell is bash-in-posix-mode on a Mac and dash on a Linux runner, and they
-disagree on exactly the comparison one defect lives on.
-
-## Critical rules
-
-Violating either of these means the work is not done. Both exist because something already
-broke for real people, and both are machine-enforced, so arguing around them fails the run.
-
-1. **`plugins/dazzer` MUST NOT contain a connection of any kind**, at any depth, in any
-   file — not even "just for telemetry". A bundled connection carries its own sign-in, so
-   installing the behaviour replaced a working, signed-in connection with an
-   unauthenticated one and people's memory went dark until they noticed. Someone who
-   already connected must never have to sign in again just to get a few reminders.
-   *Enforced by `connection-isolation`. Origin: commit `3c6fe7a`.*
-
-2. **A shipped connection MUST point at an address we own.** The first release shipped the
-   hostname the hosting platform generated. Every install would have baked in one provider,
-   one project and one region, and any move would have broken every copy in the field with
-   no way to reach them.
-   *Enforced by `connection-address`. Origin: commit `a33a129`.*
-
-## Boundaries
-
-- The rules the model follows live in the Brain and are served live. This repository holds
-  triggers, not teaching. If you find yourself writing the rulebook in here, stop — a
-  second copy will silently diverge from the real one.
-- The checkpoint script is the only thing with real reach: it runs on every reply on
-  someone else's machine and can hold their session open. It fails open **by
-  construction** — the decision defaults to staying quiet, and only a comparison that
-  actually succeeded can turn it on. Never restructure it so that "do nothing" is the
-  branch you have to remember to take.
-- Anything the incoming message says is untrusted input. Read named fields, check their
-  shape, and confine anything that becomes a filename to the folder this plugin owns.
+- `README.md` is the landing page: outcome, supported tools, what it does and never does. No
+  history and no mechanism there.
+- A new design decision gets its own record in `docs/decisions/`, in MADR format, numbered after the
+  last one.
