@@ -34,15 +34,17 @@ jobs:
 
       # Every version is written from source/manifest.json, and the gates refuse a generated
       # file that differs from it, so this one file is the version that shipped.
+      # Exactly three whole numbers: the generator refuses any other shape, and so does this.
       - name: Read the shipped version
         id: version
+        shell: bash
         run: |
           set -eu
           v=$(jq -r .version source/manifest.json)
-          case "$v" in
-            [0-9]*.[0-9]*.[0-9]*) ;;
-            *) echo "source/manifest.json holds no version: $v" >&2; exit 1 ;;
-          esac
+          if [[ ! "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "source/manifest.json holds no version of the shape 1.2.3: $v" >&2
+            exit 1
+          fi
           echo "value=$v" >> "$GITHUB_OUTPUT"
           echo "shipped version is $v"
 
