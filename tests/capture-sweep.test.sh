@@ -147,7 +147,6 @@ case_run() {
   else
     FAIL=$((FAIL + 1))
     printf 'FAIL %s -%s\n' "$id" "$problems"
-    printf 'FAILID capture-sweep::%s\n' "$id"
   fi
 }
 
