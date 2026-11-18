@@ -192,10 +192,10 @@ case_run "reentry-blocked" silent \
 # lands on one side of the flag, so a single ordering can pass while the defect is fully
 # present - and nothing promises which order the fields arrive in.
 case_run "reentry-word-before-flag" fire \
-  "$(printf '{"session_id":"r2","transcript_path":"%s","cwd":"/Users/x/truelayer","stop_hook_active":false}' "$BIG")" DAZZER_TOOL="$UNMOVED"
+  "$(printf '{"session_id":"r2","transcript_path":"%s","cwd":"/Users/x/northwind-true-north","stop_hook_active":false}' "$BIG")" DAZZER_TOOL="$UNMOVED"
 
 case_run "reentry-word-after-flag" fire \
-  "$(printf '{"session_id":"r3","transcript_path":"%s","stop_hook_active":false,"cwd":"/Users/x/truelayer"}' "$BIG")" DAZZER_TOOL="$UNMOVED"
+  "$(printf '{"session_id":"r3","transcript_path":"%s","stop_hook_active":false,"cwd":"/Users/x/northwind-true-north"}' "$BIG")" DAZZER_TOOL="$UNMOVED"
 
 case_run "reentry-word-in-prompt-after-flag" fire \
   "$(printf '{"session_id":"r4","transcript_path":"%s","stop_hook_active":false,"prompt":"is that true?"}' "$BIG")" DAZZER_TOOL="$UNMOVED"
