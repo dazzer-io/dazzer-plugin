@@ -6,7 +6,7 @@
 // and it draws nothing. It only notes which main-loop turn is running, so that a question it puts
 // later is never ended by the turn it was queued behind.
 //
-// WHAT IT DRAWS (the design approved on 8 Oct, parts/where-it-shows.md section 8). The day and one
+// WHAT IT DRAWS (the design approved on 8 Oct). The day and one
 // line of counts; four tabs, one per group, the chosen one the primary button; a bordered card per
 // row, lit on hover, with a coloured tag read from the row's own fields (never from the plain
 // words), its title, and one dim line of what it is part of, who it is from and when it last
@@ -130,7 +130,7 @@ const ACTIVE = ['now', 'waiting', 'coming'] as const
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-/** The line that says how to connect, as the README's connection step says it. */
+/** The line that says how to connect, as the connection step in docs/install.md says it. */
 const CONNECT =
   'To connect it, type /plugin install dazzer-connect@dazzer in Claude Code in a terminal, then restart and sign in. Already connected? Try Refresh.'
 

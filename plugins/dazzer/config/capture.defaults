@@ -3,8 +3,8 @@
 # This file is READ, never run. It is data, so nothing here can execute on your machine.
 # Setting any of these in your environment overrides the value here.
 #
-# Every name below is also in the README's tuning table, and a check keeps the two lists
-# identical - a setting that gets added without being documented fails the build.
+# Every name below is also in the settings table in docs/how-it-works.md, and a check keeps
+# the two lists identical - a setting that gets added without being documented fails the build.
 
 # How much new conversation has to accumulate before a save is prompted, counted in
 # entries. Raise it for fewer checkpoints, lower it to capture more eagerly.

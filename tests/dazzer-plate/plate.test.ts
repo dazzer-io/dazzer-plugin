@@ -5,22 +5,25 @@
 // plugin reaches Dazzer only through `$.tool.list` and `$.mcp.call`, so answering those two here is
 // answering for the board.
 //
-// KEPT STATES. `claude plugin test` gives a test no file system, so each state the person can see
-// is printed as one line, "kept-state <state>-<surface> <page>", and the proof's
-// scripts/kept-states.mjs writes the pages that the words check reads. A page is the drawn tree as
-// marked markup: a Box keyed "status..." is a status line (data-status), and one keyed
-// "datum:<field>:..." holds a datum from that reply field (data-source).
+// RUN FROM A COPY. `claude plugin test` runs the tests inside a mod's folder, and nothing that
+// installs may carry a test, so scripts/baseline.mjs copies plugins/dazzer-plate into a temporary
+// folder, puts this file in its tests/ folder and runs it there.
 //
-// THE DESIGN (approved 8 Oct, parts/where-it-shows.md section 8): the day and one line of counts,
-// four tabs, a bordered card per row with a coloured tag read from the row's own fields, a card
-// that opens in place with what it is, Done and Talk about it, and later as groups that open
-// through the same reading rules as the plate itself.
+// KEPT STATES. `claude plugin test` gives a test no file system, so each state the person can see
+// is printed as one line, "kept-state <state>-<surface> <page>", for anything outside the test that
+// wants to read the page. A page is the drawn tree as marked markup: a Box keyed "status..." is a
+// status line (data-status), and one keyed "datum:<field>:..." holds a datum from that reply field
+// (data-source).
+//
+// THE DESIGN: the day and one line of counts, four tabs, a bordered card per row with a coloured
+// tag read from the row's own fields, a card that opens in place with what it is, Done and Talk
+// about it, and later as groups that open through the same reading rules as the plate itself.
 
 import { expect, mock, test } from 'claude-code/testing'
 import type { Engine, MockClock } from 'claude-code/testing'
 import type { On, PluginOptions, ToolInfo } from 'claude-code'
 
-import type { PlateLaterGroup, PlateLaterRow, PlateReply, PlateRow } from '../types'
+import type { PlateLaterGroup, PlateLaterRow, PlateReply, PlateRow } from '../../plugins/dazzer-plate/types'
 
 // The test's environment has a console and timers (no DOM, so its lib declares neither): the
 // console is how a kept state leaves the test, and a timer lets a held read be looked at mid-way.
@@ -161,7 +164,7 @@ const EMPTY: PlateReply = {
 }
 
 // ---------------------------------------------------------------------------------------------
-// The plate answer plate-context carries (parts/plate-context.md): each row with what it is part
+// The fuller plate answer, from a board that sends plate context: each row with what it is part
 // of, the day it last moved and what it is, and later as groups. Made up for these tests.
 
 const OFFICE = { id: 7001, name: 'Office move' }
@@ -311,8 +314,8 @@ type Call = { server: string; tool: string; args: Record<string, unknown> }
 type Submit = 'enter' | 'drop' | 'fail'
 
 /**
- * How the engine refused the pane's own read in the operator's Desktop session, in auto
- * permission mode (the live try): the words `$.mcp.call` threw.
+ * How the engine refused the pane's own read in the desktop app, in auto permission mode, as
+ * seen in a live try: the words `$.mcp.call` threw.
  */
 const REFUSED =
   "The server-side auto mode classifier gave no verdict for mcp__dazzer__recall: the request that produced this action did not ask for one. Issue the action again once, as-is; if it is denied again, continue with other tasks that don't require it."
@@ -523,7 +526,7 @@ function markup(node: unknown): string {
   return `<span>${inner}</span>`
 }
 
-/** Prints one kept state as the one line scripts/kept-states.mjs turns into a page. */
+/** Prints one kept state as one line: its name and its page. */
 async function keep(state: string, ui: { surface: string; drawn: () => Promise<unknown> }) {
   const page = `<!doctype html><html lang="en"><meta charset="utf-8"><body>${markup(await ui.drawn())}</body></html>`
   console.log(`kept-state ${state}-${ui.surface} ${encodeURIComponent(page)}`)

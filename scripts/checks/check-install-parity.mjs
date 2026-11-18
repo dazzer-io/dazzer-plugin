@@ -1,43 +1,35 @@
 #!/usr/bin/env node
 /**
- * @purpose Keeps the commands we print for a human and the commands a screen hands them
- * as one set. The README's Install section was the only authority until a screen needed to
- * render the same steps; the moment it did, the same instructions existed in two places
- * with nothing comparing them.
- *
- * The docs gate already covers the tuning table and the uninstall lines. It does not read
- * the install blocks at all, so a command corrected in one place and not the other passes
- * everything today.
+ * @purpose Keeps the commands we print for a person and the commands a screen hands them
+ * as one set. docs/install.md is what a person reads; tools.manifest.json is what a screen
+ * renders. The same instructions exist in two places, so this compares them.
  *
  * Compared by COMMAND rather than by heading, on purpose. A heading is prose and gets
  * reworded; the command is the thing somebody actually runs, and it is what breaks when
- * these two disagree.
+ * these two disagree. The removal steps are left out: docs-truth holds those.
  */
 
 import { join } from "node:path";
-import { REPO_ROOT, read, readJson, rel, runGate } from "./lib/gate.mjs";
+import { REPO_ROOT, exists, read, readJson, rel, runGate } from "./lib/gate.mjs";
 
 const MANIFEST = join(REPO_ROOT, "tools.manifest.json");
-const README = join(REPO_ROOT, "README.md");
+const INSTALL_DOC = join(REPO_ROOT, "docs", "install.md");
 
-/** The Install section only - later sections carry commands that are not install steps. */
-function installSection(text, findings) {
-  const start = text.indexOf("\n## Install\n");
-  if (start === -1) {
-    findings.push({ file: "README.md", message: "has no Install section" });
-    return "";
-  }
+/** The page without its removal section, which carries commands that are not install steps. */
+function installSteps(text) {
+  const start = text.search(/^## Remove\s*$/m);
+  if (start === -1) return text;
   const rest = text.slice(start + 1);
-  const end = rest.indexOf("\n## ", 1);
-  return end === -1 ? rest : rest.slice(0, end);
+  const end = rest.search(/^## /m);
+  return text.slice(0, start) + (end === -1 ? "" : rest.slice(end));
 }
 
-/** Every line inside a fenced block, which is how the README shows something to run. */
+/** Every line inside a fenced block, which is how the page shows something to run. */
 function commandsIn(section) {
   const out = [];
   let fenced = false;
   for (const line of section.split("\n")) {
-    if (line.trimEnd() === "```") {
+    if (line.trimStart().startsWith("```")) {
       fenced = !fenced;
       continue;
     }
@@ -69,19 +61,19 @@ function commandsDeclared(manifest, findings) {
   // The connection is written PER TOOL, because one line in one tool's wording is what left
   // every other tool's setup ending with no way to reach the Brain. Reading only the old
   // single-step shape here would go quiet the moment that was fixed, and this gate would then
-  // pass while the README and the manifest disagreed about five of the six tools.
+  // pass while the page and the manifest disagreed about five of the six tools.
   for (const [id, step] of Object.entries(manifest.installConnection?.byTool ?? {})) {
     if (step === null || step?.none === true) continue;
     collect([step], `installConnection.${id}`);
   }
-  // The sign-in is printed in the README too, so it is declared here or the two drift apart.
+  // The sign-in is printed on the page too, so it is declared here or the two drift apart.
   for (const [id, step] of Object.entries(manifest.installConnection?.signInByTool ?? {})) {
     if (step?.when !== "own-step") continue;
     collect([step], `signIn.${id}`);
   }
   // And so is getting a current version. It is a thing a person RUNS, so it is a thing a screen
   // has to be able to hand them — printing it only in prose would put it back out of reach of
-  // anything but this README, which is how it came to be printed nowhere at all for so long that
+  // anything but the page, which is how it came to be printed nowhere at all for so long that
   // every single person was sitting on whatever version they first installed.
   for (const [id, step] of Object.entries(manifest.keepCurrent?.byTool ?? {})) {
     if (step === null || step?.kind === "none") continue;
@@ -91,25 +83,32 @@ function commandsDeclared(manifest, findings) {
     collect(step.steps ?? [step], `keepCurrent.${id}`);
   }
 
+  // The plate pane's install line is on the page as well, and so is each tool's run-log command:
+  // every tool keeps its run log in its own folder, so one command for all of them reads the wrong
+  // one for most.
+  collect(manifest.panel?.steps, "panel");
+  for (const tool of manifest.tools ?? []) collect(tool?.runLog ? [tool.runLog] : [], `tools.${tool?.id ?? "?"}.runLog`);
+
   return out;
 }
 
 runGate({
   id: "install-parity",
-  purpose: "The install commands in the README and in the manifest are one set.",
-  rule: "every command the README shows is declared, and every declared command is shown",
+  purpose: "The install commands in docs/install.md and in the manifest are one set.",
+  rule: "every command docs/install.md shows is declared, and every declared command is shown",
   assert(findings) {
     const manifest = readJson(MANIFEST, findings);
     if (manifest === undefined) return;
 
-    const section = installSection(read(README), findings);
-    if (section === "") return;
-
-    const shown = commandsIn(section);
+    if (!exists(INSTALL_DOC)) {
+      findings.push({ file: rel(INSTALL_DOC), message: "missing" });
+      return;
+    }
+    const shown = commandsIn(installSteps(read(INSTALL_DOC)));
     const declared = commandsDeclared(manifest, findings);
 
     if (shown.length === 0) {
-      findings.push({ file: "README.md", message: "the Install section shows no commands; either it changed shape or this gate has stopped seeing it" });
+      findings.push({ file: rel(INSTALL_DOC), message: "shows no commands; either it changed shape or this gate has stopped seeing it" });
       return;
     }
 
@@ -119,7 +118,7 @@ runGate({
     for (const command of shownSet) {
       if (!declaredSet.has(command)) {
         findings.push({
-          file: "README.md",
+          file: rel(INSTALL_DOC),
           message: `shows "${command}" but no tool declares it. A screen rendering the manifest would leave that step out.`,
         });
       }
@@ -129,14 +128,23 @@ runGate({
       if (!shownSet.has(d.command)) {
         findings.push({
           file: rel(MANIFEST),
-          message: `${d.where} declares "${d.command}" but the README does not show it. One of the two is telling somebody the wrong thing.`,
+          message: `${d.where} declares "${d.command}" but docs/install.md does not show it. One of the two is telling somebody the wrong thing.`,
         });
       }
+    }
+
+    if (typeof manifest.verify?.command === "string") {
+      findings.push({ file: rel(MANIFEST), message: "verify.command is one run-log command for every tool; each tool keeps its own, under runLog" });
     }
 
     // A tool that a screen would offer with nothing to do.
     for (const tool of manifest.tools ?? []) {
       if (tool?.status !== "supported") continue;
+      // Its run log: a command to read it, or none and why.
+      const log = tool?.runLog;
+      if (!(log?.kind === "run" || (log?.kind === "none" && typeof log.note === "string" && log.note.length > 0))) {
+        findings.push({ file: rel(MANIFEST), message: `"${tool.id}" gives no runLog: a command that reads its run log, or kind "none" with the reason` });
+      }
       const steps = tool?.installReminders?.steps ?? [];
       if (steps.length === 0) {
         findings.push({

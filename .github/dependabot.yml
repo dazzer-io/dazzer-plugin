@@ -1,0 +1,24 @@
+# Weekly updates, one grouped pull request per ecosystem, and only for releases at least a week
+# old, so a compromised release has time to be found before it reaches this repository.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # The Claude Code that runs the plate pane's tests. Nothing in it installs with a plugin.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      npm:
+        patterns: ["*"]

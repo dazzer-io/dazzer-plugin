@@ -1,0 +1,80 @@
+{
+  "version": "0.16.0",
+  "marketplace": "dazzer",
+  "publisher": {
+    "name": "Dazzer",
+    "url": "https://dazzer.io"
+  },
+  "homepage": "https://dazzer.io",
+  "repository": "https://github.com/dazzer-io/dazzer-plugin",
+  "license": "MIT",
+  "connection": {
+    "name": "dazzer",
+    "url": "https://graph.dazzer.io/mcp"
+  },
+  "plugins": [
+    {
+      "name": "dazzer",
+      "displayName": "Dazzer",
+      "description": "Makes your AI check your Dazzer Brain before it answers, and save decisions and facts to it as they come up. Adds no connection of its own, so it is safe to install alongside one you already have.",
+      "listing": "Makes your AI check your Dazzer Brain before it answers, and save decisions and facts as they come up. Safe beside an existing connection: it adds none of its own.",
+      "keywords": ["memory", "knowledge", "brain", "mcp"],
+      "carries": "reminders",
+      "manifests": {
+        "claude": {},
+        "cursor": {
+          "category": "developer-tools",
+          "hooks": "./hooks/cursor.json"
+        },
+        "devin": {}
+      }
+    },
+    {
+      "name": "dazzer-connect",
+      "displayName": "Dazzer Connect",
+      "description": "The Dazzer Brain connection, which the reminders need to reach your Brain. Install it alongside them; signing in is a separate step, described in the install guide.",
+      "listing": "The Dazzer Brain connection itself, which the reminders need. Signing in is a separate step: see the install guide.",
+      "keywords": ["memory", "knowledge", "brain", "mcp"],
+      "carries": "connection",
+      "manifests": {
+        "claude": {},
+        "cursor": {
+          "category": "developer-tools"
+        },
+        "devin": {}
+      }
+    },
+    {
+      "name": "dazzer-antigravity",
+      "displayName": "Dazzer reminders for Antigravity",
+      "description": "The Dazzer reminders, in the one shape Antigravity accepts. Install alongside the main Dazzer plugin - Antigravity cannot read that one's reminders file, and this carries them instead.",
+      "listing": "The Dazzer reminders in the one shape Antigravity accepts. Only for Antigravity, and only alongside the main plugin - every other tool reads its reminders from that one.",
+      "keywords": ["memory", "knowledge", "brain", "mcp"],
+      "carries": "antigravity reminders",
+      "manifests": {
+        "antigravity": {}
+      }
+    },
+    {
+      "name": "dazzer-plate",
+      "displayName": "Dazzer plate",
+      "description": "Your plate from your Dazzer board in a pane beside the chat, in Claude Code: what needs you now, what waits on someone else, and what is coming up. It opens only when you type /plate, and reads through the Dazzer connection you already have, carrying none of its own.",
+      "listing": "Your plate in a pane beside the chat, in Claude Code only: what needs you now, what waits on someone else, what is coming up. Opens only when you type /plate, and reads through the Dazzer connection you already have.",
+      "keywords": ["memory", "knowledge", "brain", "plate"],
+      "manifests": {
+        "claude": {
+          "types": "./types/index.d.ts",
+          "userConfig": {
+            "plate": {
+              "type": "string",
+              "title": "Plate pane",
+              "description": "command: /plate opens your plate in a pane. off: no /plate at all. It never opens by itself.",
+              "default": "command",
+              "options": ["command", "off"]
+            }
+          }
+        }
+      }
+    }
+  ]
+}

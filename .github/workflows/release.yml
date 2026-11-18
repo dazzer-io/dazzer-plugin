@@ -15,32 +15,36 @@ concurrency:
   group: release-tag
   cancel-in-progress: false
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
   tag:
     name: Tag the released version
+    # GitHub's machine: a public repository's jobs never run on our own machines.
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
-      contents: write # only to create the tag
+      contents: write # only to push the tag
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # The checkout keeps its credential because the last step pushes the tag with it. Nothing
+      # in this job runs code from the repository, so nothing else can reach that credential.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 # zizmor: ignore[artipacked]
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
-        with:
-          node-version-file: .nvmrc
-          package-manager-cache: false
-
-      # The gates already prove every declared version agrees, so reading one is enough.
+      # Every version is written from source/manifest.json, and the gates refuse a generated
+      # file that differs from it, so this one file is the version that shipped.
+      # Exactly three whole numbers: the generator refuses any other shape, and so does this.
       - name: Read the shipped version
         id: version
+        shell: bash
         run: |
           set -eu
-          v=$(node -e 'process.stdout.write(require("./plugins/dazzer/.claude-plugin/plugin.json").version)')
+          v=$(jq -r .version source/manifest.json)
+          if [[ ! "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "source/manifest.json holds no version of the shape 1.2.3: $v" >&2
+            exit 1
+          fi
           echo "value=$v" >> "$GITHUB_OUTPUT"
           echo "shipped version is $v"
 

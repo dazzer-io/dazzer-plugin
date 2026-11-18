@@ -1,8 +1,10 @@
 # @purpose: Runs every check on every proposed change, so a defect in the one script that
 # executes on other people's machines cannot reach the branch people install from.
 #
-# No dependencies are installed: the checks are plain Node scripts and a shell suite, so
-# there is nothing to resolve, nothing to cache and no supply chain to trust.
+# The checks are plain Node scripts and shell suites. The one dependency is the Claude Code
+# that runs the plate pane's tests, pinned with its hash in package-lock.json and installed
+# with its install scripts off. Everything runs in the one job named Gates, because that is
+# the only check the main branch's rules require.
 
 name: Gates
 
@@ -15,36 +17,47 @@ concurrency:
   group: gates-${{ github.ref }}
   cancel-in-progress: true
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
   gates:
     name: Gates
+    # GitHub's machine: a public repository's jobs never run on our own machines.
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    # The test runner is a whole Claude Code: kept from updating itself or reporting home.
+    env:
+      CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
+      DISABLE_AUTOUPDATER: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version-file: .nvmrc
           package-manager-cache: false
 
-      # The whole suite, including the defect ledger. Green means "no regressions",
-      # not "nothing is wrong" - anything outstanding is printed by name.
+      - name: Install the pinned test runner
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      # Every check and every test in tests/.
       - name: All gates, under the system shell
         run: node scripts/baseline.mjs
 
       # The script ships as plain POSIX shell and runs under whatever the person's system
       # shell happens to be. On a Mac that is bash in posix mode; here it is dash. They
       # disagree on the numeric comparison one of the defects lives on, so proving it under
-      # one says nothing about the other. Same ledger, so this is a real gate, not a smoke test.
-      - name: All gates, under bash
+      # one says nothing about the other. Only the shell suites run again: nothing else
+      # depends on the shell.
+      - name: The shell suites again, under bash
         if: ${{ !cancelled() }}
         env:
           SHELL_UNDER_TEST: bash
-        run: node scripts/baseline.mjs
+        run: node scripts/baseline.mjs --shell-suites
 
       # Asserted, not assumed: the previous suite named its shell internally, so two runs
       # would have reported two passes from one interpreter.
@@ -63,4 +76,18 @@ jobs:
 
       - name: Shell lint
         if: ${{ !cancelled() }}
-        run: shellcheck -s sh plugins/dazzer/scripts/*.sh
+        run: shellcheck -s sh plugins/dazzer/scripts/*.sh tests/*.sh
+
+      # Audits the workflows and dependabot.yml for the known ways a workflow is turned against
+      # its repository: dangerous triggers, token grants, credentials left behind, injected
+      # expressions. .github/zizmor.yml makes it refuse any action not pinned to a full commit.
+      # zizmor itself is held at 1.32.0, the version this audit was proven with: the action
+      # installs that version from a wheel whose hash its pinned commit holds, and a newer
+      # zizmor changes nothing here until the version line below does.
+      - name: Workflow audit
+        if: ${{ !cancelled() }}
+        uses: zizmorcore/zizmor-action@45d7276c9ca790aabd705e31ca99c6185c3e76dd # v0.8.1
+        with:
+          version: 1.32.0
+          advanced-security: false
+          annotations: true

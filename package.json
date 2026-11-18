@@ -1,0 +1,13 @@
+{
+  "name": "dazzer-plugin-checks",
+  "private": true,
+  "description": "For working on this repository only: pins the Claude Code that runs the plate pane's tests. Nothing here installs with a plugin.",
+  "license": "MIT",
+  "scripts": {
+    "generate": "node scripts/generate.mjs",
+    "test": "node scripts/baseline.mjs"
+  },
+  "devDependencies": {
+    "@anthropic-ai/claude-code": "2.1.326"
+  }
+}

@@ -1,614 +1,169 @@
 # Dazzer
 
-Makes your AI check what you already know before answering, and save what settles instead of
-losing it when the conversation ends.
+Your AI checks your Dazzer Brain before it answers, and saves what you decide so the next chat
+starts from it.
 
-## Install
+A Dazzer Brain is a shared record of what you and your team know and decide: decisions, facts,
+preferences and corrections, kept by Dazzer so the AI tools you work with can read it. You need a
+Dazzer account to have one. Access is by request at [dazzer.io](https://dazzer.io); see also the
+[privacy policy](https://dazzer.io/privacy) and [terms](https://dazzer.io/terms). These plugins
+make your AI tool use your Brain. A new Brain starts empty, so on day one your AI mostly finds
+nothing and says so; it fills as you work.
 
-Two lines in most tools. The same plugin, the same files — only the command changes.
+For people who work in Claude Code, Codex, GitHub Copilot, Cursor, Antigravity or Devin.
 
-### Claude Code — Anthropic’s coding tool, separate from the Claude desktop app
-
+```mermaid
+flowchart LR
+    Q["You ask"] --> AI["Your AI"]
+    AI -->|"1 checks first"| B[("Your Dazzer Brain")]
+    B -->|"what is recorded"| AI
+    AI --> A["An answer from what you decided"]
+    A -->|"2 you decide something"| S["Your AI saves it"]
+    S --> B
 ```
+
+## What you install
+
+- **`dazzer`, the reminders.** Short notes added to what your AI reads by hooks: small commands
+  your AI tool runs at set points in a chat, such as its start. The notes make your AI check your
+  Dazzer Brain before it answers, and save decisions and facts to it as they come up. They add no
+  connection of their own and leave any you already have as it is.
+- **`dazzer-connect`, the connection**, which the reminders need to reach your Brain. It signs your
+  tool in to your Brain, so your AI can read from it and save to it. Install it alongside them;
+  signing in is a separate step, described in the [install guide](docs/install.md).
+- **`dazzer-plate`, the plate pane.** Optional, Claude Code only. Your plate is your open items in
+  your Brain: what needs you, what waits on others, what is coming up and what can wait. The pane
+  lists them beside the chat.
+
+Antigravity needs one more piece, `dazzer-antigravity`: the reminders in Antigravity's own format.
+
+## Supported tools
+
+What reaches your AI in each tool. Compaction is when your AI tool shortens a long chat to fit,
+which can drop what your AI was told earlier; the note after it tells your AI to pick up again.
+
+| Tool | Check before answering | Prompt to save | After compaction | Guide |
+| --- | --- | --- | --- | --- |
+| Claude Code, in a terminal or the Claude desktop app | At the start of each chat | With your next message | Yes, with this chat's saved progress | [Install](docs/install.md#claude-code) |
+| Codex | At the start of each chat | With your next message | Yes, with this chat's saved progress | [Install](docs/install.md#codex) |
+| GitHub Copilot | From an instruction file you copy in | No | No | [Install](docs/install.md#github-copilot) |
+| Cursor | At the start of each chat | Posted in your chat as a message | No | [Install](docs/install.md#cursor) |
+| Antigravity | With every message | At the end of a reply | No | [Install](docs/install.md#antigravity) |
+| Devin | With every message | No | Yes, without a label for the chat | [Install](docs/install.md#devin) |
+| Claude chats outside Claude Code | No | No | No | [Why](docs/install.md#claude-chat-apps) |
+| ChatGPT app | No | No | No | [Why](docs/install.md#chatgpt-app) |
+
+Each tool's install section names any step not yet watched working there.
+
+## Quick start in Claude Code
+
+You need Claude Code and a Dazzer account. Type these into Claude Code's own prompt, not into your
+shell:
+
+```text
 /plugin marketplace add dazzer-io/dazzer-plugin
 /plugin install dazzer@dazzer
-```
-
-Typed into Claude itself, not into your shell.
-
-**Using the desktop app?** Install it from a terminal with the same two lines. The app and the
-terminal share one set of settings, so it appears in the app on your next conversation. The
-install command does not exist inside the app, so this genuinely needs a terminal once — even if
-you never otherwise open one.
-
-### Codex — OpenAI’s coding tool
-
-```
-codex plugin marketplace add dazzer-io/dazzer-plugin
-codex plugin add dazzer@dazzer
-```
-
-Codex asks you to approve a plugin's reminders before it will run them. If nothing appears in the
-run history described below, that approval is the first thing to check.
-
-### GitHub Copilot — GitHub’s coding tool
-
-```
-copilot plugin marketplace add dazzer-io/dazzer-plugin
-copilot plugin install dazzer@dazzer
-mkdir -p ~/.copilot/instructions && cp ~/.copilot/installed-plugins/dazzer/dazzer/instructions/copilot.md ~/.copilot/instructions/dazzer.instructions.md
-```
-
-The third line is not patching a bad install. Copilot gives a reminder no way to speak, so the
-check-your-Brain sentence is delivered as a standing instruction instead — Copilot reads it before
-every conversation. **Re-run that third line after updating the plugin**, because it is a copy:
-Copilot ignores a link.
-
-**The other two reminders still do not arrive on Copilot** — see below for why.
-
-### Antigravity — Google’s coding tool
-
-It has no store to install from, so point it at a downloaded copy:
-
-```
-git clone https://github.com/dazzer-io/dazzer-plugin.git
-agy plugin install ./dazzer-plugin/plugins/dazzer
-agy plugin install ./dazzer-plugin/plugins/dazzer-antigravity
-```
-
-Two installs here rather than one, and it is not tidiness — Antigravity cannot read the first
-one's reminders file, so the second carries them. See below for why.
-
-**Two of the three reminders arrive** — checking your Brain before answering, and saving what
-settled at the end of a reply. Being put back on track after a long conversation forgets itself
-never can: that moment does not exist in this tool at all.
-
-### Cursor — a code editor with an AI built into it
-
-Two steps, and the second one happens inside Cursor rather than in a terminal.
-
-```
-cursor-agent plugin marketplace add https://github.com/dazzer-io/dazzer-plugin.git
-```
-
-Then, in Cursor, type `/add-plugin` and choose **dazzer** from the list.
-
-Two things that cost real time when this was first tried, so they are written down here:
-
-- **If you have installed it before, remove and re-add rather than update.** Cursor's update
-  command reports success without actually re-fetching, so you keep whatever version you first
-  got. `cursor-agent plugin marketplace remove dazzer` then add it again.
-- **If you already have some other Dazzer setup wired into Cursor, take it out first**, or both
-  fire on every reply and you get the save prompt twice.
-
-One difference you will see rather than read about: Cursor offers no moment for a plugin to speak
-privately to the AI, so the save prompt cannot be moved off your screen the way it has been
-everywhere else. It only accepts a message and submits it as though you had typed it, so on Cursor
-the save prompt is visible in your conversation. Everything works; it just is not silent.
-
-### Devin — Cognition’s coding agent
-
-```
-devin plugins install dazzer-io/dazzer-plugin#plugins/dazzer
-```
-
-Two of the three reminders work. The save prompt does not, and cannot: Devin tells a reminder
-only which session and which prompt it is, with no way to tell how much conversation has built up
-since last time. The prompt has nothing to measure, so it stays quiet rather than firing blindly.
-
-### Reaching your Brain
-
-Everything above adds the **reminders**. They do not reach your Brain by themselves. A tool with
-the reminders and no connection has an AI being told to check something it cannot open, which is
-worse than having neither: it goes looking, and it finds whatever else it has.
-
-**Run this whether or not you already have Dazzer.** It used to say the opposite — skip it if
-Dazzer already shows as connected — and that one line stranded people. Somebody already installed
-skips it, nothing ever asks them to sign in, and they end up with an AI told to check a Brain it
-cannot open. Running it again is also how you get the current version.
-
-You will be asked to sign in afterwards. That is the point rather than a cost: installing does not
-sign you in on any tool, and the sign-in is the part that was missing.
-
-One line per tool, in that tool's own wording.
-
-**Claude Code** — typed into Claude itself:
-
-```
 /plugin install dazzer-connect@dazzer
 ```
 
-**Codex** — in a terminal:
-
-```
-codex plugin add dazzer-connect@dazzer
-```
-
-**GitHub Copilot** — in a terminal:
-
-```
-copilot plugin install dazzer-connect@dazzer
-```
-
-**Antigravity** — in a terminal, against the copy you downloaded:
-
-```
-agy plugin install ./dazzer-plugin/plugins/dazzer-connect
-```
-
-**Cursor** — type `/add-plugin` in Cursor and choose **dazzer-connect**.
-
-**Devin** — in a terminal:
-
-```
-devin plugins install dazzer-io/dazzer-plugin#plugins/dazzer-connect
-```
-
-### Signing in
-
-**Installing does not sign you in. On any tool.** All six were walked on one afternoon and not one
-of them reliably signs you in as part of the install. It happens the next time the tool starts up
-and reaches out.
-
-**So close your tool, start it again, and sign in when it asks.** That is the step, and it is the
-same step everywhere. Where a tool needs a command as well, it is under its name below.
-
-**Claude Code** — the sign-in appears during the install only on a machine that has never had
-Dazzer. On every other machine the install is silent and nothing ever asks. If starting it again
-does not prompt you, open the sign-in list yourself with `/mcp` and choose **dazzer**.
-
-**Codex** — nothing appears on its own. Do it up front rather than waiting for the first thing that
-reaches your Brain to fail quietly:
-
-```
-codex mcp login dazzer
-```
-
-**GitHub Copilot** — the sign-in appeared the next time the tool was started. Nothing during the
-install.
-
-**Devin** — it signed itself in without asking and worked. If yours does ask, this is when.
-
-**Antigravity** — not established. It has been watched failing to reach the Brain at all, which is
-the case to check for: ask it what your Brain knows about you, and if the answer is anything other
-than real records, it is not signed in.
-
-**Cursor** — not established.
-
-**Whoever you are already signed in as is who it signs in as.** Nothing asks and nothing warns. If you are testing with a different account, sign out of Dazzer in your browser first, or the memories land under the wrong person and the dashboard you are watching never shows them.
-
-**How to tell it worked, on any tool:** ask your AI what your Brain already knows about you. Real
-records back means it is signed in. Anything else — a shrug, a file it found, a summary of your own
-conversation — means it is not, whatever the install said.
-
-Four of the six above are now watched rather than read about: Claude Code, Codex, Copilot and
-Devin. Antigravity and Cursor are not, and say so where a person can see it.
-
-**This section existed in one wording only, Claude's, and every other tool's setup simply ended
-after the reminders.** Someone followed the Codex instructions to the letter on a clean machine,
-was never asked to sign in because there was nothing to sign in to, and watched his AI go hunting
-through an unrelated archive for the memory it had just been told to check. The command it needed
-existed and worked the whole time. Nobody had written it down, and no rule asked whether anything
-was missing — every rule here compared what we say against what we ship, and both said the same
-thing. A rule that asks the missing question now exists.
-
-### Staying current
-
-**Nothing updates on its own.** Sources like this one have automatic updating switched off by
-default — that is the tool makers' own default, not a choice of ours — so whatever version you
-first installed is the version you keep, indefinitely. A machine was found sitting several versions
-behind while reporting itself perfectly healthy.
-
-**Claude Code** — every line, in this order, then restart Claude Code:
-
-```
-claude plugin marketplace update dazzer
-claude plugin update dazzer@dazzer
-claude plugin update dazzer-connect@dazzer
-claude plugin update dazzer-plate@dazzer
-```
-
-The first refreshes the list of what exists. The lines after it are what actually move the
-version you are running, and they are what people were missing.
-
-**The first line on its own does nothing to the plugin you are using, and says otherwise.** It
-prints `✔ Successfully updated marketplace: dazzer` and leaves you on exactly the version you were
-already on. That was watched happening here: marketplace refreshed to the newest commit, plugin
-still reporting the previous version, old behaviour intact after a restart. A success message that
-means "the catalogue is current", read as "you are current", is the whole trap. Only
-`claude plugin update` changes the answer, and only a restart applies it.
-
-Drop the third line if you never installed the connection separately, and the fourth if you never
-installed the plate pane (below).
-
-To stop doing this by hand: open the plugin panel with `/plugin`, go to **Marketplaces**, choose
-**dazzer**, and select **Enable auto-update**. It keeps itself current after that.
-
-**Antigravity** — it runs from a copy you downloaded, so refresh the copy and install again:
-
-```
-git -C dazzer-plugin pull
-```
-
-Then re-run the three install lines above against it.
-
-**Cursor** — its update command reports success without actually re-fetching, so removing and
-adding again is the only thing that gets you a newer version:
-
-```
-cursor-agent plugin marketplace remove dazzer
-```
-
-Then add it again and install, as above.
-
-**Codex, GitHub Copilot and Devin** — not established. Nothing here has been run on those three, so
-there is no step to give you rather than a guess dressed up as one.
-
-**Whatever the tool, removing the source and adding it back is the fallback that always re-fetches**
-— at the cost of signing you out, so it is the last resort rather than the first.
-
-### Where reminders cannot run at all
-
-Claude's chat apps and the web app have no moment at which anything can run. There the bundled
-skill carries the same intent as plain text, and reaching your Brain works exactly the same.
-
-### Why the reminders live in three files
-
-One file cannot serve every tool, and finding that out cost a release where **Claude Code
-loaded none of this at all**. It checks every moment-name against a fixed list and throws out
-the whole file over a single name it does not know — and the shared file carried five belonging
-to other tools. It reported `failed to load` and registered nothing. Nobody noticed, because the
-reminders people saw came from their own settings rather than from here.
-
-Every tool does this. Claude Code says so out loud; the rest just go quiet. So each now reads a
-file holding its own moments and nothing else:
-
-| File | Read by |
-| --- | --- |
-| `hooks/hooks.json` | Claude Code and Codex — the three moments they both answer |
-| `hooks/cursor.json` | Cursor, which takes a file its own listing names in preference to the shared one, and refuses one without a whole-number `version` — a key the shared file must not carry, because Codex refuses a file over it |
-| `hooks.json` | Devin — at the plugin root, which Claude Code does not read at all |
-
-That last row is load-bearing and was established by experiment: a name Claude Code rejects was
-put in the root file, and the plugin still loaded.
-
-### Copilot: a reminder there can watch and block, but never speak
-
-The reason recorded here before — that Copilot's moments had to share the file Claude Code reads —
-was wrong, and it was wrong in a way worth keeping on the record, because it stood unchallenged
-while it made a supported tool look unsupported. Copilot takes a file of its own without complaint.
-Its moments even have different names from Claude Code's, so sharing was never going to work.
-
-What is true was found by running it, not by reading about it. **A reminder runs on Copilot and has
-no way to say anything to the model.** Both moments fired and left their mark on disk; five
-different shapes of reply were tried in one go, including the exact shapes Cursor and Claude Code
-use, and the model reported receiving nothing every time.
-
-Two other routes were tried and one of them works:
-
-- **What the connection announces when it opens** does reach the model, and the model acts on it —
-  but only for three services GitHub owns, on a list baked into the program. Nothing we ship can
-  join it. It only worked under test because a command-line override was passed, which nobody
-  running Copilot normally would type.
-- **A standing instruction file works, with nothing special passed.** Copilot reads
-  `~/.copilot/instructions/*.instructions.md` before every conversation. With our one sentence
-  there, asking a question the Brain could answer made the model go and ask it, unprompted. That is
-  the third install line above.
-
-So Copilot gets the check-your-Brain reminder, delivered a different way. It does not get the other
-two, and cannot: saving what settled, and getting back on track after a reset, each need to speak at
-a particular moment, and speaking is the half Copilot withholds.
-
-**It is a copy, not a link** — a link was tried and Copilot ignored it. So an update to the plugin
-does not reach the instruction until that line is run again.
-
-**The file has to instruct, not remind, and this was nearly missed.** The first version shipped
-opened by explaining to a human reader why reminders cannot work on this tool. The model reads that
-file as its own standing instruction, explanation and all — so it was being told, in effect, that
-Dazzer's prompting does not work here, and then asked to act on Dazzer's prompt.
-
-The difference is not subtle and is not a matter of taste. Asked the same question six times, with
-the connection attached and a Brain that could answer it, the explaining version made the model go
-and ask **none of those six times**. Rewritten as a plain instruction that names what to call and
-when, it asked **all six**.
-
-Two things follow, and the second is the general one. **Anything put in that file is read by the
-model**, so commentary belongs here in the README and never there. And **a wording change like this
-must be measured over several runs, never one** — the first version was called working on the
-strength of a single successful attempt, and a single attempt cannot tell a rule that is obeyed
-from one that is obeyed sometimes.
-
-### Antigravity gets no reminders for now
-
-The reason recorded here before — that a separate file was tried and Antigravity's own importer
-overwrote it — was wrong, and it kept a working capability shut off. Antigravity has a documented
-way to carry reminders, its own moments fire, and **what a reminder says there does reach the
-model**: asked to quote the sentence back, it did, word for word.
-
-**What is actually in the way is a name collision with Devin.** Both look for a file called
-`hooks.json` at the plugin root, and they want different shapes inside it. Antigravity discards the
-whole file over one entry it does not recognise — the same behaviour as Claude Code. Proven by
-putting both shapes in one file and watching every reminder vanish.
-
-So Antigravity's reminders ship as **a second small plugin of their own**, `plugins/dazzer-antigravity`,
-which is the extra install line above. Two further things were proven rather than assumed: given its
-own file it works, and **a broken neighbour sitting beside it does not drag it down** — the failing
-mixed file was left in place deliberately while the good one was tested.
-
-**Saving what settled arrives too, and it needed one thing built.** Antigravity never says whether a
-reply is the one our own save prompt asked for — every other tool says so outright. Leaning on the
-amount of new work instead was tried and measured wrong: with the prompt made deliberately eager it
-fired five times in a single reply and the answer repeated five times.
-
-So where the host will not say it, the prompt now says it to itself: it leaves a note, and the very
-next end-of-reply in that conversation reads the note, clears it, and stays quiet. One note,
-consumed once, so a prompt can never answer its own prompt. The cost is that a genuine second reply
-straight after a save is skipped — the safe direction, since the backstop fires a little less often
-rather than twice. Three tests hold that note's whole life: left, read once, and gone.
-
-### What has actually been tried
-
-Devin's limit above was found by running a real session and capturing exactly what it hands a
-reminder — not by reading its documentation, which describes a richer message than the one that
-actually arrives.
-
-**Watching it work was not enough, and it is worth saying exactly how it failed.** Watching
-proved a person saw the plugin do something. It did not prove the reminder's words ever reached
-the AI. On Codex they never did: one unexpected line made it throw the whole reminders file away,
-and it wants a reply in a particular shape, so plain words were discarded and reported as an error
-on every single message. On Cursor they never did either, and Cursor said nothing at all about it.
-On Claude Code the whole plugin never loaded.
-
-**Then the bar was raised again, twice, because each version proved too little.** Showing the
-right words reach the AI from a hand-written file says nothing about whether the shipped file
-loads — that gap is exactly how the Claude Code failure hid behind a passing test. And a tool
-reporting its own reminders as registered proves nothing either: it says so while delivering
-nothing at all. What counts is two things and no others — install the real thing, then ask the
-AI for a word only the reminder could have carried.
-
-Against that bar: **Claude Code passes** — installed from a listing, it answered back a word
-only the reminder carried.
-**Codex** runs every reminder from an installed copy with no warning and no error. **Cursor** answers it too, from an
-installed plugin reading the file of its own it moved to. Devin takes the plain wording it already gets.
-
-Cursor was the last, and it is worth saying why it took two attempts. This repository briefly
-shipped a Cursor-specific listing of what it contains; Cursor preferred that file over the one it
-had been reading happily, could not make sense of it, and silently stopped finding the plugin at
-all. Nothing reported an error — the install simply handed out a months-old version instead. The
-file has been removed. Reading a tool's documentation was not enough here, and it was not enough
-for two of the others either.
-
-## Your plate beside the chat (Claude Code only)
-
-A pane that shows your plate from your Dazzer board: what needs you now, what is waiting on
-someone else, what is coming up, and how many things can wait. It is Claude Code only, and a plugin
-of its own, so nobody gets a pane they did not ask for.
-
-```
-/plugin install dazzer-plate@dazzer
-```
-
-Typed into Claude itself, after the two Claude Code lines above. On the desktop app, install it
-from a terminal the same way; the app picks it up on your next conversation.
-
-**Then type `/plate`.** Nothing opens by itself: the pane draws only once you ask, and its
-**Refresh** button reads your plate again. At the top: the day, and one line of counts. Below it,
-four tabs: **Needs you**, **Waiting**, **Coming up** and **Later**, each with its count. Each thing
-on a tab is a card: a coloured tag saying why it is there (`8 DAYS LATE`, `WAITING ON YOU · 6 DAYS`,
-`STARTED`, `ON THEO · 65 DAYS`, `DUE SAT 10 OCT`, with `(A GUESS)` where Dazzer read it from the words
-and is unsure), its title as it was written, and one line saying what it is part of, who it is from
-and when it last moved, ending `maybe yours (a guess)` where Dazzer is unsure it is yours to do.
-**Open** shows what it is, and two buttons:
-
-- **Done** sends your AI one sentence with that item's number and nothing else (`Mark item 7240
-  done.`). **Your AI marks it done, and the pane updates on the next plate it sees.** The card says
-  it was sent only once your session took the sentence, and keeps saying so until a plate arrives
-  without that item; if it was not taken, it says so and offers Done again.
-- **Talk about it** sends `Tell me about item 7240.`, so you and your AI can talk it through. It
-  sends once for that item until the pane reads your plate again, so a double click never sends it
-  twice.
-
-The title never goes with either: anyone in your workspace can write a title, and those sentences
-go as your own words.
-
-**Later** lists what can wait, grouped by what each thing belongs to, each with its count: the 30
-largest groups, then how many more groups there are. Open a group to see its items and when each
-last moved. Once read, a group stays read until you press **Refresh**, which forgets every group, or
-until the pane reads your plate again and that group's count has changed; then the next Open reads
-it again. Until your Dazzer board sends those groups, Later shows how many things can wait.
-
-**It needs Dazzer connected** (see Reaching your Brain above): it reads through the connection
-Claude Code already has and brings none of its own. It looks only among the tools your session has
-right now, and only at a server offering both of Dazzer's recall and track, so your words, your
-time zone and the pane's name never go to any other server. When it finds none, the pane says
-Dazzer was not found here and how to connect it. A read that has not answered in 20 seconds says
-it could not reach Dazzer, rather than waiting forever.
-
-**In auto mode, /plate, Refresh and opening a later group put one question and your AI's answer
-in your chat.** Where Claude Code lets the pane read your plate itself, nothing appears in your chat.
-In auto mode it does not, so `/plate` and **Refresh** each try the read first and, when it is
-refused, put one question to your AI, as your own words: `What is on my plate? My time zone is <your
-time zone>.` Opening a later group does the same for that group: `Show my later items in plate
-group <its number>.` Its name never goes with it, for the same reason a title never does. The pane
-draws what your AI reads. One question at a time: while one is unanswered, the pane sends nothing
-more and says it is waiting on your AI. If your AI is busy when the pane asks, the question waits
-its turn behind the current reply and anything you typed meanwhile, and the pane keeps saying it
-asked until the question's own turn ends. If that question never runs (you pressed Esc), the pane
-lets your next press ask again once your AI has been idle for 10 seconds.
-
-**Nothing else ever posts in your name.** Only `/plate`, **Refresh**, opening a later group, and a
-card's **Done** and **Talk about it** do, and only when you use them.
-
-**What it keeps:** the last plate it read, and each later group it read (until the next Refresh, or
-until that group's count changes), in this session's memory only, so a read that fails can still
-show your plate with the time it was read. Nothing is saved to disk, and nothing is shared with
-another session or another account.
-
-To keep `/plate` from being offered at all, set its **Plate pane** option to **off** in `/config`.
-
-What is proven: its tests draw every state on both the terminal and the desktop app. Watched live in
-the desktop app in auto mode, on the version before commit fa5da50 (which added the one-question
-limit): the pane asked your AI, drew the plate it read, and its done buttons reached your AI. Not yet
-watched live: the one-question limit, a direct read in the desktop app outside auto mode, and the
-tabs, cards, Talk about it and later groups drawn on 8 Oct.
-
-## Two pieces, on purpose
-
-**`dazzer`** is the part that changes behaviour: the reminders, the capture sweep, and the skill.
-It adds no connection of its own, so installing it can never disturb one you already have.
-
-**`dazzer-connect`** is the connection, for people who have not already got one.
-
-They are separate because bundling them broke the first minute for anyone already connected: a
-bundled connection carries its own sign-in, so installing replaced a working connection with an
-unauthenticated one and the Brain went dark until the sign-in was noticed. Someone who already
-connected through the app should never have to re-authenticate to get a few reminders.
-
-The trade is honest and worth stating: without `dazzer-connect`, we cannot tell your traffic
-apart from a hand-configured connection. A plugin that disconnects someone is the worse outcome.
-
-**`dazzer-plate`** is the plate pane, for Claude Code only, and optional. It is separate for the
-same reason in reverse: it needs a connection rather than bringing one, and Codex refuses the
-shared reminders file over the one line a pane needs, so it cannot live in `dazzer`.
+Then restart Claude Code and sign in when it asks. The sign-in uses the Dazzer account your browser
+is signed in to. If nothing asks, type `/mcp`, choose `plugin:dazzer-connect:dazzer`, and sign in
+there.
+
+Then check it, in a new chat:
+
+1. Ask `What does my Dazzer Brain know about me?` Claude Code shows the call to your Brain in the
+   chat. An empty Brain answers that nothing is recorded yet, which still means you are connected.
+   If your AI says it cannot reach your Brain, you are not signed in.
+2. Tell it `Remember that our project is called Lumen.` It should say it saved that.
+3. In another new chat, ask `What is our project called?` The answer comes from your Brain.
+
+More checks, every other tool, updates and removal: [docs/install.md](docs/install.md).
+
+## What reaches your AI, and what leaves your machine
+
+- **To your AI:** short notes that start with `[Dazzer]` or `Dazzer checkpoint`, added to the chat
+  your AI reads, like anything you type. They tell it to check your Brain first, to save what was
+  decided, and to restore its saved progress after compaction. In Claude Code and Codex the notes
+  also carry a label for the chat, made from the id your tool already gives it.
+- **Over the network:** what your AI looks up in or saves to your Brain goes to Dazzer's servers;
+  the plugins themselves send none of your conversation. Your tool reaches your Brain through the
+  connection at `https://graph.dazzer.io/mcp`, signed in as you, and each request names the plugin
+  and its version. The plate pane asks the same connection for your open items, with your
+  computer's time zone. How Dazzer keeps and handles that data is in the
+  [privacy policy](https://dazzer.io/privacy).
+- **On disk:** a short run log and a small counter per chat, never what was said. On Copilot, the
+  instruction file you copy in. [How it works](docs/how-it-works.md#what-is-stored-on-your-machine)
+  has the full list.
 
 ## What it does
 
-**Tells the AI to check before answering.** A short reminder to look in your Brain first rather
-than answering from assumption. In Claude Code and Codex it arrives once when a chat starts, and
-again after a context reset, which is when the AI has lost what it was told. It used to ride on
-every message, and a measured week found no difference the repeats made, while the same words
-sat in a long chat dozens of times over. Each tool's own listing says how often it arrives there.
-
-**Tells it to save what settled.** Once enough real work has accumulated, your next message
-quietly carries a prompt to save it, and the AI tells you in one line what it saved. What
-actually gets saved is the model's judgment against your Brain's own rules — this plugin never
-decides that and never writes anything itself.
-
-That prompt used to go out at the end of a reply instead, and that was a mistake worth naming:
-tools print anything said at that moment straight into your conversation, in full, under a word
-of their own choosing — Claude Code painted it red as `Stop hook error`, which is what a
-checkpoint doing exactly its job looked like to everyone who saw one. It also told the AI not to
-finish, so it owed you another reply and usually filled it with a line about the checkpoint.
-Carried with your next message, the same words reach the AI and nothing is drawn on your screen.
-The one thing you will still see is the save itself, which is the part you should see.
-
-**Restores your place after a context reset.** When a long session compacts, nothing reconnects
-and the AI is never re-oriented. This is the one moment your Brain cannot reach on its own, so
-the plugin covers it.
-
-Each chat gets its own place back, not a list of every place you have saved and not the place
-another chat saved last. In Claude Code and Codex, the start of a chat, every reset and the
-prompt to save all name the same label, the id your tool already gives that chat, so the AI
-saves under it and restores from it.
+- **Checks before answering.** Your AI is told to look in your Brain before answering anything you
+  may have told it before, and to say so plainly when it cannot reach the Brain rather than guess.
+- **Prompts a save.** Once enough of the chat has built up, your AI is asked to save what was
+  decided. It chooses what to keep and tells you in one line what it saved. If nothing was
+  decided, it says nothing.
+- **Restores progress after compaction.** Your AI saves where the work stands as it goes. After
+  compaction it is told to restore that before carrying on, so you do not have to repeat yourself.
+- **Shows your open items, if you want.** In Claude Code, type `/plate` to open the plate pane:
+  what needs you, what waits on others, what is coming up, and what can wait.
 
 ## What it never does
 
-It never talks to Dazzer directly, never holds credentials, and never decides what is worth
-saving. It only taps the model at the right moment; the model acts through the connection it
-already owns and reads the current rules from your Brain at the moment it acts.
+- **The reminders never touch a connection.** Installing them adds none and changes none.
+  Installing `dazzer-connect` beside a Dazzer connection you set up another way has not been
+  tested.
+- **It never decides what is saved, and never writes to your Brain itself.** Your AI does the
+  saving, through its own connection.
+- **It never stores your chat.** To know when to prompt a save it counts the lines of your tool's
+  own record of the chat, and keeps only that count.
+- **It never posts as you, with two exceptions.** The plate pane's buttons send your AI one
+  sentence as your message, only when you press them. In Cursor, the save prompt appears in your
+  chat as a message, because Cursor offers no other way.
+- **It never carries Dazzer's instructions for what is worth saving or how.** It says only when to
+  check and when to save. Your AI reads those instructions from your Brain through the connection,
+  so Dazzer can change them without a plugin update.
 
-That is deliberate: it means the rules can change in your Brain and take effect immediately,
-without you updating anything.
+## An example
 
-The plate pane is the one piece that reads from Dazzer itself, and only once you ask: it asks for
-your plate through the connection Claude Code already has, where Claude Code allows it, holds no
-credentials of its own, and never writes. In auto mode, `/plate`, Refresh and opening a later group
-put one question to your AI instead, so that question and its answer appear in your chat. Marking a
-card done, or asking to talk about it, is a sentence to your AI, which does the writing.
+An invented exchange in Claude Code, for a team whose Brain already records a pricing decision:
 
-## Where the rules live
+```text
+You:  Where did we land on the pricing page?
 
-In your Brain, served live — `brain.door.entrance`, `brain.capture.protocol`, and
-`brain.working.memory.contract`. This repository holds triggers, not teaching.
+AI:   From your Brain: on 4 November you chose two plans, Starter and Team,
+      and Nadia Brook owns the page copy. Nothing newer is recorded.
 
-## Folder kit
+You:  Let's drop Starter. Team only, from January.
 
-`folder-kit/` is not something you install. It is the five small triggers every person's Dazzer
-folder carries, so a session working in that folder has them even where no plugin is installed,
-as in a cloud session. The creator copies it into a person's folder, under `.claude/hooks/`, and
-adds its registrations to that folder's settings; `folder-kit/kit.json` names the fingerprint of
-every file it copies, so a folder can be checked against the release it came from. It sits outside
-`plugins/` on purpose, so it is never offered or installed as a plugin.
-
-Like everything here, the triggers hold no rules: each one points Dazzer at its rulebook in the
-Brain. One starts a session as Dazzer; one adds a line to a message that may correct or steer the
-work; one stops a send once when the thread was not read, when it names a time with no calendar
-checked, or when it holds a word on the person's own banned list (`.dazzer/bans.json` in their
-folder), and lets the same send through if it is tried again; one asks for a skill's run to be
-reported; and the last says nothing at the end of a turn, leaving a note for the next message when
-a correction or a claimed save may have gone unsaved. They run only where Node is installed and
-stay silent where it is not, and their notes live in a folder of the machine's temporary folder
-that only that user can open, never in the person's folder.
-
-The start line, and the line after a compact, also name the session's own saved place, the same
-way the plugin does, so a restore in a Dazzer folder brings back that session's work and not a list.
-
-If you also have the `dazzer` plugin installed on your computer, the line that restores your place
-after a compact, and the line naming the session's own place, are said twice, once by each.
-Nothing else overlaps.
-
-## Tuning
-
-Set any of these in your environment to override the shipped value. The shipped values live
-in `plugins/dazzer/config/capture.defaults`, which is read as plain data and never run.
-
-| Variable | Default | Effect |
-| --- | --- | --- |
-| `DAZZER_CAPTURE_THRESHOLD` | `250` | How much new conversation accumulates before a save is prompted. Raise it for fewer checkpoints, lower it to capture more eagerly. |
-| `DAZZER_CAPTURE_STATE_TTL_DAYS` | `30` | How long a finished session's marker is kept before being tidied away. |
-| `DAZZER_CAPTURE_RECEIPTS_MAX_BYTES` | `262144` | How large the record of what this did may grow before the old one is rolled aside. |
-| `DAZZER_CAPTURE_MAX_INPUT_BYTES` | `100000` | A guard against an unreasonably large message, not a tuning dial. There is no reason to change it. |
-| `DAZZER_TOOL` | works itself out | Which tool this is running inside, recorded in the run history. Only set it somewhere the automatic answer is wrong. |
-| `DAZZER_MOMENT` | set by the trigger | Which moment the save prompt is running in. Set by the plugin's own trigger, not by hand. |
-
-A bad value never takes effect and never causes an error: anything that is not a whole
-number falls back to the shipped default, silently and on purpose.
-
-## Checking it is actually working
-
-The plugin writes one line every time it runs, recording when, what it decided and why —
-never any of your conversation. To see it:
-
-```
-cat "${CLAUDE_PLUGIN_DATA:-$HOME/.dazzer}/capture/receipts.jsonl" | tail
+AI:   Saved to your Brain: pricing is Team only from January. It replaces
+      the two-plan decision.
 ```
 
-An empty file, or no file at all, means the plugin has never run — which is worth knowing,
-because that failure is otherwise completely silent.
+The first answer came from the Brain, not from a guess. The last line is the save: one line,
+saying what was kept.
 
-## Uninstall
+## Learn more
 
-Remove the part that changes behaviour:
+- [Install, sign in and update](docs/install.md): every tool, step by step, how to check it works,
+  and how to remove it.
+- [How it works](docs/how-it-works.md): each note your AI gets and when, what is sent and stored,
+  the plate pane, and the settings you can change.
+- [Decisions](docs/decisions/): why it is built the way it is.
 
-```
-/plugin uninstall dazzer@dazzer
-```
+## Support
 
-If you also installed the connection, and you want that gone too:
+Questions, problems and ideas: [open an issue](https://github.com/dazzer-io/dazzer-plugin/issues).
 
-```
-/plugin uninstall dazzer-connect@dazzer
-```
+## Security
 
-Leave that second one in place if Dazzer is still how you reach your Brain — removing it
-takes the connection with it.
+Please do not report a security problem in a public issue. Follow the
+[security policy](https://github.com/dazzer-io/dazzer-plugin/security/policy) to report it
+privately.
 
-If you installed the plate pane:
+## Licence
 
-```
-/plugin uninstall dazzer-plate@dazzer
-```
+The code is released under the [MIT licence](LICENSE).
 
-On Antigravity there is a third piece, because its reminders could not travel in the same file as
-everyone else's:
-
-```
-/plugin uninstall dazzer-antigravity@dazzer
-```
-
-On Copilot, the check-your-Brain instruction is a file rather than a plugin, so removing the plugin
-leaves it behind. Delete it as well:
-
-```
-rm ~/.copilot/instructions/dazzer.instructions.md
-```
+The Dazzer name and logo are trademarks of Dazzer. You are welcome to use the name to refer to
+this project, but not in a way that suggests Dazzer endorses you, your product or your service.

@@ -1,7 +1,7 @@
 {
   "specVersion": 1,
   "kind": "dazzer-tool-support",
-  "note": "The same facts as README.md's Install section, in a shape a screen can render. Gates keep the two identical; edit both or neither.",
+  "note": "The same facts as docs/install.md, in a shape a screen can render. A gate keeps the commands in the two identical: edit both or neither. The connection, the reminder sentences and how often the check-first reminder arrives are written from source/ by scripts/generate.mjs.",
   "connection": {
     "url": "https://graph.dazzer.io/mcp",
     "serverName": "dazzer",
@@ -43,10 +43,9 @@
     }
   ],
   "verify": {
-    "what": "One line written every time the plugin runs, recording when, what it decided and why — never any of your conversation.",
+    "what": "One line written each time the prompt to save runs, recording when, what it decided and why — never any of your conversation. Each tool keeps it in its own folder, so the command that reads it is in that tool's entry, under runLog.",
     "path": "${CLAUDE_PLUGIN_DATA:-$HOME/.dazzer}/capture/receipts.jsonl",
-    "command": "cat \"${CLAUDE_PLUGIN_DATA:-$HOME/.dazzer}/capture/receipts.jsonl\" | tail",
-    "emptyMeans": "The plugin has never run — worth knowing, because that failure is otherwise completely silent."
+    "emptyMeans": "The prompt to save has never run in that tool — worth knowing, because that failure is otherwise completely silent."
   },
   "tools": [
     {
@@ -74,6 +73,12 @@
           }
         ],
         "note": "Typed into Claude itself, not into your shell."
+      },
+      "runLog": {
+        "kind": "run",
+        "where": "terminal",
+        "command": "tail ~/.claude/plugins/data/dazzer-dazzer/capture/receipts.jsonl",
+        "proven": "found on a real machine, holding lines that name this tool"
       },
       "surfaces": [
         {
@@ -116,6 +121,12 @@
         ],
         "note": "Codex asks you to approve a plugin's reminders before it will run them. If nothing appears in the run history, that approval is the first thing to check."
       },
+      "runLog": {
+        "kind": "run",
+        "where": "terminal",
+        "command": "tail ~/.codex/plugins/data/dazzer-dazzer/capture/receipts.jsonl",
+        "proven": "found on a real machine, holding lines that name this tool"
+      },
       "recallArrives": "once a session"
     },
     {
@@ -148,6 +159,12 @@
           }
         ],
         "note": "This tool gives a reminder no way to speak to the model - it can watch and it can block, and nothing it says is passed on. Proven by running one: both moments fired and every shape of reply was discarded. So the check-first reminder is delivered as a standing instruction instead, which this tool reads before every conversation, and the third step above is what puts it there. The other two reminders need a moment AND a voice, so they stay undelivered here."
+      },
+      "runLog": {
+        "kind": "run",
+        "where": "terminal",
+        "command": "tail ~/.copilot/plugin-data/dazzer/dazzer/capture/receipts.jsonl",
+        "proven": "found on a real machine, holding lines that name this tool"
       },
       "limits": [
         "Two of the three reminders do not arrive. Saving what settled at the end of a reply, and being put back on track after a long conversation forgets itself, both need to speak at a particular moment, and this tool lets a reminder do only one of those. Checking your Brain before answering is the one that survives, and it is the one that matters most.",
@@ -187,6 +204,13 @@
         ],
         "note": "This tool cannot read the main plugin's reminders file, because it and Devin both look for a file of that name and want different shapes inside it - and this tool discards a whole file over one entry it does not recognise, exactly as Claude Code does. Proven by putting both shapes in one file and watching every reminder vanish. So its reminders ship as a second small plugin of their own, which the third step installs. A broken neighbour sitting beside it does not take it down; that was proven too. The second plugin carries no copy of the end-of-reply script - it runs the one the first plugin already ships, which is why both are installed."
       },
+      "runLog": {
+        "kind": "run",
+        "where": "terminal",
+        "command": "tail ~/.dazzer/capture/receipts.jsonl",
+        "proven": "found on a real machine, holding lines that name this tool",
+        "note": "This tool gives the plugin no folder of its own, so the log is kept in ~/.dazzer, shared with any other tool that gives none. Each line names the tool that wrote it."
+      },
       "limits": [
         "Being put back on track after a long conversation forgets itself was never possible here - that moment does not exist in this tool."
       ],
@@ -203,7 +227,7 @@
       "reminders": {
         "recall": "works",
         "capture": "works-but-visible",
-        "resume": "works"
+        "resume": "not-delivered"
       },
       "installReminders": {
         "steps": [
@@ -220,6 +244,13 @@
           }
         ],
         "note": "Two steps, and the second one happens inside Cursor rather than in a terminal."
+      },
+      "runLog": {
+        "kind": "run",
+        "where": "terminal",
+        "command": "tail ~/.dazzer/capture/receipts.jsonl",
+        "proven": "found on a real machine, holding lines that name this tool",
+        "note": "This tool gives the plugin no folder of its own, so the log is kept in ~/.dazzer, shared with any other tool that gives none. Each line names the tool that wrote it."
       },
       "limits": [
         "Cursor has no way for a plugin to speak privately to the AI at the end of a reply. It only accepts a message and submits it as though you had typed it, so on Cursor the save prompt is visible in your conversation. The save prompt still does its job; it just is not silent."
@@ -250,6 +281,10 @@
           }
         ]
       },
+      "runLog": {
+        "kind": "none",
+        "note": "None. Devin's reminders never run the prompt to save, which is what writes this log, so there is no log to read."
+      },
       "limits": [
         "Two of the three reminders work. The save prompt does not, and cannot: Devin tells a reminder only which session and which prompt it is, with no way to tell how much conversation has built up since last time. The prompt has nothing to measure, so it stays quiet rather than firing blindly."
       ],
@@ -275,7 +310,7 @@
   "installConnection": {
     "conditional": true,
     "askFirst": "Nothing — run it whether or not you already have Dazzer.",
-    "skipWhen": "Never. Running it again is how you get the current version.",
+    "skipWhen": "Never.",
     "warning": "You will be asked to sign in again afterwards. That is the point: installing does not sign you in, and the sign-in is what was missing.",
     "note": "Everything above adds the reminders. They do not reach your Brain by themselves, so a tool with the reminders and no connection has an AI being told to check something it cannot open. One line per tool below, in that tool's own wording.",
     "byTool": {
