@@ -67,19 +67,28 @@ const SWEEP_CASES = {
 };
 
 /**
- * What a shell suite needs to see a failure at all: it runs its subject under the shell it was
- * handed, or the second-shell run tests the first shell again, and it keeps what the subject
- * prints to the error channel, the habit whose absence once hid three defects.
+ * What a shell suite needs to see a failure at all: every line that runs its subject runs it under
+ * the shell it was handed, or the second-shell run tests the first shell again, and keeps what the
+ * subject prints to the error channel, the habit whose absence once hid three defects.
  */
 function suiteContract(entry) {
   const text = readFileSync(join(TESTS, entry), "utf8");
-  const runs = text.split("\n").filter((line) => line.includes('"$SUBJECT"') && !line.trimStart().startsWith("#"));
+  // Every line that runs the subject: "$SUBJECT" as the command run, not a word printed or tested.
+  const runs = [];
+  text.split("\n").forEach((line, i) => {
+    if (line.trimStart().startsWith("#") || !line.includes('"$SUBJECT"')) return;
+    const command = line.slice(0, line.indexOf('"$SUBJECT"')).split(/\|\||&&|[|;(]/).pop().trim();
+    if (!/^(printf|echo|test|case)\b|^\[|^[A-Za-z_][A-Za-z0-9_]*=$/.test(command)) runs.push({ n: i + 1, line, command });
+  });
   const out = [];
-  if (!runs.some((line) => line.includes('"$SHELL_UNDER_TEST" "$SUBJECT"'))) {
-    out.push('never runs "$SUBJECT" under "$SHELL_UNDER_TEST", so a run under a second shell tests the first one again');
-  }
-  if (!runs.some((line) => /2>\s*"\$/.test(line)) || runs.some((line) => /2>\s*(\/dev\/null|&1)/.test(line))) {
-    out.push("does not keep what its subject prints to the error channel in a file of its own, so it cannot assert that channel is empty");
+  if (runs.length === 0) out.push('never runs "$SUBJECT", so it tests nothing this run can name');
+  for (const { n, line, command } of runs) {
+    if (!/"\$SHELL_UNDER_TEST"$/.test(command)) {
+      out.push(`line ${n} runs "$SUBJECT" without "$SHELL_UNDER_TEST", so a run under a second shell tests the first one again`);
+    }
+    if (!/2>\s*"\$/.test(line) || /2>\s*(\/dev\/null|&1)/.test(line)) {
+      out.push(`line ${n} does not keep what its subject prints to the error channel in a file of its own, so it cannot assert that channel is empty`);
+    }
   }
   if (entry === "capture-sweep.test.sh") {
     for (const [tag, why] of Object.entries(SWEEP_CASES)) if (!text.includes(`"${tag}`)) out.push(`has no case tagged "${tag}": ${why}`);
