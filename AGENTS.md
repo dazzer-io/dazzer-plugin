@@ -10,35 +10,50 @@ This repository is public. Every file, commit message and branch name is public.
 ## Test
 
 ```sh
+npm ci --ignore-scripts
 node scripts/baseline.mjs
 SHELL_UNDER_TEST=bash node scripts/baseline.mjs
 ```
 
-- Run both. The shipped scripts are POSIX shell and run under whatever the person's system shell
-  is: bash in POSIX mode on a Mac, dash on Linux. They disagree on comparisons a past defect lived
-  on. CI runs both lines and `shellcheck -s sh` on the shipped scripts.
-- Never name a shell inside the suite. It takes its interpreter from `SHELL_UNDER_TEST`.
-- The known-defects ledger is shrink-only in both directions: an unlisted failure fails the run,
-  and a listed entry that starts passing also fails it. When you fix one, delete its line.
-- Checks are plain Node with no dependencies, and there is no package manifest. Keep it that way. A
-  check that validates structured data parses it; it never pattern-matches it.
+- Run both baseline lines. The shipped scripts are POSIX shell and run under whatever the person's
+  system shell is: bash in POSIX mode on a Mac, dash on Linux. They disagree on comparisons a past
+  defect lived on. Never name a shell inside a test; tests take their interpreter from
+  `SHELL_UNDER_TEST`.
+- The plate pane's tests run through `claude plugin test`, using the Claude Code version that
+  `package-lock.json` pins. Install it first with `npm ci --ignore-scripts`, or have `claude` on
+  your PATH.
+- Any failure fails the run. There is no list of known failures to hide behind.
+- Every file in `tests/` runs. Tests live there and never under `plugins/`: everything under
+  `plugins/` installs on people's machines, and a check fails if a test or test data appears there.
+- The checks are plain Node with no dependencies. `package.json` exists only to pin the Claude Code
+  that runs the plate tests; nothing in it installs with a plugin. Keep the checks dependency-free.
+  A check that validates structured data parses it; it never pattern-matches it.
+- CI runs both baseline lines, `shellcheck -s sh` on the shipped scripts and the shell tests, a
+  workflow audit (zizmor), and a Scorecard workflow.
+
+## Generated files
+
+- Every per-tool file is written by `scripts/generate.mjs` from `source/`: the manifests, the hook
+  files for each tool, the Copilot instruction, and part of `tools.manifest.json`. The generator
+  lists them all.
+- Never hand-edit a generated file. Change `source/` and run `node scripts/generate.mjs`, then
+  commit both. The `generated` gate (`node scripts/generate.mjs --check`) names any file that
+  differs.
+- Every sentence the plugin says lives in `source/words.json`. Dazzer's onboarding confirms an
+  install by finding a reminder sentence in what the AI could see, so reword one only there, and
+  only on purpose.
+- Install steps live in `docs/install.md` for people and in `tools.manifest.json` for screens. Change
+  both together; the install-parity gate refuses them when they disagree.
 
 ## Release
 
 - People install from `main`. An installed copy changes only when the version changes, so any
-  change meant to reach people bumps the version, in every place it is declared. The version check
-  names any place left behind.
-- Merging to `main` tags `v<version>` automatically. Nothing else publishes.
+  change meant to reach people bumps the version.
+- The version is written once, in `source/manifest.json`. Change it there and run
+  `node scripts/generate.mjs`; the `generated` gate names any file left behind.
+- Merging to `main` tags `v<version>` automatically, read from `source/manifest.json`. Nothing else
+  publishes.
 - Without a version bump, a fix reaches nobody who already installed it.
-
-## Never edit by hand
-
-- **Generated files.** A file a generator writes is never edited directly: change its source, run
-  the generator, and commit both. If a file says it is generated, treat it as generated.
-- **Install steps live in two places**: `docs/install.md` for people and `tools.manifest.json` for
-  screens. Change both together, or change their shared source if they are generated.
-- **Reminder sentences.** Onboarding confirms an install by finding a reminder sentence in what the
-  AI could see. Reword one only together with every place that declares it.
 
 ## Rules that exist because something broke
 
