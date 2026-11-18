@@ -55,6 +55,14 @@ for (const key of ["recall", "resume", "checkpoint"]) {
 if (!Array.isArray(words.copilot) || words.copilot.some((line) => typeof line !== "string")) {
   refusals.push(`source/words.json: "copilot" must be a list of lines`);
 }
+// A plugin's name becomes a folder under plugins/, so a "../" in one would write outside it.
+for (const plugin of manifest.plugins) {
+  if (!/^[a-z0-9-]+$/.test(plugin.name)) refusals.push(`source/manifest.json: plugin name ${JSON.stringify(plugin.name)} must be lowercase letters, digits and dashes`);
+}
+// The same shape the release step tags, so a version it would refuse never ships untagged.
+if (!/^[0-9]+\.[0-9]+\.[0-9]+$/.test(manifest.version)) {
+  refusals.push(`source/manifest.json: version ${JSON.stringify(manifest.version)} must be three whole numbers, like 1.2.3`);
+}
 if (refusals.length > 0) {
   for (const line of refusals) process.stderr.write(`${line}\n`);
   process.exit(1);
