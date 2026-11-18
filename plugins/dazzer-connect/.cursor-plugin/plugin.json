@@ -2,7 +2,7 @@
   "name": "dazzer-connect",
   "displayName": "Dazzer Connect",
   "version": "0.16.0",
-  "description": "The Dazzer Brain connection. Install it alongside the reminders, even if Dazzer already shows as connected: installing it again is how you get the current version.",
+  "description": "The Dazzer Brain connection, which the reminders need to reach your Brain. Install it alongside them; signing in is a separate step, described in the install guide.",
   "author": {
     "name": "Dazzer",
     "url": "https://dazzer.io"

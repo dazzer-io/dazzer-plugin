@@ -16,8 +16,8 @@
     {
       "name": "dazzer",
       "displayName": "Dazzer",
-      "description": "Makes your AI check your Dazzer Brain before answering and save what settles. Adds no connection of its own, so it is safe to install alongside one you already have.",
-      "listing": "Makes your AI check your Dazzer Brain before answering and save what settles. Safe to install alongside an existing connection - it adds no connection of its own.",
+      "description": "Makes your AI check your Dazzer Brain before it answers, and save decisions and facts to it as they come up. Adds no connection of its own, so it is safe to install alongside one you already have.",
+      "listing": "Makes your AI check your Dazzer Brain before it answers, and save decisions and facts as they come up. Safe beside an existing connection: it adds none of its own.",
       "keywords": ["memory", "knowledge", "brain", "mcp"],
       "carries": "reminders",
       "manifests": {
@@ -32,8 +32,8 @@
     {
       "name": "dazzer-connect",
       "displayName": "Dazzer Connect",
-      "description": "The Dazzer Brain connection. Install it alongside the reminders, even if Dazzer already shows as connected: installing it again is how you get the current version.",
-      "listing": "The Dazzer Brain connection itself. Install it even if Dazzer already shows as connected: installing it again is how you get the current version.",
+      "description": "The Dazzer Brain connection, which the reminders need to reach your Brain. Install it alongside them; signing in is a separate step, described in the install guide.",
+      "listing": "The Dazzer Brain connection itself, which the reminders need. Signing in is a separate step: see the install guide.",
       "keywords": ["memory", "knowledge", "brain", "mcp"],
       "carries": "connection",
       "manifests": {
