@@ -1,30 +1,45 @@
 # Install, sign in and update
 
+- [Before you start](#before-you-start)
+- [Claude Code](#claude-code), with [the plate pane](#the-plate-pane-optional)
+- [Claude chat apps](#claude-chat-apps)
+- [Codex](#codex)
+- [ChatGPT app](#chatgpt-app)
+- [GitHub Copilot](#github-copilot)
+- [Cursor](#cursor)
+- [Antigravity](#antigravity)
+- [Devin](#devin)
+- [Check it worked](#check-it-worked)
+- [Remove](#remove)
+
 ## Before you start
 
-You need a Dazzer account, which gives you a Dazzer Brain (see [dazzer.io](https://dazzer.io)), and
-one of the tools below.
+You need a Dazzer account, which gives you a Dazzer Brain, and one of the tools below. Access is by
+request at [dazzer.io](https://dazzer.io).
 
 Every tool needs two pieces:
 
 - **`dazzer`, the reminders.** Short notes that hooks add to what your AI reads at set points in a
   chat. A hook is a small command your tool runs at a set point, such as the start of a chat.
-- **`dazzer-connect`, the connection.** Signs your tool in to your Dazzer Brain. Without it, your
-  AI is told to check a Brain it cannot open.
+- **`dazzer-connect`, the connection**, which the reminders need to reach your Brain. It signs your
+  tool in to your Dazzer Brain.
 
-The plugins install from a marketplace: the list of plugins in this repository that your tool reads.
-Its name in your tool is `dazzer`.
+The plugins install from a marketplace, the plugin store your tool installs from. Here it is the
+list of plugins in this repository, and its name in your tool is `dazzer`.
 
-**Install the connection even if Dazzer already shows as connected, then sign in.** A connection
-can show as present and still be signed out. Installing the reminders never touches a connection,
-but installing `dazzer-connect` beside a Dazzer connection you set up another way has not been
-tested: if your AI stops reaching your Brain afterwards, sign in again.
+**Install the connection alongside the reminders, even if Dazzer already shows as connected, then
+sign in.** A connection can show as present and still be signed out. The reminders never touch a
+connection, but installing `dazzer-connect` beside a Dazzer connection you set up another way has
+not been tested: if your AI stops reaching your Brain afterwards, sign in again.
 
 **Signing in is a separate step.** In most tools nothing asks during the install: restart the tool
 and sign in when it asks. Each tool's section says what happens there. The sign-in opens Dazzer's
 sign-in page in your browser and uses the Dazzer account your browser is signed in to, without
 asking which. To use a different account, sign out of Dazzer in your browser first, or what your AI
 saves lands in the wrong Brain.
+
+At the end of each tool's section, **Not yet confirmed** names any step not yet watched working in
+that tool.
 
 ## Claude Code
 
@@ -41,9 +56,6 @@ The install command does not exist inside the Claude desktop app. Open Claude Co
 once, by typing `claude`, and type the lines there. The app and the terminal share one set of
 settings, so the plugins appear in the app's next Claude Code chat.
 
-Whether Claude Code asks you to approve the reminders before they run is not yet confirmed. The
-checks under [Check it worked](#check-it-worked) show whether they ran.
-
 **Sign in.** On a machine that has never had Dazzer, Claude Code may ask during the install. If it
 does not, restart Claude Code and sign in when it asks. If nothing asks, type `/mcp`, choose
 `plugin:dazzer-connect:dazzer`, and sign in there.
@@ -53,8 +65,9 @@ so you keep the version you installed until you update. To turn them on, type `/
 **Marketplaces**, choose **dazzer**, and select **Enable auto-update**. Claude Code then keeps the
 plugins current.
 
-To update by hand instead, type these lines into a terminal, not into Claude Code, in this order,
-then restart Claude Code:
+To update by hand instead, type the lines below into a terminal, not into Claude Code, in this
+order, then restart Claude Code. Skip the third line if you did not install `dazzer-connect`, and
+the fourth if you did not install the plate pane.
 
 ```sh
 claude plugin marketplace update dazzer
@@ -64,23 +77,28 @@ claude plugin update dazzer-plate@dazzer
 ```
 
 The first line only refreshes the list of plugins. It prints a success message and changes nothing
-you run. The lines after it update the plugins, and only a restart applies them. Skip the third
-line if you did not install `dazzer-connect`, and the fourth if you did not install the plate pane.
+you run. The lines after it update the plugins, and only a restart applies them.
 
 **Removal.** See [Remove](#remove).
 
+**Not yet confirmed:** whether Claude Code asks you to approve the reminders before they run. The
+checks under [Check it worked](#check-it-worked) show whether they ran.
+
 ### The plate pane (optional)
 
-A pane beside the chat that lists your open items from your Brain, in four tabs: **Needs you**,
-**Waiting**, **Coming up** and **Later**. Claude Code only. Install it after the lines above, typed
-into Claude Code's prompt:
+Your plate is your open items in your Brain. The plate pane lists them beside the chat, in four
+tabs: **Needs you**, **Waiting**, **Coming up** and **Later**. Claude Code only. Install it after
+the lines above, typed into Claude Code's prompt:
 
 ```text
 /plugin install dazzer-plate@dazzer
 ```
 
-Then type `/plate`. Nothing opens or reads anything until you do. To remove `/plate` from the list
-of commands, set the **Plate pane** option to **off** in `/config`.
+Then type `/plate`. Nothing opens or reads anything until you do.
+
+To hide it, set the **Plate pane** option to **off** in `/config`: `/plate` disappears from the list
+of commands, but the plugin stays installed. To remove it entirely,
+uninstall `dazzer-plate` (see [Remove](#remove)).
 [How it works](how-it-works.md#the-plate-pane) says what it reads and sends.
 
 ## Claude chat apps
@@ -107,9 +125,7 @@ if [the checks](#check-it-worked) show no note reached your AI, check this first
 codex mcp login dazzer
 ```
 
-**Updates.** No update step has been confirmed for Codex yet.
-
-**Removal.** Not yet confirmed for Codex.
+**Not yet confirmed:** an update step, how to remove the plugins, and where Codex keeps the run log.
 
 ## ChatGPT app
 
@@ -135,10 +151,10 @@ The prompt to save and the note after compaction do not reach the AI in Copilot.
 
 **Sign in.** Nothing asks during the install. The sign-in appears the next time you start Copilot.
 
-**Updates.** No update step has been confirmed for Copilot yet.
+**Removal.** The instruction file stays until you delete it; see [Remove](#remove).
 
-**Removal.** Removing the plugins is not yet confirmed for Copilot. The instruction file stays until
-you delete it; see [Remove](#remove).
+**Not yet confirmed:** an update step, how to remove the plugins, and where Copilot keeps the run
+log.
 
 ## Cursor
 
@@ -157,17 +173,19 @@ Then, in Cursor, type `/add-plugin` and choose **dazzer**. Do it once more and c
   appears in your chat as a message, as though you had typed it.
 - No note reaches the AI after compaction in Cursor.
 
-**Sign in.** Not yet confirmed in Cursor. Restart Cursor, sign in if it asks, and
-[check it worked](#check-it-worked).
+**Sign in.** Restart Cursor, sign in if it asks, and [check it worked](#check-it-worked).
 
-**Updates.** Cursor's update command reports success without fetching anything new. Remove the
-marketplace, then add it again and choose the plugins again, as above:
+**Updates.** Cursor's update command reports success without fetching anything new. Instead,
+remove the marketplace and add it again, in a terminal:
 
 ```sh
 cursor-agent plugin marketplace remove dazzer
+cursor-agent plugin marketplace add https://github.com/dazzer-io/dazzer-plugin.git
 ```
 
-**Removal.** Removing the plugins themselves is not yet confirmed for Cursor.
+Then type `/add-plugin` in Cursor and choose **dazzer** and **dazzer-connect** again.
+
+**Not yet confirmed:** the sign-in, how to remove the plugins, and where Cursor keeps the run log.
 
 ## Antigravity
 
@@ -185,17 +203,17 @@ reminders file, so `dazzer-antigravity` carries the same notes in Antigravity's 
 check-before-answering note arrives with every message, and the prompt to save at the end of a
 reply. Antigravity has no point after compaction at which a note could be added.
 
-**Sign in.** Not yet confirmed in Antigravity. In one test it never reached the Brain at all.
-Restart it, sign in if it asks, and [check it worked](#check-it-worked).
+**Sign in.** Restart Antigravity, sign in if it asks, and [check it worked](#check-it-worked).
 
-**Updates.** Not yet confirmed. The intended step is to refresh the downloaded copy, from the
-folder you ran the first line in, then run the three `agy` lines above again:
+**Updates.** Refresh the downloaded copy, from the folder you ran the first line in, then run the
+three `agy` lines above again:
 
 ```sh
 git -C dazzer-plugin pull
 ```
 
-**Removal.** Not yet confirmed for Antigravity.
+**Not yet confirmed:** the sign-in (in one test it never reached the Brain at all), that the update
+step works, how to remove the plugins, and where Antigravity keeps the run log.
 
 ## Devin
 
@@ -209,13 +227,11 @@ devin plugins install dazzer-io/dazzer-plugin#plugins/dazzer-connect
 The check-before-answering note arrives with every message, and a note after compaction. That note
 carries no label for the chat, so if you have saved progress from several chats, your AI may be
 shown a list to choose from. The prompt to save does not work in Devin: Devin tells a plugin nothing
-about how long the chat has grown, so the plugin cannot tell when to prompt.
+about how long the chat has grown, so the plugin cannot tell when to prompt, and writes no run log.
 
 **Sign in.** In testing, Devin signed in without asking. If yours asks, sign in then.
 
-**Updates.** No update step has been confirmed for Devin yet.
-
-**Removal.** Not yet confirmed for Devin.
+**Not yet confirmed:** an update step, and how to remove the plugins.
 
 ## Check it worked
 
@@ -239,8 +255,8 @@ about how long the chat has grown, so the plugin cannot tell when to prompt.
    tail ~/.claude/plugins/data/dazzer-dazzer/capture/receipts.jsonl
    ```
 
-   Lines there mean the prompt to save ran; no file means it never has. Which folder other tools
-   use for the log is not yet confirmed.
+   Lines there mean the prompt to save ran; no file means it never has. For other tools, see each
+   tool's section above.
 
 ## Remove
 
@@ -275,4 +291,4 @@ terminal:
 rm ~/.copilot/instructions/dazzer.instructions.md
 ```
 
-In Codex, Cursor, Antigravity and Devin, removal steps are not yet confirmed.
+For the other tools, each tool's section above says whether a removal step is known.

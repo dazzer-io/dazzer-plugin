@@ -1,12 +1,14 @@
 # Dazzer
 
-Your AI checks your Dazzer Brain before it answers, and saves what you decide so the next chat starts from it.
+Your AI checks your Dazzer Brain before it answers, and saves what you decide so the next chat
+starts from it.
 
 A Dazzer Brain is a shared record of what you and your team know and decide: decisions, facts,
 preferences and corrections, kept by Dazzer so the AI tools you work with can read it. You need a
-Dazzer account to have one; see [dazzer.io](https://dazzer.io). These plugins make your AI tool use
-it. A new Brain starts empty, so on day one your AI mostly finds nothing and says so; it fills as
-you work.
+Dazzer account to have one. Access is by request at [dazzer.io](https://dazzer.io); see also the
+[privacy policy](https://dazzer.io/privacy) and [terms](https://dazzer.io/terms). These plugins
+make your AI tool use your Brain. A new Brain starts empty, so on day one your AI mostly finds
+nothing and says so; it fills as you work.
 
 For people who work in Claude Code, Codex, GitHub Copilot, Cursor, Antigravity or Devin.
 
@@ -22,32 +24,36 @@ flowchart LR
 
 ## What you install
 
-- **`dazzer`, the reminders.** Short notes added to what your AI reads at set points in a chat, so
-  it checks your Dazzer Brain before it answers and saves decisions and facts to it as they come up.
-  They add no connection of their own, so they are safe beside one you already have.
+- **`dazzer`, the reminders.** Short notes added to what your AI reads by hooks: small commands
+  your AI tool runs at set points in a chat, such as its start. The notes make your AI check your
+  Dazzer Brain before it answers, and save decisions and facts to it as they come up. They add no
+  connection of their own and leave any you already have as it is.
 - **`dazzer-connect`, the connection**, which the reminders need to reach your Brain. It signs your
   tool in to your Brain, so your AI can read from it and save to it. Install it alongside them;
   signing in is a separate step, described in the [install guide](docs/install.md).
-- **`dazzer-plate`, the plate pane.** Optional, Claude Code only: a pane listing your open items
-  from your Brain.
+- **`dazzer-plate`, the plate pane.** Optional, Claude Code only. Your plate is your open items in
+  your Brain: what needs you, what waits on others, what is coming up and what can wait. The pane
+  lists them beside the chat.
 
 Antigravity needs one more piece, `dazzer-antigravity`: the reminders in Antigravity's own format.
 
 ## Supported tools
 
-What reaches your AI in each tool, as tested so far. "After compaction" is the note your AI gets
-when the tool shortens a long chat to make room, which can drop what your AI was told earlier.
+What reaches your AI in each tool. Compaction is when your AI tool shortens a long chat to fit,
+which can drop what your AI was told earlier; the note after it tells your AI to pick up again.
 
-| Tool | Check before answering | Prompt to save | After compaction | Not yet confirmed | Guide |
-| --- | --- | --- | --- | --- | --- |
-| Claude Code, in a terminal or the Claude desktop app | At the start of each chat | With your next message | Yes, with this chat's saved progress | Whether it asks you to approve the reminders | [Install](docs/install.md#claude-code) |
-| Codex | At the start of each chat | With your next message | Yes, with this chat's saved progress | Updates, removal | [Install](docs/install.md#codex) |
-| GitHub Copilot | From an instruction file you copy in | No | No | Updates, removing the plugins | [Install](docs/install.md#github-copilot) |
-| Cursor | At the start of each chat | Posted in your chat as a message | No | Sign-in, removal | [Install](docs/install.md#cursor) |
-| Antigravity | With every message | At the end of a reply | No | Sign-in, updates, removal | [Install](docs/install.md#antigravity) |
-| Devin | With every message | No | Yes, without a label for the chat | Updates, removal | [Install](docs/install.md#devin) |
-| Claude chats outside Claude Code | No | No | No | Not covered | [Why](docs/install.md#claude-chat-apps) |
-| ChatGPT app | No | No | No | Not covered | [Why](docs/install.md#chatgpt-app) |
+| Tool | Check before answering | Prompt to save | After compaction | Guide |
+| --- | --- | --- | --- | --- |
+| Claude Code, in a terminal or the Claude desktop app | At the start of each chat | With your next message | Yes, with this chat's saved progress | [Install](docs/install.md#claude-code) |
+| Codex | At the start of each chat | With your next message | Yes, with this chat's saved progress | [Install](docs/install.md#codex) |
+| GitHub Copilot | From an instruction file you copy in | No | No | [Install](docs/install.md#github-copilot) |
+| Cursor | At the start of each chat | Posted in your chat as a message | No | [Install](docs/install.md#cursor) |
+| Antigravity | With every message | At the end of a reply | No | [Install](docs/install.md#antigravity) |
+| Devin | With every message | No | Yes, without a label for the chat | [Install](docs/install.md#devin) |
+| Claude chats outside Claude Code | No | No | No | [Why](docs/install.md#claude-chat-apps) |
+| ChatGPT app | No | No | No | [Why](docs/install.md#chatgpt-app) |
+
+Each tool's install section names any step not yet watched working there.
 
 ## Quick start in Claude Code
 
@@ -80,10 +86,12 @@ More checks, every other tool, updates and removal: [docs/install.md](docs/insta
   your AI reads, like anything you type. They tell it to check your Brain first, to save what was
   decided, and to restore its saved progress after compaction. In Claude Code and Codex the notes
   also carry a label for the chat, made from the id your tool already gives it.
-- **Over the network:** the reminders send nothing; they run on your machine. Your tool reaches
-  your Brain through the connection at `https://graph.dazzer.io/mcp`, signed in as you, and each
-  request names the plugin and its version. What your AI looks up and saves goes there. The plate
-  pane asks the same connection for your open items, with your computer's time zone.
+- **Over the network:** what your AI looks up in or saves to your Brain goes to Dazzer's servers;
+  the plugins themselves send none of your conversation. Your tool reaches your Brain through the
+  connection at `https://graph.dazzer.io/mcp`, signed in as you, and each request names the plugin
+  and its version. The plate pane asks the same connection for your open items, with your
+  computer's time zone. How Dazzer keeps and handles that data is in the
+  [privacy policy](https://dazzer.io/privacy).
 - **On disk:** a short run log and a small counter per chat, never what was said. On Copilot, the
   instruction file you copy in. [How it works](docs/how-it-works.md#what-is-stored-on-your-machine)
   has the full list.
@@ -102,7 +110,9 @@ More checks, every other tool, updates and removal: [docs/install.md](docs/insta
 
 ## What it never does
 
-- **It never touches a connection you already have** when you install the reminders.
+- **The reminders never touch a connection.** Installing them adds none and changes none.
+  Installing `dazzer-connect` beside a Dazzer connection you set up another way has not been
+  tested.
 - **It never decides what is saved, and never writes to your Brain itself.** Your AI does the
   saving, through its own connection.
 - **It never stores your chat.** To know when to prompt a save it counts the lines of your tool's

@@ -30,19 +30,31 @@ holds: your AI reads from your Brain and saves to it there.
 | `dazzer-plate` | The plate pane. Reads through the connection you already have. | Claude Code only, optional |
 
 The reminders and the connection are separate on purpose, so installing the reminders never touches
-a connection you already have. The
-[decision record](decisions/0001-reminders-apart-from-the-connection.md) explains why.
+a connection. Installing `dazzer-connect` beside a Dazzer connection you set up another way has not
+been tested. The [decision record](decisions/0001-reminders-apart-from-the-connection.md) explains
+why.
 
 ## What reaches your AI
 
-| Note | What your AI is told | Claude Code, Codex | Copilot | Cursor | Antigravity | Devin |
-| --- | --- | --- | --- | --- | --- | --- |
-| Check before answering | Look in your Brain before answering anything it may already know, and say so plainly if the Brain cannot be reached. | Start of each chat | Start of each conversation, from the instruction file | Start of each chat | Every message | Every message |
-| Prompt to save | Save what was decided; say nothing if nothing was. | With your next message | Does not arrive | End of a reply, as a message in your chat | End of a reply | Does not run |
-| After compaction | Restore your saved progress before carrying on, and before asking you to repeat anything. | Yes, with this chat's label | Does not arrive | None | None | Yes, without a label |
+| Note | What your AI is told |
+| --- | --- |
+| Check before answering | Look in your Brain before answering anything it may already know, and say so plainly if the Brain cannot be reached. |
+| Prompt to save | Save what was decided; say nothing if nothing was. |
+| After compaction | Restore your saved progress before carrying on, and before asking you to repeat anything. |
+
+When each note arrives, by tool:
+
+| Tool | Check before answering | Prompt to save | After compaction |
+| --- | --- | --- | --- |
+| Claude Code, Codex | Start of each chat | With your next message | Yes, with this chat's label |
+| Copilot | Start of each conversation, from the instruction file | Does not arrive | Does not arrive |
+| Cursor | Start of each chat | End of a reply, as a message in your chat | None |
+| Antigravity | Every message | End of a reply | None |
+| Devin | Every message | Does not run | Yes, without a label |
 
 Every note a hook adds starts with `[Dazzer]` or `Dazzer checkpoint`, so it cannot be mistaken for
-your own words. In Copilot the same sentence sits in the instruction file. The notes go to your AI model as part of the chat, like anything else in it.
+your own words. In Copilot the same sentence sits in the instruction file. The notes go to your AI
+model as part of the chat, like anything else in it.
 
 The skill is a short file that tells your AI when to reach for your Brain and that Dazzer's
 instructions for using it, such as what is worth saving and how to record it, are read from the
@@ -107,8 +119,8 @@ AI changes an item. A read with no answer after 20 seconds says it could not rea
 
 **What it sends to your AI, as you.** Only when you press a button. A card's **Open** shows two:
 
-- **Done** sends one sentence with the item's number, such as `Mark item 7240 done.` Your AI marks it
-  done, and the pane updates on the next plate it reads.
+- **Done** sends one sentence with the item's number, such as `Mark item 7240 done.` Your AI marks
+  it done, and the pane updates on the next plate it reads.
 - **Talk about it** sends `Tell me about item 7240.`, once per item until the pane reads your plate
   again.
 
@@ -153,8 +165,9 @@ own, `~/.dazzer/capture/`. Which folder each other tool uses is not yet confirme
 Elsewhere:
 
 - **The plugins themselves**, in your tool's own plugin folder, like any plugin.
-- **In Copilot**, the instruction file you copy in, at `~/.copilot/instructions/dazzer.instructions.md`.
-  It stays after you remove the plugins, until you delete it.
+- **In Copilot**, the instruction file you copy in, at
+  `~/.copilot/instructions/dazzer.instructions.md`. It stays after you remove the plugins, until you
+  delete it.
 - **In Antigravity**, the `dazzer-plugin` folder you downloaded.
 
 The sign-in to your Brain is held by your tool, not by the plugins.
