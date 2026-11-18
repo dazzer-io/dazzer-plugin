@@ -203,7 +203,7 @@
       "reminders": {
         "recall": "works",
         "capture": "works-but-visible",
-        "resume": "works"
+        "resume": "not-delivered"
       },
       "installReminders": {
         "steps": [
