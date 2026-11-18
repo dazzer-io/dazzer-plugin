@@ -150,9 +150,18 @@ goes to disk, and nothing is shared with another session or account.
 
 ## What is stored on your machine
 
-The prompt to save keeps its files in a `capture` folder: in Claude Code,
-`~/.claude/plugins/data/dazzer-dazzer/capture/`; in a tool that gives the plugin no folder of its
-own, `~/.dazzer/capture/`. Which folder each other tool uses is not yet confirmed. In it:
+The prompt to save keeps its files in a `capture` folder, inside the folder your tool gives the
+plugin, or in `~/.dazzer/capture/` where the tool gives it none:
+
+| Tool | Folder |
+| --- | --- |
+| Claude Code | `~/.claude/plugins/data/dazzer-dazzer/capture/` |
+| Codex | `~/.codex/plugins/data/dazzer-dazzer/capture/` |
+| GitHub Copilot | `~/.copilot/plugin-data/dazzer/dazzer/capture/` |
+| Cursor and Antigravity | `~/.dazzer/capture/` |
+| Devin | None: the prompt to save does not run in Devin. |
+
+In it:
 
 - **`receipts.jsonl`**, the run log: one line each time the prompt to save runs, with the time, the
   tool, the plugin version, and what it decided and why. Never any of the chat. When it passes

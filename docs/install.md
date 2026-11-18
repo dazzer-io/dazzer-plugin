@@ -79,6 +79,13 @@ claude plugin update dazzer-plate@dazzer
 The first line only refreshes the list of plugins. It prints a success message and changes nothing
 you run. The lines after it update the plugins, and only a restart applies them.
 
+**Run log.** The prompt to save writes one line to its run log each time it runs
+([what a line holds](#check-it-worked)). Read the last lines in a terminal:
+
+```sh
+tail ~/.claude/plugins/data/dazzer-dazzer/capture/receipts.jsonl
+```
+
 **Removal.** See [Remove](#remove).
 
 **Not yet confirmed:** whether Claude Code asks you to approve the reminders before they run. The
@@ -125,7 +132,14 @@ if [the checks](#check-it-worked) show no note reached your AI, check this first
 codex mcp login dazzer
 ```
 
-**Not yet confirmed:** an update step, how to remove the plugins, and where Codex keeps the run log.
+**Run log.** The prompt to save writes one line to its run log each time it runs
+([what a line holds](#check-it-worked)). Read the last lines in a terminal:
+
+```sh
+tail ~/.codex/plugins/data/dazzer-dazzer/capture/receipts.jsonl
+```
+
+**Not yet confirmed:** an update step, and how to remove the plugins.
 
 ## ChatGPT app
 
@@ -151,10 +165,17 @@ The prompt to save and the note after compaction do not reach the AI in Copilot.
 
 **Sign in.** Nothing asks during the install. The sign-in appears the next time you start Copilot.
 
+**Run log.** The prompt to save still runs in Copilot, though what it says does not reach the AI,
+and writes one line to its run log each time ([what a line holds](#check-it-worked)). Read the
+last lines in a terminal:
+
+```sh
+tail ~/.copilot/plugin-data/dazzer/dazzer/capture/receipts.jsonl
+```
+
 **Removal.** The instruction file stays until you delete it; see [Remove](#remove).
 
-**Not yet confirmed:** an update step, how to remove the plugins, and where Copilot keeps the run
-log.
+**Not yet confirmed:** an update step, and how to remove the plugins.
 
 ## Cursor
 
@@ -185,7 +206,14 @@ cursor-agent plugin marketplace add https://github.com/dazzer-io/dazzer-plugin.g
 
 Then type `/add-plugin` in Cursor and choose **dazzer** and **dazzer-connect** again.
 
-**Not yet confirmed:** the sign-in, how to remove the plugins, and where Cursor keeps the run log.
+**Run log.** The prompt to save writes one line to its run log each time it runs
+([what a line holds](#check-it-worked)). Read the last lines in a terminal:
+
+```sh
+tail ~/.dazzer/capture/receipts.jsonl
+```
+
+**Not yet confirmed:** the sign-in, and how to remove the plugins.
 
 ## Antigravity
 
@@ -212,8 +240,15 @@ three `agy` lines above again:
 git -C dazzer-plugin pull
 ```
 
+**Run log.** The prompt to save writes one line to its run log each time it runs
+([what a line holds](#check-it-worked)). Read the last lines in a terminal:
+
+```sh
+tail ~/.dazzer/capture/receipts.jsonl
+```
+
 **Not yet confirmed:** the sign-in (in one test it never reached the Brain at all), that the update
-step works, how to remove the plugins, and where Antigravity keeps the run log.
+step works, and how to remove the plugins.
 
 ## Devin
 
@@ -246,17 +281,10 @@ about how long the chat has grown, so the plugin cannot tell when to prompt, and
    chat.` If it quotes one, the reminders reached it.
 4. **The run log.** The prompt to save writes one line to a run log each time it runs: when, which
    tool, which version, and what it decided and why, never what was said. The check-before-answering
-   note writes nothing.
-
-   In Claude Code, read the last lines of the log in a terminal. This is the folder Claude Code
-   gives the plugin:
-
-   ```sh
-   tail ~/.claude/plugins/data/dazzer-dazzer/capture/receipts.jsonl
-   ```
-
-   Lines there mean the prompt to save ran; no file means it never has. For other tools, see each
-   tool's section above.
+   note writes nothing. Each tool's **Run log** line above reads its own log:
+   [Claude Code](#claude-code), [Codex](#codex), [GitHub Copilot](#github-copilot),
+   [Cursor](#cursor) and [Antigravity](#antigravity). Lines there mean the prompt to save ran; no
+   file means it never has. Devin writes no run log.
 
 ## Remove
 
