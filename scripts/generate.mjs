@@ -6,6 +6,10 @@
  *   node scripts/generate.mjs           write every generated file
  *   node scripts/generate.mjs --check   write nothing; exit 1 naming each file that differs
  *
+ * Either way it also fails on a file under plugins/ that nobody writes, and on generated files that
+ * break what a host needs: the reminders tools.manifest.json promises each tool, the keys each host
+ * accepts, the [Dazzer] mark, and the paths a listing names.
+ *
  * Six tools read this repository, each in its own format:
  *
  *   Claude Code   .claude-plugin/marketplace.json, <plugin>/.claude-plugin/plugin.json, hooks/hooks.json
@@ -178,6 +182,8 @@ const COPILOT_CADENCE = "once a conversation";
 
 const files = new Map();
 const cadence = new Map([["copilot", COPILOT_CADENCE]]);
+/** The file each tool reads its reminders from, for the checks below. */
+const toolFile = new Map();
 
 const base = (plugin) => ({
   name: plugin.name,
@@ -225,11 +231,15 @@ for (const plugin of manifest.plugins) {
   const hookFiles = { reminders: REMINDER_FILES, "antigravity reminders": [ANTIGRAVITY_FILE] }[plugin.carries] ?? [];
   for (const file of hookFiles) {
     files.set(`${dir}/${file.path}`, json(file.doc));
-    for (const tool of file.tools) cadence.set(tool, CADENCE[file.recallOn]);
+    for (const tool of file.tools) {
+      cadence.set(tool, CADENCE[file.recallOn]);
+      toolFile.set(tool, `${dir}/${file.path}`);
+    }
   }
 
   if (plugin.carries === "reminders") {
     files.set(`${dir}/instructions/copilot.md`, `${words.copilot.join("\n")}\n\n${words.recall}\n`);
+    toolFile.set("copilot", `${dir}/instructions/copilot.md`);
     files.set(`${dir}/prompts/capture-tap.txt`, words.checkpoint);
   }
 
@@ -302,6 +312,87 @@ for (const entry of readdirSync(join(ROOT, "plugins"), { recursive: true, withFi
   }
 }
 
+// --- what the files must say --------------------------------------------------------------------
+// The comparison below proves each file matches its template. These prove the templates are right.
+
+const textOf = (path) => files.get(path) ?? (existsSync(join(ROOT, path)) ? readFileSync(join(ROOT, path), "utf8") : undefined);
+const parse = (path, text) => {
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    problems.push(`${path} is not JSON: ${error.message}`);
+    return {};
+  }
+};
+const valuesIn = (node, key) =>
+  node === null || typeof node !== "object" ? [] : [...(typeof node[key] === "string" ? [node[key]] : []), ...Object.values(node).flatMap((child) => valuesIn(child, key))];
+const stringsIn = (node) => (typeof node === "string" ? [node] : node !== null && typeof node === "object" ? Object.values(node).flatMap(stringsIn) : []);
+
+/** The top-level keys each host accepts: Codex drops a whole file over one more, Cursor one with no "version". */
+const HOST_KEYS = {
+  "plugins/dazzer/hooks/hooks.json": { may: ["hooks"], must: ["hooks"] },
+  "plugins/dazzer/hooks/cursor.json": { may: ["version", "hooks"], must: ["version", "hooks"] },
+  "plugins/dazzer/hooks.json": { may: ["UserPromptSubmit", "SessionStart"], must: [] },
+  "plugins/dazzer-antigravity/hooks.json": { may: ["dazzer"], must: ["dazzer"] },
+  "plugins/dazzer-plate/hooks/hooks.json": { may: ["modules"], must: ["modules"] },
+};
+for (const [path, { may, must }] of Object.entries(HOST_KEYS)) {
+  const text = textOf(path);
+  if (text === undefined) {
+    problems.push(`${path} is missing, and its host reads no other file`);
+    continue;
+  }
+  const doc = parse(path, text);
+  for (const key of Object.keys(doc)) if (!may.includes(key)) problems.push(`${path} holds "${key}", which its host does not accept, so it drops the whole file`);
+  for (const key of must) if (!(key in doc)) problems.push(`${path} has no "${key}", which its host needs`);
+  for (const command of valuesIn(doc, "command")) {
+    if (command.includes("/scripts/") || command.includes("[Dazzer] ")) continue;
+    const said = Object.keys(words).find((key) => typeof words[key] === "string" && command.includes(words[key]));
+    problems.push(`${path} speaks ${said ? `the "${said}" sentence` : command.slice(0, 60)} without the [Dazzer] mark`);
+  }
+}
+const plate = "plugins/dazzer-plate/hooks/hooks.json";
+const modules = parse(plate, textOf(plate) ?? "{}").modules;
+if (!Array.isArray(modules) || modules.length === 0 || !modules.every((m) => typeof m === "string" && existsSync(join(ROOT, dirname(plate), m)))) {
+  problems.push(`${plate} must list the plate's modules, each a file that is there`);
+}
+
+// Each tool's file carries exactly the reminders tools.manifest.json says arrive there.
+const CARRIES = {
+  recall: (text) => text.includes(words.recall),
+  resume: (text) => text.includes(words.resume),
+  capture: (text) => text.includes("/scripts/capture-sweep.sh"),
+};
+for (const tool of tools.tools) {
+  if (typeof tool.describedAs !== "string" || tool.describedAs.trim() === "") problems.push(`${toolsPath}: ${tool.id} has no describedAs, so a screen naming it cannot say what it is`);
+  if (tool.status !== "supported") continue;
+  const path = toolFile.get(tool.id);
+  const text = (path && textOf(path)) ?? "";
+  for (const [id, carries] of Object.entries(CARRIES)) {
+    const promised = ["works", "works-but-visible"].includes(tool.reminders?.[id]);
+    if (promised !== carries(text)) problems.push(`${path ?? tool.id}: ${toolsPath} says ${tool.id}'s ${id} reminder is "${tool.reminders?.[id]}", and the file ${promised ? "does not carry it" : "carries it"}`);
+  }
+}
+
+for (const [path, text] of files) {
+  // The checkpoint sent with a person's next message names the chat's thread, and only
+  // own-place.sh tells the model that thread: in the start-of-chat group, which also runs after a reset.
+  if (text.includes("DAZZER_MOMENT=with-next-message")) {
+    const opening = parse(path, text).hooks?.SessionStart?.find((group) => group.matcher === undefined);
+    if (!valuesIn(opening, "command").some((c) => c.includes("/scripts/own-place.sh"))) problems.push(`${path} names the chat's thread at each checkpoint and never runs own-place.sh when a chat starts`);
+  }
+  // Every "./" a listing names is there, and only Cursor's names a hooks file: Claude Code reads a
+  // named one as well as its own, which would hand it the file it must not see.
+  if (/(^|\/)(plugin|marketplace)\.json$/.test(path)) {
+    const doc = parse(path, text);
+    const home = path.startsWith("plugins/") ? path.split("/").slice(0, 2).join("/") : ".";
+    for (const pointer of stringsIn(doc).filter((s) => s.startsWith("./"))) {
+      if (!files.has(join(home, pointer)) && !existsSync(join(ROOT, home, pointer))) problems.push(`${path} points at ${pointer}, which is not there`);
+    }
+    if ("hooks" in doc && !path.includes("/.cursor-plugin/")) problems.push(`${path} names a hooks file, which only Cursor's listing may`);
+  }
+}
+
 for (const [path, text] of files) {
   const full = join(ROOT, path);
   const current = existsSync(full) ? readFileSync(full, "utf8") : undefined;
@@ -316,7 +407,7 @@ for (const [path, text] of files) {
 
 if (problems.length > 0) {
   process.stdout.write(`FAIL generated\n${problems.map((line) => `  ${line}`).join("\n")}\n`);
-  if (check) process.stdout.write("  Change source/ and run: node scripts/generate.mjs\n");
+  if (check) process.stdout.write("  Fix what is named (most often in source/), then run: node scripts/generate.mjs\n");
   process.exit(1);
 }
 process.stdout.write(check ? `ok   generated (${files.size} files match source/)\n` : `${files.size} files match source/\n`);
