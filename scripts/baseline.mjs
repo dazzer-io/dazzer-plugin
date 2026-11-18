@@ -26,20 +26,19 @@ const CHECK = (name) => `node scripts/checks/${name}.mjs`;
  * the rest.
  */
 const GATES = [
+  // Every per-tool file is written from source/ by scripts/generate.mjs.
+  { id: "generated", name: "every per-tool file matches the generator", cmd: "node scripts/generate.mjs --check" },
+
   // The two constraints that exist because something broke in the field.
   { id: "connection-isolation", name: "behaviour plugin ships no connection", cmd: CHECK("check-connection-isolation") },
   { id: "connection-address", name: "connection address is product-owned", cmd: CHECK("check-connection-address") },
-  { id: "address-parity", name: "the address we tell is the address we ship", cmd: CHECK("check-address-parity") },
 
   // Packaging truth.
-  { id: "version-parity", name: "one version, agreed everywhere", cmd: CHECK("check-version-parity") },
-  { id: "manifest-parity", name: "manifests and the install index agree", cmd: CHECK("check-manifest-parity") },
   { id: "trigger-paths", name: "every trigger resolves to a real script", cmd: CHECK("check-trigger-paths") },
 
   // The defect classes, asserted against the shipped script.
   { id: "shell-contract", name: "shipped shell obeys the defect-class rules", cmd: CHECK("check-shell-contract") },
   { id: "harness-contract", name: "the test harness can actually see failures", cmd: CHECK("check-harness-contract") },
-  { id: "parity-armed", name: "the parity gates can actually see failures", cmd: CHECK("check-parity-armed") },
 
   // Documentation that would otherwise drift away from the code.
   { id: "rules-not-restated", name: "everything shipped is a trigger, never a rule", cmd: CHECK("check-rules-not-restated") },
@@ -47,8 +46,6 @@ const GATES = [
   { id: "install-parity", name: "printed and rendered install steps agree", cmd: CHECK("check-install-parity") },
   { id: "tool-description", name: "every tool says what it actually is", cmd: CHECK("check-tool-description") },
   { id: "connection-coverage", name: "every tool has a way to reach the Brain", cmd: CHECK("check-connection-coverage") },
-  { id: "reminder-parity", name: "every tool gets a reminder it can actually read", cmd: CHECK("check-reminder-parity") },
-  { id: "reminder-cadence", name: "what a person is told they will see is what fires", cmd: CHECK("check-reminder-cadence") },
 
   // CI guarding itself.
   { id: "workflow-sha-pin", name: "every action is pinned to a commit", cmd: CHECK("check-workflow-sha-pin") },
