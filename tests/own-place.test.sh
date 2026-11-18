@@ -8,7 +8,7 @@
 set -u
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-SUBJECT="${DAZZER_OWN_PLACE_BIN:-$HERE/own-place.sh}"
+SUBJECT="${DAZZER_OWN_PLACE_BIN:-$HERE/../plugins/dazzer/scripts/own-place.sh}"
 SHELL_UNDER_TEST="${SHELL_UNDER_TEST:-sh}"
 
 ROOT="$(mktemp -d)"

@@ -4,8 +4,6 @@
  * as classes rather than instances. Four of the six defects were one habit - treating
  * a structured message as loose text and then trusting the result - so the rules below
  * describe the shape correct code has, not the specific bugs we happened to find.
- *
- * Each rule reports its own id so the ledger can hold them one at a time.
  */
 
 import { join } from "node:path";
@@ -181,10 +179,6 @@ runGate({
     for (const file of shippedScripts()) {
       const all = codeLines(read(file));
       for (const rule of RULES) rule.check(all, findings, rel(file));
-    }
-    // Let the ledger hold each class separately rather than the whole gate.
-    for (const id of new Set(findings.map((f) => f.id).filter(Boolean))) {
-      process.stdout.write(`FAILID shell-contract::${id}\n`);
     }
   },
 });

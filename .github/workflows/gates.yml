@@ -1,8 +1,9 @@
 # @purpose: Runs every check on every proposed change, so a defect in the one script that
 # executes on other people's machines cannot reach the branch people install from.
 #
-# No dependencies are installed: the checks are plain Node scripts and a shell suite, so
-# there is nothing to resolve, nothing to cache and no supply chain to trust.
+# The checks are plain Node scripts and shell suites. The one dependency is the Claude Code
+# that runs the plate pane's tests, pinned with its hash in package-lock.json and installed
+# with its install scripts off.
 
 name: Gates
 
@@ -31,8 +32,10 @@ jobs:
           node-version-file: .nvmrc
           package-manager-cache: false
 
-      # The whole suite, including the defect ledger. Green means "no regressions",
-      # not "nothing is wrong" - anything outstanding is printed by name.
+      - name: Install the pinned test runner
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      # Every check and every test in tests/.
       - name: All gates, under the system shell
         run: node scripts/baseline.mjs
 
@@ -63,4 +66,4 @@ jobs:
 
       - name: Shell lint
         if: ${{ !cancelled() }}
-        run: shellcheck -s sh plugins/dazzer/scripts/*.sh
+        run: shellcheck -s sh plugins/dazzer/scripts/*.sh tests/*.sh

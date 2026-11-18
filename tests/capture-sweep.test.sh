@@ -20,7 +20,7 @@
 set -u
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-SUBJECT="${DAZZER_SWEEP_BIN:-$HERE/capture-sweep.sh}"
+SUBJECT="${DAZZER_SWEEP_BIN:-$HERE/../plugins/dazzer/scripts/capture-sweep.sh}"
 SHELL_UNDER_TEST="${SHELL_UNDER_TEST:-sh}"
 
 ROOT="$(mktemp -d)"
@@ -167,7 +167,7 @@ UNMOVED="a-tool-we-have-not-met"
 # stop testing what they were chosen to test the moment somebody retunes the default - which
 # is exactly what happened: three cases sized against the old value went quiet, and the suite
 # would have called that a pass had two others not failed loudly beside them.
-DEFAULT_THRESHOLD="$(sed -n 's/^DAZZER_CAPTURE_THRESHOLD=//p' "$HERE/../config/capture.defaults" | head -1)"
+DEFAULT_THRESHOLD="$(sed -n 's/^DAZZER_CAPTURE_THRESHOLD=//p' "$HERE/../plugins/dazzer/config/capture.defaults" | head -1)"
 case "$DEFAULT_THRESHOLD" in '' | *[!0-9]*) printf 'cannot read the shipped threshold\n' >&2; exit 1 ;; esac
 
 BIG="$(transcript $((DEFAULT_THRESHOLD * 4)))"
