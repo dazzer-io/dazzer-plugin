@@ -310,7 +310,7 @@
   "installConnection": {
     "conditional": true,
     "askFirst": "Nothing — run it whether or not you already have Dazzer.",
-    "skipWhen": "Never. Running it again is how you get the current version.",
+    "skipWhen": "Never.",
     "warning": "You will be asked to sign in again afterwards. That is the point: installing does not sign you in, and the sign-in is what was missing.",
     "note": "Everything above adds the reminders. They do not reach your Brain by themselves, so a tool with the reminders and no connection has an AI being told to check something it cannot open. One line per tool below, in that tool's own wording.",
     "byTool": {
