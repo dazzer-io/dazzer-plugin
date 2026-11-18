@@ -1,135 +1,163 @@
 # How it works
 
-The plugin does one thing: at the right moment, it reminds your AI to use your Dazzer Brain. It
-holds no rules and no credentials. Your AI acts through the connection it already has, and reads
-the current rules from your Brain at the moment it acts. A change to the rules in your Brain
-therefore reaches you at once, with nothing to update.
+The plugins add short notes to what your AI reads at set points in a chat: when it starts, when you
+send a message, at the end of a reply, or after the chat is compacted. The notes say when to check
+your Dazzer Brain and when to save to it. Everything else happens through the connection your tool
+holds: your AI reads from your Brain and saves to it there.
+
+## Words used in these docs
+
+| Word | Meaning |
+| --- | --- |
+| Dazzer Brain | Your shared record, kept by Dazzer, of what you and your team know and decide. |
+| Connection | How your tool reaches your Brain, signed in as you. `dazzer-connect` adds one. |
+| Hook | A small command your tool runs at a set point in a chat. The plugins' hooks add the notes. |
+| Reminders | The notes the hooks add: check before answering, prompt to save, note after compaction. |
+| Prompt to save | The note asking your AI to save what was decided. It starts `Dazzer checkpoint`. |
+| Compaction | When your tool shortens a long chat to make room. Your AI can lose what it was told earlier. |
+| Saved progress | Where the work in a chat stands, which your AI saves to your Brain and restores after compaction. |
+| Plate | Your open items in your Brain: what needs you, what waits on others, what is coming up, what can wait. |
+| Skill | A short instruction file your tool loads when a request matches its description. `dazzer` ships one. |
+| Marketplace | The list of plugins in this repository that your tool installs from. Its name in your tool is `dazzer`. |
 
 ## The pieces
 
 | Piece | What it is | Who needs it |
 | --- | --- | --- |
-| `dazzer` | The reminders, the save prompt and a short skill. Carries no connection. | Everyone |
-| `dazzer-connect` | The connection to your Brain, at `https://graph.dazzer.io/mcp`, and nothing else. | Everyone |
-| `dazzer-antigravity` | The reminders in the one shape Antigravity accepts. | Antigravity only |
-| `dazzer-plate` | The plate pane. Reads through the connection you already have and brings none. | Claude Code only, optional |
+| `dazzer` | The reminders, the prompt to save and a skill. Carries no connection. | Everyone |
+| `dazzer-connect` | The connection to your Brain, at `https://graph.dazzer.io/mcp`, and nothing else. | Everyone, unless your AI already reaches your Brain another way |
+| `dazzer-antigravity` | The same reminders in Antigravity's format. | Antigravity only |
+| `dazzer-plate` | The plate pane. Reads through the connection you already have. | Claude Code only, optional |
 
-The reminders and the connection are separate on purpose: a bundled connection carries its own
-sign-in, and installing it replaced a working connection with one that was not signed in. The
-[decision record](decisions/0001-reminders-apart-from-the-connection.md) has the full story.
+The reminders and the connection are separate on purpose, so installing the reminders never touches
+a connection you already have. The
+[decision record](decisions/0001-reminders-apart-from-the-connection.md) explains why.
 
-## The three reminders
+## What reaches your AI
 
-| Reminder | What your AI is told | When it arrives |
-| --- | --- | --- |
-| Check first | Before answering anything your Brain may already know, recall it, and say so plainly if the Brain cannot be reached. | Once when a chat starts in Claude Code, Codex and Cursor; once per conversation in Copilot; with every message in Antigravity and Devin |
-| Save what settles | Something may have settled: save it, by the rule your Brain serves. If nothing was saved, say nothing. | With your next message, once enough new work has built up |
-| Pick up after a reset | This chat was compacted: restore your saved place before carrying on. | Right after a long chat is compacted |
+| Note | What your AI is told | Claude Code, Codex | Copilot | Cursor | Antigravity | Devin |
+| --- | --- | --- | --- | --- | --- | --- |
+| Check before answering | Look in your Brain before answering anything it may already know, and say so plainly if the Brain cannot be reached. | Start of each chat | Start of each conversation, from the instruction file | Start of each chat | Every message | Every message |
+| Prompt to save | Save what was decided; say nothing if nothing was. | With your next message | Does not arrive | End of a reply, as a message in your chat | End of a reply | Does not run |
+| After compaction | Restore your saved progress before carrying on, and before asking you to repeat anything. | Yes, with this chat's label | Does not arrive | None | None | Yes, without a label |
 
-Every reminder starts with `[Dazzer]` or `Dazzer checkpoint`, so you can tell it apart from your own
-words.
+Every note a hook adds starts with `[Dazzer]` or `Dazzer checkpoint`, so it cannot be mistaken for
+your own words. In Copilot the same sentence sits in the instruction file. The notes go to your AI model as part of the chat, like anything else in it.
 
-### Saving what settles
+The skill is a short file that tells your AI when to reach for your Brain and that Dazzer's
+instructions for using it, such as what is worth saving and how to record it, are read from the
+Brain itself. Neither the notes nor the skill carry those instructions: your AI reads the current
+ones from your Brain when it needs them, so Dazzer can change them without a plugin update.
 
-The plugin counts how much new conversation has built up since the last save. Past a threshold
-(250 entries by default, see [Settings](#settings)), your next message carries the save prompt.
-Your AI judges what is worth keeping against your Brain's own rules, saves it, and tells you in one
-line what it saved. If nothing settled, it says nothing.
+### The prompt to save
 
-The prompt rides with your next message rather than at the end of a reply. Said at the end of a
-reply, tools print it on your screen and the AI owes you another reply about it. Said with your
-next message, the same words reach the AI and nothing is drawn.
+The prompt is a backstop for when your AI has not saved on its own. Each time it could run, the
+plugin counts the lines in the record your tool keeps of the chat (in Claude Code, each message,
+tool call and tool result adds lines). Once 250 new lines have built up since the last prompt, the
+prompt goes out. In a busy chat that is roughly every six of your messages; in a quiet one, about
+every twenty. Your AI judges what is worth keeping, saves it, and tells you in one line what it
+saved. If nothing was decided, it says nothing.
 
-Two tools differ:
+In Claude Code and Codex the prompt rides with your next message, so nothing appears on screen.
+Cursor and Antigravity offer no such point, so there it goes at the end of a reply. In Cursor it
+appears in your chat as a message, as though you had typed it. To keep a prompt from answering
+itself in these two tools, the plugin leaves a one-time note on disk that the very next reply reads
+and deletes; the cost is that a genuine second reply straight after a prompt gets none. Devin tells
+a plugin nothing about how long the chat has grown, so there the prompt never runs.
 
-- **Cursor** offers no private moment, so the prompt is submitted as a visible message.
-- **Antigravity** never says whether a reply is the one the save prompt asked for, so the prompt
-  leaves itself a note that the very next end of reply reads once and clears. A save prompt can
-  therefore never answer itself. The cost is that a genuine second reply straight after a save is
-  skipped.
+### After compaction
 
-Devin gives a plugin no measure of how much conversation has built up, so there the save prompt
-stays quiet.
-
-### Picking up after a reset
-
-When a long chat is compacted, nothing reconnects and your AI loses what it was told. The plugin
-covers that moment: it tells your AI to restore its saved place before carrying on, and before
-asking you to repeat anything.
-
-Each chat gets its own place back. In Claude Code and Codex, the start of a chat, every reset and
-the save prompt all name the same label: the id your tool already gives that chat. Your AI saves
-under it and restores from it, so a restore never brings back another chat's work.
+Your AI saves its progress in a chat as it goes. After compaction it is told to restore that
+progress before carrying on. In Claude Code and Codex, the note at the start of the chat, the prompt
+to save and the note after compaction all carry the same label for the chat, made from the id your
+tool already gives it, so your AI saves under it and restores from it, never another chat's work.
+In Devin the note carries no label, so if several chats have saved progress your AI may be shown a
+list to choose from.
 
 ## Each tool in its own format
 
-Tools read plugin reminders in different formats, and most discard a whole file over one entry they
-do not recognise. So each tool reads reminders in its own format, with the same words:
+Tools read hooks in different formats, and most ignore a whole file over one entry they do not
+recognise. So each tool reads its own file, with the same words:
 
-- **Claude Code and Codex** share one reminders file.
+- **Claude Code and Codex** share one file.
 - **Cursor** and **Devin** each read a file of their own.
-- **Antigravity** looks for the same file name as Devin but wants a different shape inside it, so
-  its reminders ship as the separate `dazzer-antigravity` plugin.
-- **Copilot** runs a plugin's reminders but gives them no way to speak to the AI. The check-first
-  sentence goes in as a standing instruction file instead, which Copilot reads before every
-  conversation. It is a copy, so it needs copying again after each update.
-- **Claude's chat and web apps** have no moment at which anything can run. The plugin's skill
-  carries the same intent as plain text.
-
-The skill says when to reach for your Brain and where the rules are. It never says what they are.
-
-## Where the rules live
-
-In your Brain, served live, under these keys:
-
-- `brain.door.entrance`: the contract every AI starts from
-- `brain.capture.protocol`: when something is worth saving, and what to record
-- `brain.working.memory.contract`: keeping your place across a reset
-
-This repository holds triggers, not teaching.
+- **Antigravity** looks for the same file name as Devin but needs a different format inside it, so
+  its hooks ship as the separate `dazzer-antigravity` plugin.
+- **Copilot** runs a plugin's hooks but does not pass what they say to the AI. The check before
+  answering goes in as an instruction file instead, which you copy in during the install.
+- **Claude chats outside Claude Code** cannot run hooks.
 
 ## The plate pane
 
-Claude Code only, and optional. Type `/plate` to open it; nothing opens by itself. At the top: the
-day and one line of counts. Below: four tabs, **Needs you**, **Waiting**, **Coming up** and
-**Later**, each with its count.
+Claude Code only, and optional. Type `/plate` to open it; nothing opens or reads anything until you
+do. At the top: the day and one line of counts. Below: four tabs, **Needs you**, **Waiting**,
+**Coming up** and **Later**, each with its count.
 
-Each item is a card with a tag saying why it is there (for example `8 DAYS LATE` or `DUE SAT 10
-OCT`, with `(A GUESS)` where Dazzer is unsure), its title, what it is part of, who it is from and
-when it last moved. **Later** groups what can wait by what it belongs to: the 30 largest groups, then
-how many more. **Refresh** reads your plate again.
+Each item is a card. Its tag says why it is there, for example `8 DAYS LATE` or `DUE SAT 10 OCT`,
+with `(A GUESS)` when Dazzer read it from the item's own words and is not sure. Then
+its title, what it is part of, who it is from, and when it last moved. **Later** groups what can
+wait by what it belongs to: the 30 largest groups, then how many more. **Refresh** reads your plate
+again.
 
-A card's **Open** shows two buttons:
+**What it sends to Dazzer.** Through the connection Claude Code already has, and only to a server
+offering both of Dazzer's tools for reading your Brain (`recall`) and tracking work (`track`): the
+words `what is on my plate`, your computer's time zone, the label `plate-pane`, and a group's number
+when you open one in **Later**. Once open, it reads again when you press **Refresh** and after your
+AI changes an item. A read with no answer after 20 seconds says it could not reach Dazzer.
 
-- **Done** sends your AI one sentence with the item's number and nothing else, such as
-  `Mark item 7240 done.` Your AI marks it done, and the pane updates on the next plate it reads.
+**What it sends to your AI, as you.** Only when you press a button. A card's **Open** shows two:
+
+- **Done** sends one sentence with the item's number, such as `Mark item 7240 done.` Your AI marks it
+  done, and the pane updates on the next plate it reads.
 - **Talk about it** sends `Tell me about item 7240.`, once per item until the pane reads your plate
   again.
 
-An item's title never goes with either sentence: anyone in your workspace can write a title, and
-these sentences go as your own words.
+An item's title never goes with either sentence: other people who share your Brain can write
+titles, and these sentences go as your own words.
 
-**How it reads.** Through the connection Claude Code already has, and only from a server offering
-both of Dazzer's `recall` and `track`, so your words and time zone never go to any other server.
-With no such connection, the pane says Dazzer was not found and how to connect it. A read with no
-answer after 20 seconds says it could not reach Dazzer.
+**In auto mode**, where Claude Code decides which actions to allow without asking you, it may
+refuse the pane's own read. Then `/plate`, **Refresh** and opening a group in **Later** each send
+your AI one question as your message instead: `What is on my plate? My time zone is <your time
+zone>.`, or `Show my later items in plate group <the group's number>.` The pane draws what your AI
+reads, one question at a time.
 
-**In auto mode**, where Claude Code may refuse the pane's own read, `/plate`, Refresh and opening a
-later group each put one question to your AI instead, as your own words: `What is on my plate? My
-time zone is <your time zone>.`, or `Show my later items in plate group <its number>.` The pane
-draws what your AI reads. It asks one question at a time and waits for the answer.
+**What it keeps.** The last plate it read, and each group it opened, for that session only. Nothing
+goes to disk, and nothing is shared with another session or account.
 
-**What it keeps.** The last plate it read, and each later group it opened, for that session only.
-Nothing goes to disk, and nothing is shared with another session or account.
+## What leaves your machine
+
+- **The reminders and the prompt to save send nothing over the network.** They run on your
+  machine and only add notes to the chat.
+- **The connection** is how your tool talks to your Brain at `https://graph.dazzer.io/mcp`, signed
+  in as you. Each request carries two headers naming the plugin and its version,
+  `X-Dazzer-Distribution: plugin` and `X-Dazzer-Plugin-Version`. What your AI looks up and saves
+  travels this way.
+- **The plate pane** sends what is listed above, through the same connection.
+- **The notes themselves** reach your AI model's provider as part of the chat, like everything else
+  you send.
 
 ## What is stored on your machine
 
-- A run log, one line each time the plugin runs: when, what it decided and why. Never any of your
-  conversation. [Install, sign in and update](install.md#check-it-worked) shows how to read it.
-- A small marker per chat, so the save prompt never fires twice for the same work. A finished
-  chat's marker is tidied away after 30 days.
+The prompt to save keeps its files in a `capture` folder: in Claude Code,
+`~/.claude/plugins/data/dazzer-dazzer/capture/`; in a tool that gives the plugin no folder of its
+own, `~/.dazzer/capture/`. Which folder each other tool uses is not yet confirmed. In it:
 
-Both live under `${CLAUDE_PLUGIN_DATA:-$HOME/.dazzer}`.
+- **`receipts.jsonl`**, the run log: one line each time the prompt to save runs, with the time, the
+  tool, the plugin version, and what it decided and why. Never any of the chat. When it passes
+  262,144 bytes (256 KiB) it is renamed `receipts.jsonl.1`, replacing the previous one, and a new
+  log starts.
+- **One counter file per chat**, named after the chat's id, holding the line count at the last
+  prompt. Files untouched for 30 days are deleted the next time a prompt goes out.
+- **A one-time note per chat** in Cursor and Antigravity, deleted by the next reply.
+
+Elsewhere:
+
+- **The plugins themselves**, in your tool's own plugin folder, like any plugin.
+- **In Copilot**, the instruction file you copy in, at `~/.copilot/instructions/dazzer.instructions.md`.
+  It stays after you remove the plugins, until you delete it.
+- **In Antigravity**, the `dazzer-plugin` folder you downloaded.
+
+The sign-in to your Brain is held by your tool, not by the plugins.
 
 ## Settings
 
@@ -138,9 +166,9 @@ number never takes effect and never causes an error: the shipped default is used
 
 | Variable | Default | Effect |
 | --- | --- | --- |
-| `DAZZER_CAPTURE_THRESHOLD` | `250` | How much new conversation builds up before a save is prompted. Raise it for fewer prompts, lower it to save more eagerly. |
-| `DAZZER_CAPTURE_STATE_TTL_DAYS` | `30` | How long a finished chat's marker is kept before it is tidied away. |
-| `DAZZER_CAPTURE_RECEIPTS_MAX_BYTES` | `262144` | How large the run log may grow before the old one is set aside. |
-| `DAZZER_CAPTURE_MAX_INPUT_BYTES` | `100000` | A guard against an unreasonably large message, not a tuning dial. |
+| `DAZZER_CAPTURE_THRESHOLD` | `250` | How many new lines of the chat record build up before the prompt to save. Raise it for fewer prompts, lower it to save more eagerly. |
+| `DAZZER_CAPTURE_STATE_TTL_DAYS` | `30` | How many days an untouched counter file is kept before it is deleted. |
+| `DAZZER_CAPTURE_RECEIPTS_MAX_BYTES` | `262144` | How large the run log may grow, in bytes, before it is renamed and a new one started. |
+| `DAZZER_CAPTURE_MAX_INPUT_BYTES` | `100000` | The most the plugin reads of what your tool hands it at once. A guard, not a tuning dial. |
 | `DAZZER_TOOL` | works itself out | Which tool this is running inside, recorded in the run log. Set it only where the automatic answer is wrong. |
-| `DAZZER_MOMENT` | set by the plugin | Which moment the save prompt is running in. Not set by hand. |
+| `DAZZER_MOMENT` | set by the hook | Whether the prompt to save is running with your next message or at the end of a reply. The plugin's own hook sets it; leave it unset. |
