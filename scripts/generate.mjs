@@ -117,12 +117,19 @@ const CADENCE = {
   sessionStart: "once a session",
 };
 
-/** Each reminder file, the tools that read it, and the event its check-first sentence rides on. */
+/**
+ * Each reminder file, the tools that read it, the event its check-first sentence rides on, and the
+ * shape its host accepts: the top-level keys it may and must hold, and the moments it answers. Every
+ * host here drops a whole file over one key or moment it does not know: Codex refused this one over
+ * "version", Cursor refuses its own without one, and Claude Code once loaded none of this because
+ * its file carried other tools' moments.
+ */
 const REMINDER_FILES = [
   {
     path: "hooks/hooks.json",
     tools: ["claude-code", "codex"],
     recallOn: "SessionStart",
+    shape: { may: ["hooks"], must: ["hooks"], under: "hooks", moments: ["UserPromptSubmit", "SessionStart"] },
     doc: {
       hooks: {
         UserPromptSubmit: [
@@ -144,6 +151,7 @@ const REMINDER_FILES = [
     path: "hooks/cursor.json",
     tools: ["cursor"],
     recallOn: "sessionStart",
+    shape: { may: ["version", "hooks"], must: ["version", "hooks"], under: "hooks", moments: ["stop", "sessionStart"] },
     doc: {
       version: 1,
       hooks: {
@@ -156,6 +164,8 @@ const REMINDER_FILES = [
     path: "hooks.json",
     tools: ["devin"],
     recallOn: "UserPromptSubmit",
+    // No wrapper: every top-level key is a moment.
+    shape: { moments: ["UserPromptSubmit", "SessionStart"] },
     doc: {
       UserPromptSubmit: [{ hooks: [{ type: "command", command: plain(words.recall) }] }],
       SessionStart: [{ matcher: "compact", hooks: [{ type: "command", command: plain(words.resume) }] }],
@@ -167,6 +177,7 @@ const ANTIGRAVITY_FILE = {
   path: "hooks.json",
   tools: ["antigravity"],
   recallOn: "PreInvocation",
+  shape: { may: [reminders.name], must: [reminders.name], under: reminders.name, moments: ["PreInvocation", "Stop"] },
   doc: {
     [reminders.name]: {
       PreInvocation: [{ type: "command", command: reply({ injectSteps: [{ ephemeralMessage: words.recall }] }) }],
@@ -181,6 +192,12 @@ const COPILOT_CADENCE = "once a conversation";
 // --- every generated file -----------------------------------------------------------------------
 
 const files = new Map();
+/** The shape each generated JSON file's host accepts, for the checks below. */
+const shapes = new Map();
+const emit = (path, text, shape) => {
+  files.set(path, text);
+  if (shape !== undefined) shapes.set(path, shape);
+};
 const cadence = new Map([["copilot", COPILOT_CADENCE]]);
 /** The file each tool reads its reminders from, for the checks below. */
 const toolFile = new Map();
@@ -197,16 +214,23 @@ const base = (plugin) => ({
   keywords: plugin.keywords,
 });
 
-/** Each manifest format: where it is written and how it is laid out. */
+/** The manifest keys every format here is known to load with. */
+const BASE_KEYS = ["name", "displayName", "version", "description", "author", "homepage", "repository", "license", "keywords"];
+
+/**
+ * Each manifest format: where it is written, how it is laid out, and the keys it may hold. Only
+ * Cursor's may name a hooks file: Claude Code reads a named one as well as its own, which would
+ * hand it the file it must not see.
+ */
 const MANIFESTS = {
-  claude: { paths: [".claude-plugin/plugin.json"], inline: true },
-  cursor: { paths: [".cursor-plugin/plugin.json"], inline: false },
-  devin: { paths: [".devin-plugin/plugin.json"], inline: false },
+  claude: { paths: [".claude-plugin/plugin.json"], inline: true, may: [...BASE_KEYS, "types", "userConfig"] },
+  cursor: { paths: [".cursor-plugin/plugin.json"], inline: false, may: [...BASE_KEYS, "category", "hooks"] },
+  devin: { paths: [".devin-plugin/plugin.json"], inline: false, may: BASE_KEYS },
   // Antigravity reads plugin.json; the marketplace's own hosts read .claude-plugin/plugin.json.
-  antigravity: { paths: ["plugin.json", ".claude-plugin/plugin.json"], inline: false },
+  antigravity: { paths: ["plugin.json", ".claude-plugin/plugin.json"], inline: false, may: BASE_KEYS },
 };
 
-files.set(
+emit(
   ".claude-plugin/marketplace.json",
   json({
     name: manifest.marketplace,
@@ -217,6 +241,7 @@ files.set(
       description: plugin.listing,
     })),
   }),
+  { may: ["name", "owner", "plugins"], must: ["name", "owner", "plugins"], home: "." },
 );
 
 for (const plugin of manifest.plugins) {
@@ -225,12 +250,14 @@ for (const plugin of manifest.plugins) {
   for (const [format, extra] of Object.entries(plugin.manifests)) {
     const shape = MANIFESTS[format];
     if (shape === undefined) throw new Error(`${plugin.name}: no manifest format called "${format}"`);
-    for (const path of shape.paths) files.set(`${dir}/${path}`, json({ ...base(plugin), ...extra }, { inline: shape.inline }));
+    for (const path of shape.paths) {
+      emit(`${dir}/${path}`, json({ ...base(plugin), ...extra }, { inline: shape.inline }), { may: shape.may, must: ["name", "version"], home: dir });
+    }
   }
 
   const hookFiles = { reminders: REMINDER_FILES, "antigravity reminders": [ANTIGRAVITY_FILE] }[plugin.carries] ?? [];
   for (const file of hookFiles) {
-    files.set(`${dir}/${file.path}`, json(file.doc));
+    emit(`${dir}/${file.path}`, json(file.doc), file.shape && { ...file.shape, hooks: true, recallOn: file.recallOn });
     for (const tool of file.tools) {
       cadence.set(tool, CADENCE[file.recallOn]);
       toolFile.set(tool, `${dir}/${file.path}`);
@@ -245,7 +272,7 @@ for (const plugin of manifest.plugins) {
 
   if (plugin.carries === "connection") {
     const { name, url } = manifest.connection;
-    files.set(
+    emit(
       `${dir}/.mcp.json`,
       json({
         mcpServers: {
@@ -256,6 +283,7 @@ for (const plugin of manifest.plugins) {
           },
         },
       }),
+      { may: ["mcpServers"], must: ["mcpServers"] },
     );
   }
 }
@@ -328,47 +356,59 @@ const valuesIn = (node, key) =>
   node === null || typeof node !== "object" ? [] : [...(typeof node[key] === "string" ? [node[key]] : []), ...Object.values(node).flatMap((child) => valuesIn(child, key))];
 const stringsIn = (node) => (typeof node === "string" ? [node] : node !== null && typeof node === "object" ? Object.values(node).flatMap(stringsIn) : []);
 
-/**
- * The top-level keys each host accepts, and the moments each file is for one level down: Codex drops
- * a whole file over one key more, Cursor one with no "version", and Claude Code one moment it does
- * not know, which is how it once loaded none of this.
- */
-const HOST_KEYS = {
-  "plugins/dazzer/hooks/hooks.json": { may: ["hooks"], must: ["hooks"], under: "hooks", moments: ["UserPromptSubmit", "SessionStart"] },
-  "plugins/dazzer/hooks/cursor.json": { may: ["version", "hooks"], must: ["version", "hooks"], under: "hooks", moments: ["stop", "sessionStart"] },
-  "plugins/dazzer/hooks.json": { may: ["UserPromptSubmit", "SessionStart"], must: [] },
-  "plugins/dazzer-antigravity/hooks.json": { may: ["dazzer"], must: ["dazzer"], under: "dazzer", moments: ["PreInvocation", "Stop"] },
-  "plugins/dazzer-plate/hooks/hooks.json": { may: ["modules"], must: ["modules"] },
-};
-for (const [path, { may, must, under, moments = [] }] of Object.entries(HOST_KEYS)) {
+// The plate's hooks file is written by hand and checked like the generated ones: modules only.
+const PLATE = "plugins/dazzer-plate/hooks/hooks.json";
+shapes.set(PLATE, { may: ["modules"], must: ["modules"], hooks: true });
+const modules = parse(PLATE, textOf(PLATE) ?? "{}").modules;
+if (!Array.isArray(modules) || modules.length === 0 || !modules.every((m) => typeof m === "string" && existsSync(join(ROOT, dirname(PLATE), m)))) {
+  problems.push(`${PLATE} must list the plate's modules, each a file that is there`);
+}
+
+/** The moments capture-sweep.sh reads as a person's next message, by the event name the host sends. */
+const NEXT_MESSAGE = ["UserPromptSubmit"];
+const unmatched = (groups) => (Array.isArray(groups) ? groups.filter((group) => group?.matcher === undefined) : []);
+
+// Every JSON file the generator writes, and the plate's, holds only what its host accepts.
+for (const [path, text] of files) if (path.endsWith(".json") && path !== toolsPath && !shapes.has(path)) problems.push(`${path} has no list of the keys its host accepts`);
+for (const [path, shape] of shapes) {
   const text = textOf(path);
   if (text === undefined) {
     problems.push(`${path} is missing, and its host reads no other file`);
     continue;
   }
   const doc = parse(path, text);
-  for (const key of Object.keys(doc)) if (!may.includes(key)) problems.push(`${path} holds "${key}", which its host does not accept, so it drops the whole file`);
-  for (const key of must) if (!(key in doc)) problems.push(`${path} has no "${key}", which its host needs`);
-  for (const moment of under ? Object.keys(doc[under] ?? {}) : []) {
-    if (!moments.includes(moment)) problems.push(`${path} answers "${moment}", a moment this file is not for, and its host drops the whole file over one it does not know`);
+  const moments = (shape.under ? doc[shape.under] : doc) ?? {};
+  for (const key of Object.keys(doc)) if (!(shape.may ?? shape.moments ?? []).includes(key)) problems.push(`${path} holds "${key}", which its host does not accept`);
+  for (const key of shape.must ?? []) if (!(key in doc)) problems.push(`${path} has no "${key}", which its host needs`);
+  if (shape.under) for (const moment of Object.keys(moments)) if (!shape.moments.includes(moment)) problems.push(`${path} answers "${moment}", a moment this file is not for`);
+  // Every "./" a listing names is there.
+  for (const pointer of shape.home === undefined ? [] : stringsIn(doc).filter((s) => s.startsWith("./"))) {
+    if (!files.has(join(shape.home, pointer)) && !existsSync(join(ROOT, shape.home, pointer))) problems.push(`${path} points at ${pointer}, which is not there`);
   }
+  if (!shape.hooks) continue;
   for (const command of valuesIn(doc, "command")) {
     if (command.includes("/scripts/") || command.includes("[Dazzer] ")) continue;
     const said = Object.keys(words).find((key) => typeof words[key] === "string" && command.includes(words[key]));
     problems.push(`${path} speaks ${said ? `the "${said}" sentence` : command.slice(0, 60)} without the [Dazzer] mark`);
   }
-}
-const plate = "plugins/dazzer-plate/hooks/hooks.json";
-const modules = parse(plate, textOf(plate) ?? "{}").modules;
-if (!Array.isArray(modules) || modules.length === 0 || !modules.every((m) => typeof m === "string" && existsSync(join(ROOT, dirname(plate), m)))) {
-  problems.push(`${plate} must list the plate's modules, each a file that is there`);
+  // The check-first sentence rides the moment recallOn names, since its cadence is read from there.
+  if (shape.recallOn && !valuesIn(unmatched(moments[shape.recallOn]), "command").some((c) => c.includes(words.recall))) {
+    problems.push(`${path} does not speak the check-first sentence at ${shape.recallOn}, where its recallOn says it rides`);
+  }
+  // A checkpoint at the next message names the chat's thread, and only own-place.sh tells the model
+  // that thread: at the start of a chat, in the group with no matcher, which also runs after a reset.
+  const nextMessage = Object.entries(moments).some(([moment, groups]) =>
+    valuesIn(groups, "command").some((c) => /\bcapture-sweep\.sh\b/.test(c) && (NEXT_MESSAGE.includes(moment) || /DAZZER_MOMENT=["']?with-next-message/.test(c))),
+  );
+  const start = Object.entries(moments).find(([moment]) => moment.toLowerCase() === "sessionstart")?.[1];
+  if (nextMessage && !valuesIn(unmatched(start), "command").some((c) => /\bown-place\.sh\b/.test(c))) problems.push(`${path} names the chat's thread at each checkpoint and never runs own-place.sh when a chat starts`);
 }
 
 // Each tool's file carries exactly the reminders tools.manifest.json says arrive there.
 const CARRIES = {
   recall: (text) => text.includes(words.recall),
   resume: (text) => text.includes(words.resume),
-  capture: (text) => text.includes("/scripts/capture-sweep.sh"),
+  capture: (text) => /\bcapture-sweep\.sh\b/.test(text),
 };
 for (const tool of tools.tools) {
   if (typeof tool.describedAs !== "string" || tool.describedAs.trim() === "") problems.push(`${toolsPath}: ${tool.id} has no describedAs, so a screen naming it cannot say what it is`);
@@ -378,25 +418,6 @@ for (const tool of tools.tools) {
   for (const [id, carries] of Object.entries(CARRIES)) {
     const promised = ["works", "works-but-visible"].includes(tool.reminders?.[id]);
     if (promised !== carries(text)) problems.push(`${path ?? tool.id}: ${toolsPath} says ${tool.id}'s ${id} reminder is "${tool.reminders?.[id]}", and the file ${promised ? "does not carry it" : "carries it"}`);
-  }
-}
-
-for (const [path, text] of files) {
-  // The checkpoint sent with a person's next message names the chat's thread, and only
-  // own-place.sh tells the model that thread: in the start-of-chat group, which also runs after a reset.
-  if (text.includes("DAZZER_MOMENT=with-next-message")) {
-    const opening = parse(path, text).hooks?.SessionStart?.find((group) => group.matcher === undefined);
-    if (!valuesIn(opening, "command").some((c) => c.includes("/scripts/own-place.sh"))) problems.push(`${path} names the chat's thread at each checkpoint and never runs own-place.sh when a chat starts`);
-  }
-  // Every "./" a listing names is there, and only Cursor's names a hooks file: Claude Code reads a
-  // named one as well as its own, which would hand it the file it must not see.
-  if (/(^|\/)(plugin|marketplace)\.json$/.test(path)) {
-    const doc = parse(path, text);
-    const home = path.startsWith("plugins/") ? path.split("/").slice(0, 2).join("/") : ".";
-    for (const pointer of stringsIn(doc).filter((s) => s.startsWith("./"))) {
-      if (!files.has(join(home, pointer)) && !existsSync(join(ROOT, home, pointer))) problems.push(`${path} points at ${pointer}, which is not there`);
-    }
-    if ("hooks" in doc && !path.includes("/.cursor-plugin/")) problems.push(`${path} names a hooks file, which only Cursor's listing may`);
   }
 }
 
