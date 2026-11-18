@@ -83,9 +83,11 @@ function commandsDeclared(manifest, findings) {
     collect(step.steps ?? [step], `keepCurrent.${id}`);
   }
 
-  // The plate pane's install line and the run-log command are on the page as well.
+  // The plate pane's install line is on the page as well, and so is each tool's run-log command:
+  // every tool keeps its run log in its own folder, so one command for all of them reads the wrong
+  // one for most.
   collect(manifest.panel?.steps, "panel");
-  if (typeof manifest.verify?.command === "string") collect([{ kind: "run", command: manifest.verify.command }], "verify");
+  for (const tool of manifest.tools ?? []) collect(tool?.runLog ? [tool.runLog] : [], `tools.${tool?.id ?? "?"}.runLog`);
 
   return out;
 }
@@ -131,9 +133,18 @@ runGate({
       }
     }
 
+    if (typeof manifest.verify?.command === "string") {
+      findings.push({ file: rel(MANIFEST), message: "verify.command is one run-log command for every tool; each tool keeps its own, under runLog" });
+    }
+
     // A tool that a screen would offer with nothing to do.
     for (const tool of manifest.tools ?? []) {
       if (tool?.status !== "supported") continue;
+      // Its run log: a command to read it, or none and why.
+      const log = tool?.runLog;
+      if (!(log?.kind === "run" || (log?.kind === "none" && typeof log.note === "string" && log.note.length > 0))) {
+        findings.push({ file: rel(MANIFEST), message: `"${tool.id}" gives no runLog: a command that reads its run log, or kind "none" with the reason` });
+      }
       const steps = tool?.installReminders?.steps ?? [];
       if (steps.length === 0) {
         findings.push({
