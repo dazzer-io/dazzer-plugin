@@ -45,7 +45,7 @@
   "verify": {
     "what": "One line written every time the plugin runs, recording when, what it decided and why — never any of your conversation.",
     "path": "${CLAUDE_PLUGIN_DATA:-$HOME/.dazzer}/capture/receipts.jsonl",
-    "command": "cat \"${CLAUDE_PLUGIN_DATA:-$HOME/.dazzer}/capture/receipts.jsonl\" | tail",
+    "command": "tail ~/.claude/plugins/data/dazzer-dazzer/capture/receipts.jsonl",
     "emptyMeans": "The plugin has never run — worth knowing, because that failure is otherwise completely silent."
   },
   "tools": [
