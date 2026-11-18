@@ -13,7 +13,7 @@
     {
       "name": "dazzer-connect",
       "source": "./plugins/dazzer-connect",
-      "description": "The Dazzer Brain connection itself, for people who have not already connected one. Skip this if Dazzer already shows as connected."
+      "description": "The Dazzer Brain connection itself. Install it even if Dazzer already shows as connected: installing it again is how you get the current version."
     },
     {
       "name": "dazzer-antigravity",

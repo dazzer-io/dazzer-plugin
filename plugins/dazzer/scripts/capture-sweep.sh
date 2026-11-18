@@ -30,7 +30,7 @@
 # silence saving for a whole session. Anything that becomes a filename is flattened first,
 # because a session name containing "../" used to write outside the folder we own.
 #
-# Tuning lives in config/capture.defaults, documented in the README. Environment wins.
+# Tuning lives in config/capture.defaults, documented in docs/how-it-works.md. Environment wins.
 set +eu
 
 # --- settings ----------------------------------------------------------------

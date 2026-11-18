@@ -32,8 +32,8 @@
     {
       "name": "dazzer-connect",
       "displayName": "Dazzer Connect",
-      "description": "The Dazzer Brain connection, for people who have not already connected one. Skip this if Dazzer already shows as connected.",
-      "listing": "The Dazzer Brain connection itself, for people who have not already connected one. Skip this if Dazzer already shows as connected.",
+      "description": "The Dazzer Brain connection. Install it alongside the reminders, even if Dazzer already shows as connected: installing it again is how you get the current version.",
+      "listing": "The Dazzer Brain connection itself. Install it even if Dazzer already shows as connected: installing it again is how you get the current version.",
       "keywords": ["memory", "knowledge", "brain", "mcp"],
       "carries": "connection",
       "manifests": {
