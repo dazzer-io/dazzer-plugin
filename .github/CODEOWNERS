@@ -1,0 +1,9 @@
+# What runs on a user's machine or in CI is reviewed by its owner: hook files, executables, the
+# connection, every script (the shipped ones under plugins/*/scripts/ included) and the workflows.
+hooks/ @ben-dazzer
+hooks.json @ben-dazzer
+bin/ @ben-dazzer
+.mcp.json @ben-dazzer
+scripts/ @ben-dazzer
+/.github/workflows/ @ben-dazzer
+/.github/CODEOWNERS @ben-dazzer

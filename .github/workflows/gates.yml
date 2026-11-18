@@ -16,16 +16,20 @@ concurrency:
   group: gates-${{ github.ref }}
   cancel-in-progress: true
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
   gates:
     name: Gates
+    # GitHub's machine: a public repository's jobs never run on our own machines.
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
@@ -42,7 +46,7 @@ jobs:
       # The script ships as plain POSIX shell and runs under whatever the person's system
       # shell happens to be. On a Mac that is bash in posix mode; here it is dash. They
       # disagree on the numeric comparison one of the defects lives on, so proving it under
-      # one says nothing about the other. Same ledger, so this is a real gate, not a smoke test.
+      # one says nothing about the other.
       - name: All gates, under bash
         if: ${{ !cancelled() }}
         env:
@@ -67,3 +71,21 @@ jobs:
       - name: Shell lint
         if: ${{ !cancelled() }}
         run: shellcheck -s sh plugins/dazzer/scripts/*.sh tests/*.sh
+
+  # Audits every workflow. Its default policy refuses any action not pinned by its full commit.
+  zizmor:
+    name: Workflow audit
+    # GitHub's machine: a public repository's jobs never run on our own machines.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: zizmorcore/zizmor-action@45d7276c9ca790aabd705e31ca99c6185c3e76dd # v0.8.1
+        with:
+          advanced-security: false
+          annotations: true
