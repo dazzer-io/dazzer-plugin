@@ -27,6 +27,10 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
+    # The test runner is a whole Claude Code: kept from updating itself or reporting home.
+    env:
+      CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
+      DISABLE_AUTOUPDATER: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -47,12 +51,13 @@ jobs:
       # The script ships as plain POSIX shell and runs under whatever the person's system
       # shell happens to be. On a Mac that is bash in posix mode; here it is dash. They
       # disagree on the numeric comparison one of the defects lives on, so proving it under
-      # one says nothing about the other.
-      - name: All gates, under bash
+      # one says nothing about the other. Only the shell suites run again: nothing else
+      # depends on the shell.
+      - name: The shell suites again, under bash
         if: ${{ !cancelled() }}
         env:
           SHELL_UNDER_TEST: bash
-        run: node scripts/baseline.mjs
+        run: node scripts/baseline.mjs --shell-suites
 
       # Asserted, not assumed: the previous suite named its shell internally, so two runs
       # would have reported two passes from one interpreter.
