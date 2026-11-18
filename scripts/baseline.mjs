@@ -35,8 +35,10 @@ const SHELL_ONLY = process.argv.includes("--shell-suites");
 const MAX_OUTPUT = 64 * 1024 * 1024;
 
 const GATES = [
-  // Every per-tool file is written from source/ by scripts/generate.mjs.
+  // Every per-tool file is written from source/ by scripts/generate.mjs, and each of its checks is
+  // seen refusing a planted fault on every run.
   { id: "generated", name: "every per-tool file matches the generator", cmd: "node", args: ["scripts/generate.mjs", "--check"] },
+  { id: "generated-selftest", name: "every generator check refuses its planted fault", cmd: "node", args: ["scripts/generate.mjs", "--selftest"] },
 
   // The two constraints that exist because something broke in the field.
   { id: "connection-isolation", name: "behaviour plugin ships no connection", ...CHECK("check-connection-isolation") },

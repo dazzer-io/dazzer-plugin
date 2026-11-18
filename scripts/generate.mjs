@@ -5,6 +5,7 @@
  *
  *   node scripts/generate.mjs           write every generated file
  *   node scripts/generate.mjs --check   write nothing; exit 1 naming each file that differs
+ *   node scripts/generate.mjs --selftest  plant one fault per check in a copy; exit 1 unless each is refused
  *
  * Either way it also fails on a file under plugins/ that nobody writes, and on generated files that
  * break what a host needs: the reminders tools.manifest.json promises each tool, the keys each host
@@ -30,12 +31,79 @@
  * no byte: the Claude manifests write short lists on one line, the other formats one item a line.
  */
 
-import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(process.env.DAZZER_REPO_ROOT ?? join(dirname(fileURLToPath(import.meta.url)), ".."));
 const readJson = (path) => JSON.parse(readFileSync(join(ROOT, path), "utf8"));
+
+// --- --selftest: every check below can still fail -----------------------------------------------
+// A check that passes by finding nothing can go blind and stay green. Each plant below breaks one
+// check in a copy of this tree; the run fails unless each is refused with its own words and the
+// untouched copy passes. A plant that no longer applies fails too, rather than proving nothing.
+
+/** Replaces the one place `from` occurs; null when it occurs more often or not at all. */
+const swap = (from, to) => (text) => (text?.split(from).length === 2 ? text.replace(from, () => to) : null);
+const OWN_PLACE = '\n              { type: "command", command: script("own-place.sh") },';
+const PLANTS = [
+  // [the fault, the file it is planted in, the edit (or the whole new file), words the refusal must carry]
+  ["a hook file nobody writes", "plugins/dazzer/hooks/quillpad.json", "{}\n", "quillpad.json is not written by the generator"],
+  ["own-place.sh dropped", "scripts/generate.mjs", swap(OWN_PLACE, ""), "never runs own-place.sh"],
+  ["own-place.sh dropped where the checkpoint is not told its moment", "scripts/generate.mjs", (text) => swap(OWN_PLACE, "")(swap('\n          { hooks: [{ type: "command", command: `DAZZER_MOMENT=with-next-message ', '\n          { hooks: [{ type: "command", command: `')(text)), "never runs own-place.sh"],
+  ["a reminders file with no shape", "scripts/generate.mjs", swap("\n  shape: { may: [reminders.name]", "\n  unshaped: { may: [reminders.name]"), "dazzer-antigravity/hooks.json has no list of the keys its host accepts"],
+  ["a key the Codex file may not hold", "scripts/generate.mjs", swap("\n    doc: {\n      hooks: {\n        UserPromptSubmit", "\n    doc: {\n      version: 1,\n      hooks: {\n        UserPromptSubmit"), 'hooks/hooks.json holds "version"'],
+  ["a key a listing may not hold, through source/", "source/manifest.json", swap('"types": "./types/index.d.ts",', '"types": "./types/index.d.ts", "hooks": "./hooks/hooks.json",'), 'plugin.json holds "hooks"'],
+  ["a moment the file is not for", "scripts/generate.mjs", swap("\n      Stop: [{ type", "\n      Quit: [{ type"), 'answers "Quit"'],
+  ["a sentence without the mark", "source/words.json", swap('"resume": "[Dazzer] ', '"resume": "'), '"resume" sentence without the [Dazzer] mark'],
+  ["the check-first sentence off its moment", "scripts/generate.mjs", swap('\n    recallOn: "UserPromptSubmit",', '\n    recallOn: "SessionStart",'), "does not speak the check-first sentence at SessionStart"],
+  ["a reminder promised and not carried", "tools.manifest.json", swap('"capture": "works-but-visible",\n        "resume": "not-delivered"', '"capture": "works-but-visible",\n        "resume": "works"'), `cursor's resume reminder is "works", and the file does not carry it`],
+  ["a tool with no describedAs", "tools.manifest.json", swap('"describedAs": "Cognition’s coding agent",', ""), "devin has no describedAs"],
+  ["a listing path that is not there", "source/manifest.json", swap('"./hooks/cursor.json"', '"./hooks/cursr.json"'), "points at ./hooks/cursr.json"],
+  ["the plate's hooks file holds more than modules", "plugins/dazzer-plate/hooks/hooks.json", '{ "modules": ["./plate.tsx"], "SessionStart": [] }\n', 'dazzer-plate/hooks/hooks.json holds "SessionStart"'],
+  ["the plate's module is not there", "plugins/dazzer-plate/hooks/hooks.json", swap("./plate.tsx", "./plates.tsx"), "must list the plate's modules"],
+  ["a plugin name that leaves plugins/", "source/manifest.json", swap('"name": "dazzer-plate"', '"name": "../plate"'), 'plugin name "../plate"'],
+  ["a version the release step would not tag", "source/manifest.json", (text) => text.replace(/"version": "[^"]*"/, '"version": "1.2"'), 'version "1.2" must be three whole numbers'],
+];
+if (process.argv.includes("--selftest")) {
+  const scratch = mkdtempSync(join(tmpdir(), "dazzer-generate-selftest-"));
+  const failures = [];
+  let copies = 0;
+  const run = (name, plant) => {
+    const copy = join(scratch, String((copies += 1)));
+    for (const part of ["source", "scripts", "plugins", ".claude-plugin", "tools.manifest.json"]) cpSync(join(ROOT, part), join(copy, part), { recursive: true });
+    if (plant) {
+      const [file, edit] = plant;
+      const before = existsSync(join(copy, file)) ? readFileSync(join(copy, file), "utf8") : undefined;
+      const after = typeof edit === "function" ? edit(before ?? "") : edit;
+      if (after === null || after === before) return `${name}: the plant no longer applies to ${file}, so it proves nothing`;
+      writeFileSync(join(copy, file), after);
+    }
+    const result = spawnSync(process.execPath, [join(copy, "scripts", "generate.mjs"), "--check"], { encoding: "utf8", env: { ...process.env, DAZZER_REPO_ROOT: copy } });
+    return { said: `${result.stdout}${result.stderr}`, status: result.status };
+  };
+  try {
+    const clean = run("the untouched copy");
+    if (clean.status !== 0) failures.push(`the untouched copy fails the check:\n${clean.said}`);
+    for (const [name, file, edit, expect] of PLANTS) {
+      const result = run(name, [file, edit]);
+      if (typeof result === "string") failures.push(result);
+      else if (result.status === 0) failures.push(`${name}: planted in ${file}, and the check passed`);
+      else if (!result.said.includes(expect)) failures.push(`${name}: refused, but not with "${expect}":\n${result.said}`);
+      else process.stdout.write(`ok   refused: ${name}\n`);
+    }
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+  if (failures.length > 0) {
+    process.stdout.write(`FAIL generator selftest\n${failures.map((line) => `  ${line}`).join("\n")}\n`);
+    process.exit(1);
+  }
+  process.stdout.write(`ok   generator selftest (${PLANTS.length} faults refused, the untouched copy passes)\n`);
+  process.exit(0);
+}
 
 const manifest = readJson("source/manifest.json");
 const words = readJson("source/words.json");
