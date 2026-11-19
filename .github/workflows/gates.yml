@@ -35,6 +35,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # Every ref, so the leak check below reads the whole history it scans refs against.
+          fetch-depth: 0
 
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
@@ -91,3 +93,10 @@ jobs:
           version: 1.32.0
           advanced-security: false
           annotations: true
+
+      # Reads every tracked file and the tip of every branch, tag and pull request ref for private
+      # names, held only as one-way hashes, and refuses a change that adds one. Last, because it
+      # sets up its own Node. It needs only the contents: read this job already grants.
+      - name: Leak check
+        if: ${{ !cancelled() }}
+        uses: dazzer-io/.github/leak-check@22e60ff85082ee719764f901b114494332428610 # PR 50
