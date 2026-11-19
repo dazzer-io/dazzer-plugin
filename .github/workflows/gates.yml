@@ -94,9 +94,30 @@ jobs:
           advanced-security: false
           annotations: true
 
+      # Lints every workflow with actionlint, the organisation's own: scripts/actionlint.mjs of the
+      # shared dazzer-io/.github, checked out at the same full commit as the leak check below. It
+      # runs one pinned actionlint release, refused unless its SHA-256 matches. The checkout lands
+      # in a folder of its own, removed once the lint has read the workflows.
+      - name: Check out the shared workflow lint
+        if: ${{ !cancelled() }}
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: dazzer-io/.github
+          ref: e3a419d50cd4dc87adfd75ba6ee823232f4aa8f3
+          path: .shared-lint
+          persist-credentials: false
+
+      - name: Workflow lint
+        if: ${{ !cancelled() }}
+        run: |
+          status=0
+          node .shared-lint/scripts/actionlint.mjs .github/workflows/*.yml || status=$?
+          rm -rf .shared-lint
+          exit "$status"
+
       # Reads every tracked file and the tip of every branch, tag and pull request ref for private
       # names, held only as one-way hashes, and refuses a change that adds one. Last, because it
       # sets up its own Node. It needs only the contents: read this job already grants.
       - name: Leak check
         if: ${{ !cancelled() }}
-        uses: dazzer-io/.github/leak-check@22e60ff85082ee719764f901b114494332428610 # PR 50
+        uses: dazzer-io/.github/leak-check@e3a419d50cd4dc87adfd75ba6ee823232f4aa8f3 # dazzer-io/.github main, 19 Nov 2026
