@@ -54,6 +54,9 @@ const GATES = [
   { id: "docs-truth", name: "settings and removal steps match the code", ...CHECK("check-docs-truth") },
   { id: "install-parity", name: "printed and rendered install steps agree", ...CHECK("check-install-parity") },
   { id: "connection-coverage", name: "every tool has a way to reach the Brain", ...CHECK("check-connection-coverage") },
+
+  // What a stranger can read: Gates runs the shared leak check, pinned, on every change.
+  { id: "leak-gate", name: "Gates runs the pinned leak check", ...CHECK("check-leak-gate") },
 ];
 
 /** The suites that must be there: found tests that vanish would otherwise just stop running. */
