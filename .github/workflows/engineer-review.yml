@@ -1,6 +1,7 @@
 # @purpose: Asks the organisation's shared engineer review to read every pull request.
 #
-# The call is pinned to one commit of the shared workflow, and its job hands the review only the
+# The call is pinned to one commit of the shared workflow, the same commit Gates' leak check and
+# workflow lint name (scripts/checks/check-leak-gate.mjs holds it), and its job hands the review only the
 # three grants it uses: reading the code, setting a commit status and reading the pull request.
 # The workflow's own token grants nothing.
 
@@ -21,7 +22,7 @@ permissions: {}
 
 jobs:
   engineer-review:
-    uses: dazzer-io/.github/.github/workflows/engineer-review.yml@d55b0f394ef10806897274710cdb7ffa3017161e # dazzer-io/.github main, 15 Nov 2026
+    uses: dazzer-io/.github/.github/workflows/engineer-review.yml@e3a419d50cd4dc87adfd75ba6ee823232f4aa8f3 # dazzer-io/.github main, 19 Nov 2026
     permissions:
       contents: read
       statuses: write
