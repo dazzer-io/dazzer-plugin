@@ -132,7 +132,12 @@ runGate({
 
     // Dependabot: the shared .github is re-pinned by hand, never offered as an update.
     const botPath = join(REPO_ROOT, DEPENDABOT);
-    const ignored = exists(botPath) && lines(read(botPath)).some((l) => new RegExp(`^\\s*-?\\s*dependency-name:\\s*["']?${SHARED.replace(/[./]/g, "\\$&")}["']?\\s*(#.*)?$`).test(l.text));
+    const ignoredName = (text) => {
+      const body = text.trim().replace(/^-\s*/, "");
+      if (!body.startsWith("dependency-name:")) return "";
+      return body.slice("dependency-name:".length).replace(/\s+#.*$/, "").trim().replace(/^["']|["']$/g, "");
+    };
+    const ignored = exists(botPath) && lines(read(botPath)).some((l) => ignoredName(l.text) === SHARED);
     if (!ignored) {
       findings.push({ file: DEPENDABOT, message: `Dependabot still offers the shared .github pin: ${DEPENDABOT} has no ignore for ${SHARED}, so its first newer commit fails Gates and holds back the group` });
     }
