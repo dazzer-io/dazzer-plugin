@@ -12,6 +12,8 @@
  * the leak check step, the workflow lint Gates runs (that repository's scripts/actionlint.mjs,
  * checked out at the same commit) and the engineer review in engineer-review.yml. A commit of any
  * other history is refused, so a re-pin moves PIN and the three places in the same change.
+ * Dependabot must not offer that repository's commits, since a bump of one pin alone fails Gates and
+ * holds back the rest of its group: .github/dependabot.yml ignores it.
  */
 
 import { join } from "node:path";
@@ -19,6 +21,7 @@ import { REPO_ROOT, exists, lines, read, runGate } from "./lib/gate.mjs";
 
 const WORKFLOW = ".github/workflows/gates.yml";
 const REVIEW = ".github/workflows/engineer-review.yml";
+const DEPENDABOT = ".github/dependabot.yml";
 const SHARED = "dazzer-io/.github";
 const ACTION = `${SHARED}/leak-check`;
 const REVIEW_CALL = `${SHARED}/.github/workflows/engineer-review.yml`;
@@ -53,7 +56,7 @@ function stepsOf(block) {
 runGate({
   id: "leak-gate",
   purpose: "Gates runs the shared leak check and workflow lint, pinned, on every change, and the engineer review is pinned to the same commit.",
-  rule: `Gates calls ${ACTION}@${PIN} after a checkout that fetches every ref, granting only contents: read, and runs ${SHARED}'s actionlint at ${PIN}; ${REVIEW} calls ${REVIEW_CALL}@${PIN}`,
+  rule: `dependabot.yml ignores ${SHARED}; Gates calls ${ACTION}@${PIN} after a checkout that fetches every ref, granting only contents: read, and runs ${SHARED}'s actionlint at ${PIN}; ${REVIEW} calls ${REVIEW_CALL}@${PIN}`,
   assert(findings) {
     const path = join(REPO_ROOT, WORKFLOW);
     if (!exists(path)) {
@@ -125,6 +128,13 @@ runGate({
     if (perm >= 0) for (const l of job.slice(perm + 1)) { if (!/^ {6}\S/.test(l.text)) break; grants.push(l.text.trim()); }
     if (grants.join(",") !== "contents: read") {
       findings.push({ file: WORKFLOW, message: `the gates job grants "${grants.join(", ") || "nothing named"}"; the leak check needs contents: read and nothing more` });
+    }
+
+    // Dependabot: the shared .github is re-pinned by hand, never offered as an update.
+    const botPath = join(REPO_ROOT, DEPENDABOT);
+    const ignored = exists(botPath) && lines(read(botPath)).some((l) => new RegExp(`^\\s*-?\\s*dependency-name:\\s*["']?${SHARED.replace(/[./]/g, "\\$&")}["']?\\s*(#.*)?$`).test(l.text));
+    if (!ignored) {
+      findings.push({ file: DEPENDABOT, message: `Dependabot still offers the shared .github pin: ${DEPENDABOT} has no ignore for ${SHARED}, so its first newer commit fails Gates and holds back the group` });
     }
 
     // The engineer review: the shared reusable workflow, called at PIN.
