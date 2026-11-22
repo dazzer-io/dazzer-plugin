@@ -11,6 +11,9 @@ updates:
     groups:
       actions:
         patterns: ["*"]
+    # The shared dazzer-io/.github is re-pinned by hand: its pin and the checkout ref move together.
+    ignore:
+      - dependency-name: "dazzer-io/.github"
 
   # The Claude Code that runs the plate pane's tests. Nothing in it installs with a plugin.
   - package-ecosystem: npm
